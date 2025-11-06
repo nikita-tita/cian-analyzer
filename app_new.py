@@ -17,7 +17,10 @@ from src.models.property import (
     AnalysisRequest
 )
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -25,6 +28,14 @@ app.secret_key = os.urandom(24)
 
 # Хранилище сессий (в production использовать Redis)
 sessions_storage = {}
+
+# Логируем запуск приложения
+logger.info("=" * 60)
+logger.info("🚀 Cian Analyzer v2.0 - Railway Deployment")
+logger.info("=" * 60)
+logger.info(f"📊 Parser: SimpleParser (Railway-optimized)")
+logger.info(f"📊 Cache: In-memory (sessions_storage)")
+logger.info("=" * 60)
 
 
 @app.route('/')
@@ -76,6 +87,9 @@ def parse_url():
             'step': 1
         }
 
+        logger.info(f"✅ Сессия создана: {session_id}")
+        logger.info(f"📊 Всего активных сессий: {len(sessions_storage)}")
+
         return jsonify({
             'status': 'success',
             'data': parsed_data,
@@ -117,12 +131,32 @@ def update_target():
         session_id = payload.get('session_id')
         data = payload.get('data')
 
-        if not session_id or session_id not in sessions_storage:
-            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+        logger.info(f"📝 Запрос на обновление сессии: {session_id}")
+        logger.info(f"📊 Доступные сессии: {list(sessions_storage.keys())}")
+        logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
+
+        if not session_id:
+            logger.error("❌ Session ID не предоставлен")
+            return jsonify({'status': 'error', 'message': 'Session ID обязателен'}), 400
+
+        if session_id not in sessions_storage:
+            logger.error(f"❌ Сессия {session_id} не найдена в хранилище")
+            logger.error(f"📊 Существующие сессии: {list(sessions_storage.keys())}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Сессия не найдена. Возможно приложение перезапустилось. Попробуйте спарсить объект заново.',
+                'debug': {
+                    'requested_session': session_id,
+                    'available_sessions': list(sessions_storage.keys()),
+                    'total_sessions': len(sessions_storage)
+                }
+            }), 404
 
         # Обновляем данные
         sessions_storage[session_id]['target_property'].update(data)
         sessions_storage[session_id]['step'] = 2
+
+        logger.info(f"✅ Сессия {session_id} обновлена, переход на шаг 2")
 
         return jsonify({
             'status': 'success',
@@ -163,12 +197,19 @@ def find_similar():
         limit = payload.get('limit', 20)
         search_type = payload.get('search_type', 'building')  # По умолчанию ищем в ЖК
 
+        logger.info(f"🔍 Запрос на поиск аналогов для сессии: {session_id}")
+        logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
+
         if not session_id or session_id not in sessions_storage:
-            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+            logger.error(f"❌ Сессия {session_id} не найдена при поиске аналогов")
+            return jsonify({
+                'status': 'error',
+                'message': 'Сессия не найдена. Попробуйте спарсить объект заново.'
+            }), 404
 
         target = sessions_storage[session_id]['target_property']
 
-        logger.info(f"Поиск похожих объектов для сессии {session_id} (тип: {search_type})")
+        logger.info(f"✅ Поиск похожих объектов для сессии {session_id} (тип: {search_type})")
 
         # Поиск аналогов
         with SimpleParser(headless=True, delay=1.0) as parser:
@@ -183,6 +224,8 @@ def find_similar():
 
         # Сохраняем в сессию
         sessions_storage[session_id]['comparables'] = similar
+
+        logger.info(f"✅ Найдено {len(similar)} аналогов для сессии {session_id}")
 
         return jsonify({
             'status': 'success',
@@ -222,10 +265,16 @@ def add_comparable():
         session_id = payload.get('session_id')
         url = payload.get('url')
 
-        if not session_id or session_id not in sessions_storage:
-            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+        logger.info(f"➕ Запрос на добавление аналога для сессии: {session_id}")
 
-        logger.info(f"Добавление аналога: {url}")
+        if not session_id or session_id not in sessions_storage:
+            logger.error(f"❌ Сессия {session_id} не найдена при добавлении аналога")
+            return jsonify({
+                'status': 'error',
+                'message': 'Сессия не найдена. Попробуйте спарсить объект заново.'
+            }), 404
+
+        logger.info(f"✅ Добавление аналога: {url}")
 
         # Парсим аналог
         with SimpleParser(headless=True, delay=1.0) as parser:
@@ -233,6 +282,8 @@ def add_comparable():
 
         # Добавляем в список
         sessions_storage[session_id]['comparables'].append(comparable_data)
+
+        logger.info(f"✅ Аналог добавлен, всего аналогов: {len(sessions_storage[session_id]['comparables'])}")
 
         return jsonify({
             'status': 'success',
@@ -310,12 +361,18 @@ def analyze():
         filter_outliers = payload.get('filter_outliers', True)
         use_median = payload.get('use_median', True)
 
+        logger.info(f"📊 Запрос на анализ для сессии: {session_id}")
+
         if not session_id or session_id not in sessions_storage:
-            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+            logger.error(f"❌ Сессия {session_id} не найдена при анализе")
+            return jsonify({
+                'status': 'error',
+                'message': 'Сессия не найдена. Попробуйте спарсить объект заново.'
+            }), 404
 
         session_data = sessions_storage[session_id]
 
-        logger.info(f"Анализ для сессии {session_id}")
+        logger.info(f"✅ Начало анализа для сессии {session_id}")
 
         # Валидация и создание моделей
         try:
@@ -378,12 +435,45 @@ def get_session(session_id):
             "data": {...}
         }
     """
-    if session_id not in sessions_storage:
-        return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+    logger.info(f"🔍 Проверка сессии: {session_id}")
+    logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
 
+    if session_id not in sessions_storage:
+        logger.error(f"❌ Сессия {session_id} не найдена")
+        return jsonify({
+            'status': 'error',
+            'message': 'Сессия не найдена',
+            'debug': {
+                'requested_session': session_id,
+                'available_sessions': list(sessions_storage.keys()),
+                'total_sessions': len(sessions_storage)
+            }
+        }), 404
+
+    logger.info(f"✅ Сессия {session_id} найдена")
     return jsonify({
         'status': 'success',
         'data': sessions_storage[session_id]
+    })
+
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """
+    API: Проверка здоровья приложения
+
+    Returns:
+        {
+            "status": "healthy",
+            "sessions": 5,
+            "parser": "SimpleParser"
+        }
+    """
+    return jsonify({
+        'status': 'healthy',
+        'sessions': len(sessions_storage),
+        'parser': 'SimpleParser',
+        'worker_id': os.getpid()
     })
 
 
