@@ -19,3 +19,19 @@ tenacity>=8.2.3
 # Statistics
 numpy>=1.24.0
 scipy>=1.11.0
+
+# ==========================================
+# NEW: Production enhancements
+# ==========================================
+
+# Redis for session storage and caching
+redis>=5.0.0
+
+# PostgreSQL for historical data
+psycopg2-binary>=2.9.9
+
+# Browser automation (async parsing)
+playwright>=1.40.0
+
+# Logging and monitoring
+coloredlogs>=15.0.1
