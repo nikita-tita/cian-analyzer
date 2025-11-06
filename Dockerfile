@@ -1,43 +1,25 @@
-# Dockerfile для полнофункционального деплоя с Playwright
+# Упрощённый Dockerfile без Playwright (быстрее деплоится)
 FROM python:3.11-slim
 
-# Установка системных зависимостей для Playwright
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    ca-certificates \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libwayland-client0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxkbcommon0 \
-    libxrandr2 \
-    xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Рабочая директория
 WORKDIR /app
 
 # Копируем requirements
 COPY requirements.txt .
 
-# Устанавливаем Python зависимости
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Устанавливаем Playwright браузеры
-RUN playwright install chromium
+# Устанавливаем только базовые зависимости (без playwright)
+RUN pip install --no-cache-dir \
+    Flask>=3.0.0 \
+    pydantic>=2.5.0 \
+    requests>=2.31.0 \
+    beautifulsoup4>=4.12.0 \
+    lxml>=4.9.0 \
+    python-dotenv>=1.0.0 \
+    fake-useragent>=1.4.0 \
+    tenacity>=8.2.3 \
+    numpy>=1.24.0 \
+    scipy>=1.11.0 \
+    redis>=5.0.0 \
+    psycopg2-binary>=2.9.9
 
 # Копируем приложение
 COPY . .
@@ -49,8 +31,8 @@ RUN mkdir -p logs
 EXPOSE 5002
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5002/health')"
 
-# Запуск приложения
-CMD ["python", "app_production.py"]
+# Запуск (используем Vercel entry point без Playwright)
+CMD ["python", "index.py"]
