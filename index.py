@@ -1,13 +1,13 @@
 """
-Vercel entry point for the application
+Entry point for serverless deployments (Vercel, Render, etc.)
 Использует совместимую версию без Playwright
 """
 
-# Патчим импорты для Vercel (без Playwright)
 import sys
+import os
 from unittest.mock import MagicMock
 
-# Создаем mock для playwright если его нет
+# Создаем mock для playwright если его нет (для serverless окружений)
 try:
     import playwright
 except ImportError:
@@ -23,8 +23,10 @@ sys.modules['src.parsers.playwright_parser'].PlaywrightParser = simple_parser.Si
 
 from app_new import app
 
-# Vercel будет искать переменную 'app' или 'application'
+# Для Vercel/Render
 application = app
 
 if __name__ == "__main__":
-    app.run()
+    # Для локального запуска или debug
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

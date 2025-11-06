@@ -4,9 +4,9 @@ services:
     env: python
     region: frankfurt
     plan: free
-    branch: main
+    branch: claude/deployment-options-research-011CUsDXb5jUWFybZr5LuqNj
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 30 index:app"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 60 --log-level debug --access-logfile - --error-logfile - index:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
