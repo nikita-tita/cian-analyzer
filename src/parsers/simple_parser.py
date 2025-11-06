@@ -18,10 +18,24 @@ class SimpleParser:
     Не требует Playwright/браузер
     """
 
-    def __init__(self):
+    def __init__(self, headless=True, delay=1.0, **kwargs):
+        """
+        Совместимость с PlaywrightParser API
+        Параметры headless и delay игнорируются
+        """
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
+        self.headless = headless
+        self.delay = delay
+
+    def __enter__(self):
+        """Context manager support"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager support"""
+        pass
 
     def parse_property(self, url: str) -> Dict[str, Any]:
         """
@@ -197,3 +211,29 @@ class SimpleParser:
             '_parser_type': 'demo',
             '_warning': 'Ошибка парсинга. Показаны демо-данные.'
         }
+
+    # ======================================================================
+    # API compatibility with PlaywrightParser
+    # ======================================================================
+
+    def parse_detail_page(self, url: str) -> Dict[str, Any]:
+        """
+        Алиас для parse_property для совместимости с PlaywrightParser API
+        """
+        return self.parse_property(url)
+
+    def search_similar(self, target: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Поиск похожих объектов (широкий поиск)
+        Для SimpleParser возвращает демо-данные
+        """
+        logger.warning("SimpleParser: search_similar returns demo data")
+        return self.parse_comparables("", limit=limit)
+
+    def search_similar_in_building(self, target: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Поиск похожих объектов в том же ЖК
+        Для SimpleParser возвращает демо-данные
+        """
+        logger.warning("SimpleParser: search_similar_in_building returns demo data")
+        return self.parse_comparables("", limit=limit)
