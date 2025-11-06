@@ -9,7 +9,8 @@ import logging
 from typing import Dict, List
 from datetime import datetime
 
-from src.parsers.simple_parser import SimpleParser
+from src.parsers.playwright_parser import PlaywrightParser
+from redis_session_manager import RedisSessionManager
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.models.property import (
     TargetProperty,
@@ -26,8 +27,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Хранилище сессий (в production использовать Redis)
-sessions_storage = {}
+# Хранилище сессий через Redis
+session_manager = RedisSessionManager()
 
 # Middleware для логирования всех запросов
 @app.before_request
@@ -48,10 +49,11 @@ def log_response(response):
 # Логируем запуск приложения
 worker_id = os.getpid()
 logger.info("=" * 60)
-logger.info(f"🚀 Cian Analyzer v2.0 - Railway Deployment [Worker: {worker_id}]")
+logger.info(f"🚀 Cian Analyzer v2.0 - Railway Production [Worker: {worker_id}]")
 logger.info("=" * 60)
-logger.info(f"📊 Parser: SimpleParser (Railway-optimized)")
-logger.info(f"📊 Cache: In-memory (sessions_storage)")
+logger.info(f"📊 Parser: PlaywrightParser (Full-featured)")
+logger.info(f"📊 Cache: Redis (Distributed)")
+logger.info(f"📊 Redis Connected: {session_manager.is_redis_connected()}")
 logger.info(f"📊 Worker ID: {worker_id}")
 logger.info("=" * 60)
 
@@ -89,24 +91,25 @@ def parse_url():
 
         logger.info(f"Парсинг URL: {url}")
 
-        # Парсинг через SimpleParser (для Railway/Vercel)
-        with SimpleParser(headless=True, delay=1.0) as parser:
+        # Парсинг через PlaywrightParser (полноценный парсинг)
+        with PlaywrightParser(headless=True, delay=1.0) as parser:
             parsed_data = parser.parse_detail_page(url)
 
         # Определяем недостающие поля для анализа
         missing_fields = _identify_missing_fields(parsed_data)
 
-        # Создаем сессию
+        # Создаем сессию в Redis
         session_id = str(uuid.uuid4())
-        sessions_storage[session_id] = {
+        session_data = {
             'target_property': parsed_data,
             'comparables': [],
-            'created_at': datetime.now(),
             'step': 1
         }
 
+        session_manager.create_session(session_id, session_data, ttl=7200)  # 2 часа
+
         logger.info(f"✅ Сессия создана: {session_id}")
-        logger.info(f"📊 Всего активных сессий: {len(sessions_storage)}")
+        logger.info(f"📊 Всего активных сессий: {session_manager.get_all_sessions()}")
 
         return jsonify({
             'status': 'success',
@@ -150,29 +153,30 @@ def update_target():
         data = payload.get('data')
 
         logger.info(f"📝 Запрос на обновление сессии: {session_id}")
-        logger.info(f"📊 Доступные сессии: {list(sessions_storage.keys())}")
-        logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
+        logger.info(f"📊 Всего сессий: {session_manager.get_all_sessions()}")
 
         if not session_id:
             logger.error("❌ Session ID не предоставлен")
             return jsonify({'status': 'error', 'message': 'Session ID обязателен'}), 400
 
-        if session_id not in sessions_storage:
-            logger.error(f"❌ Сессия {session_id} не найдена в хранилище")
-            logger.error(f"📊 Существующие сессии: {list(sessions_storage.keys())}")
+        # Получаем сессию из Redis
+        session_data = session_manager.get_session(session_id)
+
+        if not session_data:
+            logger.error(f"❌ Сессия {session_id} не найдена в Redis")
             return jsonify({
                 'status': 'error',
-                'message': f'Сессия не найдена. Возможно приложение перезапустилось. Попробуйте спарсить объект заново.',
+                'message': f'Сессия не найдена. Возможно время сессии истекло. Попробуйте спарсить объект заново.',
                 'debug': {
                     'requested_session': session_id,
-                    'available_sessions': list(sessions_storage.keys()),
-                    'total_sessions': len(sessions_storage)
+                    'total_sessions': session_manager.get_all_sessions()
                 }
             }), 404
 
         # Обновляем данные
-        sessions_storage[session_id]['target_property'].update(data)
-        sessions_storage[session_id]['step'] = 2
+        session_data['target_property'].update(data)
+        session_data['step'] = 2
+        session_manager.update_session(session_id, session_data, ttl=7200)
 
         logger.info(f"✅ Сессия {session_id} обновлена, переход на шаг 2")
 
@@ -216,21 +220,23 @@ def find_similar():
         search_type = payload.get('search_type', 'building')  # По умолчанию ищем в ЖК
 
         logger.info(f"🔍 Запрос на поиск аналогов для сессии: {session_id}")
-        logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
+        logger.info(f"📊 Всего сессий: {session_manager.get_all_sessions()}")
 
-        if not session_id or session_id not in sessions_storage:
+        session_data = session_manager.get_session(session_id)
+
+        if not session_data:
             logger.error(f"❌ Сессия {session_id} не найдена при поиске аналогов")
             return jsonify({
                 'status': 'error',
                 'message': 'Сессия не найдена. Попробуйте спарсить объект заново.'
             }), 404
 
-        target = sessions_storage[session_id]['target_property']
+        target = session_data['target_property']
 
         logger.info(f"✅ Поиск похожих объектов для сессии {session_id} (тип: {search_type})")
 
         # Поиск аналогов
-        with SimpleParser(headless=True, delay=1.0) as parser:
+        with PlaywrightParser(headless=True, delay=1.0) as parser:
             if search_type == 'building':
                 # Поиск в том же ЖК
                 similar = parser.search_similar_in_building(target, limit=limit)
@@ -241,7 +247,8 @@ def find_similar():
                 residential_complex = None
 
         # Сохраняем в сессию
-        sessions_storage[session_id]['comparables'] = similar
+        session_data['comparables'] = similar
+        session_manager.update_session(session_id, session_data, ttl=7200)
 
         logger.info(f"✅ Найдено {len(similar)} аналогов для сессии {session_id}")
 
@@ -285,7 +292,9 @@ def add_comparable():
 
         logger.info(f"➕ Запрос на добавление аналога для сессии: {session_id}")
 
-        if not session_id or session_id not in sessions_storage:
+        session_data = session_manager.get_session(session_id)
+
+        if not session_data:
             logger.error(f"❌ Сессия {session_id} не найдена при добавлении аналога")
             return jsonify({
                 'status': 'error',
@@ -295,13 +304,14 @@ def add_comparable():
         logger.info(f"✅ Добавление аналога: {url}")
 
         # Парсим аналог
-        with SimpleParser(headless=True, delay=1.0) as parser:
+        with PlaywrightParser(headless=True, delay=1.0) as parser:
             comparable_data = parser.parse_detail_page(url)
 
         # Добавляем в список
-        sessions_storage[session_id]['comparables'].append(comparable_data)
+        session_data['comparables'].append(comparable_data)
+        session_manager.update_session(session_id, session_data, ttl=7200)
 
-        logger.info(f"✅ Аналог добавлен, всего аналогов: {len(sessions_storage[session_id]['comparables'])}")
+        logger.info(f"✅ Аналог добавлен, всего аналогов: {len(session_data['comparables'])}")
 
         return jsonify({
             'status': 'success',
@@ -381,14 +391,14 @@ def analyze():
 
         logger.info(f"📊 Запрос на анализ для сессии: {session_id}")
 
-        if not session_id or session_id not in sessions_storage:
+        session_data = session_manager.get_session(session_id)
+
+        if not session_data:
             logger.error(f"❌ Сессия {session_id} не найдена при анализе")
             return jsonify({
                 'status': 'error',
                 'message': 'Сессия не найдена. Попробуйте спарсить объект заново.'
             }), 404
-
-        session_data = sessions_storage[session_id]
 
         logger.info(f"✅ Начало анализа для сессии {session_id}")
 
@@ -426,8 +436,9 @@ def analyze():
         result_dict['metrics'] = metrics
 
         # Сохраняем в сессию
-        sessions_storage[session_id]['analysis'] = result_dict
-        sessions_storage[session_id]['step'] = 3
+        session_data['analysis'] = result_dict
+        session_data['step'] = 3
+        session_manager.update_session(session_id, session_data, ttl=7200)
 
         return jsonify({
             'status': 'success',
@@ -454,24 +465,25 @@ def get_session(session_id):
         }
     """
     logger.info(f"🔍 Проверка сессии: {session_id}")
-    logger.info(f"📊 Всего сессий в памяти: {len(sessions_storage)}")
+    logger.info(f"📊 Всего сессий: {session_manager.get_all_sessions()}")
 
-    if session_id not in sessions_storage:
+    session_data = session_manager.get_session(session_id)
+
+    if not session_data:
         logger.error(f"❌ Сессия {session_id} не найдена")
         return jsonify({
             'status': 'error',
             'message': 'Сессия не найдена',
             'debug': {
                 'requested_session': session_id,
-                'available_sessions': list(sessions_storage.keys()),
-                'total_sessions': len(sessions_storage)
+                'total_sessions': session_manager.get_all_sessions()
             }
         }), 404
 
     logger.info(f"✅ Сессия {session_id} найдена")
     return jsonify({
         'status': 'success',
-        'data': sessions_storage[session_id]
+        'data': session_data
     })
 
 
@@ -489,8 +501,9 @@ def health():
     """
     return jsonify({
         'status': 'healthy',
-        'sessions': len(sessions_storage),
-        'parser': 'SimpleParser',
+        'sessions': session_manager.get_all_sessions(),
+        'parser': 'PlaywrightParser',
+        'redis_connected': session_manager.is_redis_connected(),
         'worker_id': os.getpid()
     })
 
