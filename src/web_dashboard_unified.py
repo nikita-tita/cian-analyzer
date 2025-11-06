@@ -26,12 +26,18 @@ from models.property import (
     AnalysisResult
 )
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
 
 @app.route('/')
 def index():
-    """Главная страница unified dashboard"""
+    """Главная страница - лендинг HOUSLER"""
+    return render_template('landing.html')
+
+
+@app.route('/calculator')
+def calculator():
+    """Страница калькулятора недвижимости"""
     return render_template('dashboard_unified.html')
 
 
