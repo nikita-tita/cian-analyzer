@@ -18,10 +18,27 @@ class SimpleParser:
     Не требует Playwright/браузер
     """
 
-    def __init__(self):
+    def __init__(self, headless=True, delay=1.0):
+        """Инициализация парсера (параметры для совместимости с PlaywrightParser)"""
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
+        self.headless = headless
+        self.delay = delay
+
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        pass
+
+    def parse_detail_page(self, url: str) -> Dict[str, Any]:
+        """
+        Парсинг детальной страницы объекта (alias для совместимости с PlaywrightParser)
+        """
+        return self.parse_property(url)
 
     def parse_property(self, url: str) -> Dict[str, Any]:
         """
@@ -94,6 +111,26 @@ class SimpleParser:
             # Возвращаем минимальные данные для демо
             return self._get_demo_data(url)
 
+    def search_similar(self, target_property: Dict, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Поиск похожих объектов (для совместимости с PlaywrightParser)
+
+        Примечание: Упрощенная версия для демо.
+        Возвращает тестовые данные.
+        """
+        logger.warning("SimpleParser: search_similar returns demo data only")
+        return self._generate_demo_comparables(target_property, limit)
+
+    def search_similar_in_building(self, target_property: Dict, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Поиск похожих объектов в том же здании (для совместимости с PlaywrightParser)
+
+        Примечание: Упрощенная версия для демо.
+        Возвращает тестовые данные.
+        """
+        logger.warning("SimpleParser: search_similar_in_building returns demo data only")
+        return self._generate_demo_comparables(target_property, limit)
+
     def parse_comparables(self, search_url: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Парсинг аналогов
@@ -102,17 +139,23 @@ class SimpleParser:
         Возвращает тестовые данные.
         """
         logger.warning("SimpleParser: parse_comparables returns demo data only")
+        return self._generate_demo_comparables({}, limit)
 
-        # Для демо возвращаем несколько тестовых аналогов
+    def _generate_demo_comparables(self, target_property: Dict, limit: int) -> List[Dict[str, Any]]:
+        """Генерация демо-аналогов для тестирования"""
+        base_price = target_property.get('price', 15000000)
+        base_area = target_property.get('total_area', 65.0)
+        base_rooms = target_property.get('rooms', 2)
+
         demo_comparables = []
         for i in range(min(limit, 5)):
             demo_comparables.append({
-                'title': f'2-комн. квартира, {60 + i * 5} м²',
-                'price': 15000000 + i * 500000,
-                'price_per_sqm': 250000 - i * 5000,
-                'rooms': 2,
-                'total_area': 60.0 + i * 5,
-                'living_area': 40.0 + i * 3,
+                'title': f'{base_rooms}-комн. квартира, {base_area + i * 5:.0f} м²',
+                'price': int(base_price * (0.9 + i * 0.05)),
+                'price_per_sqm': int((base_price * (0.9 + i * 0.05)) / (base_area + i * 5)),
+                'rooms': base_rooms,
+                'total_area': base_area + i * 5,
+                'living_area': (base_area + i * 5) * 0.65,
                 'kitchen_area': 12.0,
                 'floor': 5 + i,
                 'total_floors': 17,
