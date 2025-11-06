@@ -1,0 +1,24 @@
+# Основные зависимости
+Flask>=3.0.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+fake-useragent>=1.4.0
+
+# Playwright для парсинга
+playwright>=1.40.0
+
+# Валидация данных
+pydantic>=2.5.0
+
+# Retry механизм
+tenacity>=8.2.3
+
+# Дополнительные утилиты
+python-dotenv>=1.0.0
+
+# Development (опционально)
+pytest>=7.4.0
+black>=23.11.0
+mypy>=1.7.0
+flake8>=6.1.0

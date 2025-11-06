@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Real Estate Analysis Dashboard v2.0</title>
+    <link rel="stylesheet" href="/static/css/unified-dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>🏠 Анализ Недвижимости v2.0</h1>
+                <p class="subtitle">Умная аналитика с персонализированными рекомендациями</p>
+            </div>
+            <div class="health-status" id="healthStatus">
+                <span class="status-indicator"></span>
+                <span class="status-text">Проверка...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="dashboard-main">
+            <!-- Input Form Section -->
+            <section class="card input-section">
+                <h2>📋 Данные объекта</h2>
+                <form id="analysisForm">
+                    <div class="form-grid">
+                        <!-- Target Property -->
+                        <div class="form-section">
+                            <h3>Целевой объект</h3>
+
+                            <div class="form-group">
+                                <label for="targetPrice">
+                                    Цена за м² (₽)
+                                    <span class="glossary-term" data-term="price_per_sqm">ℹ️</span>
+                                </label>
+                                <input type="number" id="targetPrice" name="targetPrice"
+                                       value="200000" required min="10000" step="1000">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="targetArea">Площадь (м²)</label>
+                                <input type="number" id="targetArea" name="targetArea"
+                                       value="50" required min="10" step="0.1">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="targetLivingArea">
+                                    Жилая площадь (м²)
+                                    <span class="glossary-term" data-term="living_area_percent">ℹ️</span>
+                                </label>
+                                <input type="number" id="targetLivingArea" name="targetLivingArea"
+                                       value="30" required min="5" step="0.1">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="targetFloor">Этаж</label>
+                                <input type="number" id="targetFloor" name="targetFloor"
+                                       value="5" required min="1" max="100">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="targetTotalFloors">Этажей в доме</label>
+                                <input type="number" id="targetTotalFloors" name="targetTotalFloors"
+                                       value="10" required min="1" max="100">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="targetRooms">Комнат</label>
+                                <input type="number" id="targetRooms" name="targetRooms"
+                                       value="2" required min="1" max="20">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="repairLevel">
+                                    Уровень отделки
+                                    <span class="glossary-term" data-term="repair_level">ℹ️</span>
+                                </label>
+                                <select id="repairLevel" name="repairLevel" required>
+                                    <option value="черновая">Черновая (-25%)</option>
+                                    <option value="эконом">Эконом (-15%)</option>
+                                    <option value="стандартная" selected>Стандартная (база)</option>
+                                    <option value="капитальная">Капитальная (+15%)</option>
+                                    <option value="улучшенная">Улучшенная (+25%)</option>
+                                    <option value="премиум">Премиум (+50%)</option>
+                                    <option value="люкс">Люкс (+80%)</option>
+                                    <option value="дизайнерская">Дизайнерская (+100%)</option>
+                                </select>
+                                <small>Влияние на цену: от -25% до +100%</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="viewType">
+                                    Вид из окна
+                                    <span class="glossary-term" data-term="view_type">ℹ️</span>
+                                </label>
+                                <select id="viewType" name="viewType" required>
+                                    <option value="худогов">Промзона/мусорка (-3%)</option>
+                                    <option value="дом" selected>Двор/дом (база)</option>
+                                    <option value="улица">Улица (база)</option>
+                                    <option value="парк">Парк (+3%)</option>
+                                    <option value="город">Город (+4%)</option>
+                                    <option value="вода">Вода (+5%)</option>
+                                    <option value="закат">Закат (+5%)</option>
+                                    <option value="премиум">Премиум (+5%)</option>
+                                </select>
+                                <small>Влияние на цену: до ±5%</small>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Options -->
+                        <div class="form-section">
+                            <h3>Параметры анализа</h3>
+
+                            <div class="form-group">
+                                <label for="comparablesCount">Количество аналогов</label>
+                                <input type="number" id="comparablesCount" name="comparablesCount"
+                                       value="10" min="3" max="50">
+                                <small>Рекомендуется 10-20 для точности</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="filterOutliers" checked>
+                                    Фильтровать выбросы (±3σ)
+                                    <span class="glossary-term" data-term="sigma">ℹ️</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="useMedian" checked>
+                                    Использовать медиану
+                                    <span class="glossary-term" data-term="median">ℹ️</span>
+                                </label>
+                            </div>
+
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Floating Action Bar -->
+                <div class="floating-action-bar">
+                    <button type="submit" form="analysisForm" class="btn btn-primary btn-floating">
+                        🔍 Анализировать
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>Анализируем рынок...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsContainer" style="display: none;">
+
+                <!-- Recommendations Panel -->
+                <section class="card recommendations-section">
+                    <h2>🎯 Персонализированные рекомендации</h2>
+                    <div id="recommendationsContainer" class="recommendations-grid">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </section>
+
+                <!-- Waterfall Chart -->
+                <section class="card chart-section">
+                    <h2>📊 Формирование справедливой цены</h2>
+                    <p class="chart-description">
+                        Пошаговая визуализация того, как складывается справедливая рыночная цена вашего объекта
+                    </p>
+                    <div class="chart-container">
+                        <canvas id="waterfallChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Price Analysis Summary -->
+                <section class="card summary-section">
+                    <h2>💰 Анализ цены</h2>
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-label">Текущая цена</div>
+                            <div class="summary-value" id="currentPrice">—</div>
+                        </div>
+                        <div class="summary-card highlight">
+                            <div class="summary-label">Справедливая цена</div>
+                            <div class="summary-value" id="fairPrice">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">
+                                Отклонение
+                                <span class="glossary-term" data-term="overpricing">ℹ️</span>
+                            </div>
+                            <div class="summary-value" id="priceDeviation">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Рекомендация</div>
+                            <div class="summary-value" id="priceRecommendation">—</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Market Statistics -->
+                <section class="card stats-section">
+                    <h2>📈 Рыночная статистика</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-content">
+                                <div class="stat-label">
+                                    Медиана рынка
+                                    <span class="glossary-term" data-term="median">ℹ️</span>
+                                </div>
+                                <div class="stat-value" id="marketMedian">—</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📉</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Минимум</div>
+                                <div class="stat-value" id="marketMin">—</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Максимум</div>
+                                <div class="stat-value" id="marketMax">—</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Разброс (σ)</div>
+                                <div class="stat-value" id="marketStd">—</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Аналогов</div>
+                                <div class="stat-value" id="comparablesCount">—</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🔍</div>
+                            <div class="stat-content">
+                                <div class="stat-label">После фильтрации</div>
+                                <div class="stat-value" id="filteredCount">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Selling Scenarios -->
+                <section class="card scenarios-section">
+                    <h2>🎲 Сценарии продажи</h2>
+                    <div id="scenariosContainer" class="scenarios-grid">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+            <p>Unified Real Estate Analysis Dashboard v2.0 | Powered by Smart Analytics</p>
+        </footer>
+    </div>
+
+    <!-- Glossary Tooltip Container -->
+    <div id="glossaryTooltip" class="glossary-tooltip" style="display: none;"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/glossary.js"></script>
+    <script>
+        // Initialize glossary
+        const glossary = new GlossaryTooltip();
+
+        // Check health status
+        async function checkHealth() {
+            const statusEl = document.getElementById('healthStatus');
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+
+                if (data.status === 'healthy') {
+                    statusEl.innerHTML = '<span class="status-indicator status-healthy"></span><span class="status-text">Система работает</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="status-indicator status-error"></span><span class="status-text">Ошибка</span>';
+                }
+            } catch (error) {
+                statusEl.innerHTML = '<span class="status-indicator status-error"></span><span class="status-text">Недоступно</span>';
+            }
+        }
+
+        // Format price
+        function formatPrice(value) {
+            return new Intl.NumberFormat('ru-RU', {
+                style: 'currency',
+                currency: 'RUB',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        // Format percentage
+        function formatPercent(value) {
+            const sign = value > 0 ? '+' : '';
+            return `${sign}${value.toFixed(1)}%`;
+        }
+
+        // Render recommendations
+        function renderRecommendations(recommendations) {
+            const container = document.getElementById('recommendationsContainer');
+
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = '<p class="empty-state">Нет рекомендаций</p>';
+                return;
+            }
+
+            container.innerHTML = recommendations.map(rec => {
+                const priorityClass = `priority-${rec.priority}`;
+                const priorityLabel = ['', 'КРИТИЧНО', 'ВАЖНО', 'СРЕДНЕ', 'ИНФО'][rec.priority];
+                const priorityIcon = ['', '⚠️', '🎯', '💡', 'ℹ️'][rec.priority];
+
+                let actionsHtml = '';
+                if (rec.actions && rec.actions.length > 0) {
+                    actionsHtml = `
+                        <div class="recommendation-actions">
+                            ${rec.actions.map(action => `
+                                <div class="action-item">
+                                    <strong>Действие:</strong> ${action.action}<br>
+                                    <strong>Результат:</strong> ${action.result}
+                                    ${action.value ? `<br><strong>Эффект:</strong> ${action.value}` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                let roiHtml = '';
+                if (rec.roi !== null && rec.roi !== undefined) {
+                    roiHtml = `
+                        <div class="roi-badge">
+                            <div class="roi-circle">
+                                <span class="roi-value">${rec.roi}%</span>
+                            </div>
+                            <span class="roi-label">ROI</span>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="recommendation-card ${priorityClass}">
+                        <div class="recommendation-header">
+                            <span class="recommendation-priority">${priorityIcon} [${priorityLabel}]</span>
+                            ${roiHtml}
+                        </div>
+                        <h3 class="recommendation-title">${rec.title}</h3>
+                        <p class="recommendation-description">${rec.description}</p>
+                        ${actionsHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render waterfall chart
+        let waterfallChartInstance = null;
+
+        function renderWaterfallChart(data) {
+            const ctx = document.getElementById('waterfallChart').getContext('2d');
+
+            if (waterfallChartInstance) {
+                waterfallChartInstance.destroy();
+            }
+
+            const labels = data.steps.map(s => s.label);
+            const values = data.steps.map(s => s.value);
+            const colors = data.steps.map(s => {
+                if (s.type === 'base' || s.type === 'total') return '#3b82f6';
+                if (s.type === 'positive') return '#10b981';
+                return '#ef4444';
+            });
+
+            // Calculate cumulative values for waterfall effect
+            let cumulative = 0;
+            const chartData = data.steps.map((step, idx) => {
+                if (step.type === 'base') {
+                    cumulative = step.value;
+                    return [0, cumulative];
+                } else if (step.type === 'total') {
+                    return [0, cumulative];
+                } else {
+                    const start = cumulative;
+                    cumulative += step.value;
+                    return [start, cumulative];
+                }
+            });
+
+            waterfallChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: chartData,
+                        backgroundColor: colors,
+                        borderColor: colors.map(c => c),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Пошаговое формирование справедливой цены',
+                            font: { size: 16 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const step = data.steps[context.dataIndex];
+                                    const value = step.value;
+                                    return [
+                                        `Изменение: ${formatPrice(Math.abs(value))}`,
+                                        step.explanation || ''
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatPrice(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render scenarios
+        function renderScenarios(scenarios) {
+            const container = document.getElementById('scenariosContainer');
+
+            if (!scenarios || scenarios.length === 0) {
+                container.innerHTML = '<p class="empty-state">Нет сценариев</p>';
+                return;
+            }
+
+            container.innerHTML = scenarios.map((scenario, idx) => {
+                const strategyIcons = {
+                    'aggressive': '🚀',
+                    'moderate': '⚖️',
+                    'conservative': '🛡️',
+                    'optimal': '🎯'
+                };
+
+                return `
+                    <div class="scenario-card">
+                        <div class="scenario-header">
+                            <h3>${strategyIcons[scenario.strategy] || '📊'} ${scenario.strategy}</h3>
+                            <span class="scenario-probability">${(scenario.success_probability * 100).toFixed(0)}%</span>
+                        </div>
+                        <div class="scenario-body">
+                            <div class="scenario-price">
+                                <label>Цена:</label>
+                                <span>${formatPrice(scenario.recommended_price_per_sqm)}/м²</span>
+                            </div>
+                            <div class="scenario-time">
+                                <label>Время продажи:</label>
+                                <span>${scenario.expected_sale_time_months} мес</span>
+                            </div>
+                            <div class="scenario-revenue">
+                                <label>Чистый доход:</label>
+                                <span>${formatPrice(scenario.net_revenue)}</span>
+                            </div>
+                        </div>
+                        <div class="scenario-footer">
+                            <small>${scenario.reasoning}</small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update summary cards
+        function updateSummary(analysisResult) {
+            const currentPrice = analysisResult.target_property.price_per_sqm;
+            const fairPrice = analysisResult.fair_price_analysis.final_fair_price_per_sqm;
+            const deviation = ((currentPrice - fairPrice) / fairPrice) * 100;
+
+            document.getElementById('currentPrice').textContent = formatPrice(currentPrice) + '/м²';
+            document.getElementById('fairPrice').textContent = formatPrice(fairPrice) + '/м²';
+
+            const deviationEl = document.getElementById('priceDeviation');
+            deviationEl.textContent = formatPercent(deviation);
+            deviationEl.className = 'summary-value ' + (deviation > 5 ? 'negative' : deviation < -5 ? 'positive' : '');
+
+            const recommendationEl = document.getElementById('priceRecommendation');
+            if (Math.abs(deviation) < 5) {
+                recommendationEl.textContent = '✅ Справедливая цена';
+                recommendationEl.className = 'summary-value positive';
+            } else if (deviation > 0) {
+                recommendationEl.textContent = '⚠️ Переоценка';
+                recommendationEl.className = 'summary-value negative';
+            } else {
+                recommendationEl.textContent = '💰 Недооценка';
+                recommendationEl.className = 'summary-value positive';
+            }
+
+            // Market stats
+            const stats = analysisResult.market_statistics;
+            document.getElementById('marketMedian').textContent = formatPrice(stats.median_price_per_sqm) + '/м²';
+            document.getElementById('marketMin').textContent = formatPrice(stats.min_price_per_sqm) + '/м²';
+            document.getElementById('marketMax').textContent = formatPrice(stats.max_price_per_sqm) + '/м²';
+            document.getElementById('marketStd').textContent = formatPrice(stats.std_dev_price_per_sqm);
+            document.getElementById('comparablesCount').textContent = stats.total_comparables;
+            document.getElementById('filteredCount').textContent = stats.filtered_comparables;
+        }
+
+        // Handle form submission
+        document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Show loading
+            document.getElementById('loadingState').style.display = 'flex';
+            document.getElementById('resultsContainer').style.display = 'none';
+
+            // Gather form data
+            const formData = {
+                target_property: {
+                    price_per_sqm: parseFloat(document.getElementById('targetPrice').value),
+                    total_area: parseFloat(document.getElementById('targetArea').value),
+                    living_area: parseFloat(document.getElementById('targetLivingArea').value),
+                    floor: parseInt(document.getElementById('targetFloor').value),
+                    total_floors: parseInt(document.getElementById('targetTotalFloors').value),
+                    rooms: parseInt(document.getElementById('targetRooms').value),
+                    repair_level: document.getElementById('repairLevel').value,
+                    view_type: document.getElementById('viewType').value
+                },
+                comparables: generateMockComparables(parseInt(document.getElementById('comparablesCount').value)),
+                filter_outliers: document.getElementById('filterOutliers').checked,
+                use_median: document.getElementById('useMedian').checked
+            };
+
+            try {
+                const response = await fetch('/api/v2/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Hide loading
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('resultsContainer').style.display = 'block';
+
+                // Render all components
+                renderRecommendations(result.recommendations);
+                renderWaterfallChart(result.waterfall_chart_data);
+                updateSummary(result);
+                renderScenarios(result.selling_scenarios);
+
+                // Scroll to results
+                document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error('Analysis error:', error);
+                document.getElementById('loadingState').style.display = 'none';
+                alert('Ошибка анализа: ' + error.message);
+            }
+        });
+
+        // Generate mock comparables for demo
+        function generateMockComparables(count) {
+            const comparables = [];
+            const basePrice = 180000;
+
+            for (let i = 0; i < count; i++) {
+                const variation = (Math.random() - 0.5) * 0.3; // ±15%
+                const price = basePrice * (1 + variation);
+
+                const repairLevels = ['черновая', 'эконом', 'стандартная', 'капитальная', 'улучшенная', 'премиум', 'люкс', 'дизайнерская'];
+                const viewTypes = ['худогов', 'дом', 'улица', 'парк', 'город', 'вода', 'закат', 'премиум'];
+
+                comparables.push({
+                    price_per_sqm: Math.round(price),
+                    total_area: 45 + Math.random() * 20,
+                    living_area: 25 + Math.random() * 15,
+                    floor: Math.floor(Math.random() * 10) + 1,
+                    total_floors: Math.floor(Math.random() * 15) + 5,
+                    rooms: Math.floor(Math.random() * 3) + 1,
+                    repair_level: repairLevels[Math.floor(Math.random() * repairLevels.length)],
+                    view_type: viewTypes[Math.floor(Math.random() * viewTypes.length)],
+                    building_age_years: Math.floor(Math.random() * 30),
+                    distance_to_center_km: 5 + Math.random() * 15
+                });
+            }
+
+            return comparables;
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkHealth();
+
+            // Set up periodic health checks
+            setInterval(checkHealth, 30000); // Every 30 seconds
+        });
+    </script>
+</body>
+</html>

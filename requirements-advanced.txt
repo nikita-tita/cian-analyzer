@@ -1,0 +1,41 @@
+# Базовые зависимости
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+fake-useragent>=1.4.0
+python-dotenv>=1.0.0
+
+# Playwright - Рекомендуется (быстро, надежно, современно)
+playwright>=1.40.0
+playwright-stealth>=0.1.0
+
+# Альтернативы для максимальной защиты от обнаружения
+
+# Nodriver - максимальная защита (обходит Cloudflare)
+# nodriver>=0.28
+
+# Zendriver - форк nodriver с улучшениями
+# zendriver>=0.1.0
+
+# Scrapy - для массового парсинга
+# scrapy>=2.11.0
+# scrapy-playwright>=0.0.34
+
+# Дополнительные инструменты
+
+# Для обхода TLS fingerprinting
+# curl-cffi>=0.6.0
+
+# Современные HTTP клиенты
+# httpx[http2]>=0.25.0
+
+# Selenium (если нужен для совместимости)
+# selenium>=4.15.0
+# undetected-chromedriver>=3.5.0
+
+# Парсинг и извлечение данных
+# parsel>=1.8.0
+# selectolax>=0.3.0
+
+# Для работы с прокси
+# scrapy-rotating-proxies>=0.6.0

@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд анализа недвижимости</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --info-color: #3498db;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .container {
+            max-width: 1400px;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 5px;
+            height: 35px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .metric-card h3 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .metric-card .subvalue {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .stat-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin: 5px;
+        }
+
+        .stat-badge.success {
+            background-color: rgba(39, 174, 96, 0.2);
+            color: var(--success-color);
+            border: 2px solid var(--success-color);
+        }
+
+        .stat-badge.danger {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: var(--danger-color);
+            border: 2px solid var(--danger-color);
+        }
+
+        .stat-badge.warning {
+            background-color: rgba(243, 156, 18, 0.2);
+            color: var(--warning-color);
+            border: 2px solid var(--warning-color);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .scenario-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .scenario-card:hover {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transform: translateX(5px);
+        }
+
+        .scenario-card h4 {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .scenario-card .probability {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .progress-bar-custom {
+            height: 30px;
+            border-radius: 15px;
+            background: #ecf0f1;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            transition: width 1s ease;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .btn-analyze:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
+        }
+
+        .comparison-table {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .comparison-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .comparison-table tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .alert-custom {
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .alert-custom.warning {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid var(--warning-color);
+        }
+
+        .alert-custom.success {
+            background: rgba(39, 174, 96, 0.1);
+            border-left: 5px solid var(--success-color);
+        }
+
+        .alert-custom.danger {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 5px solid var(--danger-color);
+        }
+
+        #results-section {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .comparable-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .comparable-item .remove-btn {
+            color: #e74c3c;
+            cursor: pointer;
+            float: right;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-card">
+            <div class="header">
+                <h1>📊 Дашборд Анализа Недвижимости</h1>
+                <p>Интерактивная визуализация расчетов и сравнений объектов</p>
+            </div>
+
+            <!-- Форма ввода данных -->
+            <div class="section-title">🏠 Целевой объект</div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label>Цена (₽)</label>
+                        <input type="number" id="target-price" placeholder="195000000" value="195000000">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label>Общая площадь (м²)</label>
+                        <input type="number" id="target-total-area" placeholder="180.4" value="180.4" step="0.1">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label>Жилая площадь (м²)</label>
+                        <input type="number" id="target-living-area" placeholder="40.2" value="40.2" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <label>Комнат</label>
+                        <input type="number" id="target-rooms" placeholder="3" value="3">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <label>Этаж</label>
+                        <input type="text" id="target-floor" placeholder="6/7" value="6/7">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="target-design" checked>
+                            Дизайнерская отделка
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="target-panoramic" checked>
+                            Панорамные виды
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="target-premium" checked>
+                            Премиум локация
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="target-renders" checked>
+                            Только рендеры (нет фото)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="margin: 40px 0;">
+
+            <!-- Аналоги -->
+            <div class="section-title">📋 Аналоги для сравнения</div>
+
+            <div id="comparables-list"></div>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <input type="number" id="comp-price" placeholder="Цена" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" id="comp-area" placeholder="Площадь м²" class="form-control" step="0.1">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" id="comp-rooms" placeholder="Комнат" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <input type="text" id="comp-floor" placeholder="Этаж" class="form-control">
+                </div>
+                <div class="col-md-1">
+                    <input type="checkbox" id="comp-design"> Дизайн
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-secondary" onclick="addComparable()">+ Добавить</button>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px;">
+                <button class="btn-analyze" onclick="analyzeProperty()">🔍 Анализировать</button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <p style="margin-top: 20px; color: #666;">Выполняется анализ...</p>
+            </div>
+        </div>
+
+        <!-- Результаты -->
+        <div id="results-section">
+            <!-- Ключевые метрики -->
+            <div class="main-card">
+                <div class="section-title">📈 Ключевые метрики</div>
+
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <h3>Текущая цена за м²</h3>
+                            <div class="value" id="metric-current-price">-</div>
+                            <div class="subvalue">млн ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <h3>Справедливая цена за м²</h3>
+                            <div class="value" id="metric-fair-price">-</div>
+                            <div class="subvalue">млн ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <h3>Средняя по рынку</h3>
+                            <div class="value" id="metric-market-avg">-</div>
+                            <div class="subvalue">млн ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                            <h3>Переоценка</h3>
+                            <div class="value" id="metric-overpricing">-</div>
+                            <div class="subvalue">%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row" style="margin-top: 20px;">
+                    <div class="col-md-4">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                            <h3>Процент жилой площади</h3>
+                            <div class="value" id="metric-living-percent">-</div>
+                            <div class="subvalue">%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                            <h3>Рекомендуемая цена</h3>
+                            <div class="value" id="metric-recommended">-</div>
+                            <div class="subvalue">млн ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                            <h3>Ожидаемое время продажи</h3>
+                            <div class="value" id="metric-time">4-5</div>
+                            <div class="subvalue">месяцев</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- График сравнения цен -->
+            <div class="main-card">
+                <div class="section-title">📊 Сравнение цен за м² с аналогами</div>
+                <div class="chart-container">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Сценарии продажи -->
+            <div class="main-card">
+                <div class="section-title">💼 Сценарии продажи</div>
+                <div id="scenarios-container"></div>
+            </div>
+
+            <!-- График динамики цен -->
+            <div class="main-card">
+                <div class="section-title">📉 Динамика цен по сценариям</div>
+                <div class="chart-container">
+                    <canvas id="scenariosChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Сильные и слабые стороны -->
+            <div class="main-card">
+                <div class="section-title">⚖️ Анализ сильных и слабых сторон</div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4 style="color: var(--success-color); margin-bottom: 20px;">✅ Сильные стороны</h4>
+                        <div id="strengths-list"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h4 style="color: var(--danger-color); margin-bottom: 20px;">❌ Слабые стороны</h4>
+                        <div id="weaknesses-list"></div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <div class="alert-custom" id="net-adjustment-alert">
+                        <div style="font-size: 2rem;">⚖️</div>
+                        <div>
+                            <strong>Итоговая корректировка:</strong>
+                            <div id="net-adjustment-text" style="font-size: 1.2rem; font-weight: 600;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Детальный расчет справедливой цены -->
+            <div class="main-card">
+                <div class="section-title">🧮 Детальный расчет справедливой цены</div>
+                <div id="fair-price-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script>
+        let comparables = [];
+
+        // Добавить предзаполненные аналоги
+        function loadDefaultComparables() {
+            comparables = [
+                {price: 150000000, area: 161.4, rooms: 3, floor: '3/9', has_design: true},
+                {price: 107900000, area: 145, rooms: 3, floor: '3/9', has_design: true},
+                {price: 130000000, area: 186, rooms: 5, floor: '3/9', has_design: true},
+                {price: 87000000, area: 110, rooms: 3, floor: '5/9', has_design: true},
+                {price: 75000000, area: 106.2, rooms: 3, floor: '5/9', has_design: true},
+                {price: 70000000, area: 107.6, rooms: 3, floor: '9/9', has_design: false},
+                {price: 72000000, area: 110, rooms: 3, floor: '5/9', has_design: false},
+                {price: 58000000, area: 105.3, rooms: 2, floor: '4/9', has_design: false}
+            ];
+            updateComparablesList();
+        }
+
+        function addComparable() {
+            const price = parseFloat(document.getElementById('comp-price').value);
+            const area = parseFloat(document.getElementById('comp-area').value);
+            const rooms = parseInt(document.getElementById('comp-rooms').value);
+            const floor = document.getElementById('comp-floor').value;
+            const hasDesign = document.getElementById('comp-design').checked;
+
+            if (!price || !area) {
+                alert('Заполните минимум цену и площадь!');
+                return;
+            }
+
+            comparables.push({
+                price: price,
+                area: area,
+                rooms: rooms,
+                floor: floor,
+                has_design: hasDesign,
+                price_per_sqm: price / area
+            });
+
+            // Очистить поля
+            document.getElementById('comp-price').value = '';
+            document.getElementById('comp-area').value = '';
+            document.getElementById('comp-rooms').value = '';
+            document.getElementById('comp-floor').value = '';
+            document.getElementById('comp-design').checked = false;
+
+            updateComparablesList();
+        }
+
+        function removeComparable(index) {
+            comparables.splice(index, 1);
+            updateComparablesList();
+        }
+
+        function updateComparablesList() {
+            const container = document.getElementById('comparables-list');
+
+            if (comparables.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">Аналоги не добавлены. Добавьте минимум 3 аналога для точного анализа.</p>';
+                return;
+            }
+
+            let html = '';
+            comparables.forEach((comp, index) => {
+                const pricePerSqm = (comp.price / comp.area / 1000000).toFixed(3);
+                html += `
+                    <div class="comparable-item">
+                        <span class="remove-btn" onclick="removeComparable(${index})">✕</span>
+                        <strong>${comp.rooms || '?'}-комн</strong> ${comp.area}м² •
+                        ${(comp.price / 1000000).toFixed(1)} млн ₽ •
+                        ${pricePerSqm} млн/м² •
+                        ${comp.floor || '?'} •
+                        ${comp.has_design ? '✨ Дизайн' : '🔧 Без ремонта'}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function analyzeProperty() {
+            // Собрать данные целевого объекта
+            const targetProperty = {
+                price: parseFloat(document.getElementById('target-price').value),
+                total_area: parseFloat(document.getElementById('target-total-area').value),
+                living_area: parseFloat(document.getElementById('target-living-area').value),
+                rooms: parseInt(document.getElementById('target-rooms').value),
+                floor: document.getElementById('target-floor').value,
+                has_design: document.getElementById('target-design').checked,
+                panoramic_views: document.getElementById('target-panoramic').checked,
+                premium_location: document.getElementById('target-premium').checked,
+                renders_only: document.getElementById('target-renders').checked
+            };
+
+            // Добавить price_per_sqm
+            targetProperty.price_per_sqm = targetProperty.price / targetProperty.total_area;
+
+            // Добавить price_per_sqm для аналогов
+            const comparablesWithPrice = comparables.map(comp => ({
+                ...comp,
+                price_per_sqm: comp.price / comp.area
+            }));
+
+            // Показать загрузку
+            document.getElementById('loading').style.display = 'block';
+
+            // Отправить на анализ
+            fetch('/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    target_property: targetProperty,
+                    comparables: comparablesWithPrice
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayResults(data);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results-section').style.display = 'block';
+
+                // Плавная прокрутка к результатам
+                document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка анализа! Проверьте консоль.');
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        function displayResults(data) {
+            // Обновить метрики
+            const currentPrice = data.target_property.price_per_sqm / 1000000;
+            const fairPrice = data.fair_price_analysis.fair_price_per_sqm / 1000000;
+            const marketAvg = data.market_statistics.all.mean / 1000000;
+            const overpricing = data.fair_price_analysis.overpricing_percent;
+            const livingPercent = data.target_property.living_area_percent;
+
+            document.getElementById('metric-current-price').textContent = currentPrice.toFixed(3);
+            document.getElementById('metric-fair-price').textContent = fairPrice.toFixed(3);
+            document.getElementById('metric-market-avg').textContent = marketAvg.toFixed(3);
+            document.getElementById('metric-overpricing').textContent = overpricing.toFixed(1);
+            document.getElementById('metric-living-percent').textContent = livingPercent.toFixed(1);
+            document.getElementById('metric-recommended').textContent =
+                (data.fair_price_analysis.fair_price_total / 1000000).toFixed(1);
+
+            // График сравнения
+            displayComparisonChart(data.comparison_chart_data);
+
+            // Сценарии продажи
+            displayScenarios(data.price_scenarios);
+
+            // График сценариев
+            displayScenariosChart(data.price_scenarios);
+
+            // Сильные и слабые стороны
+            displayStrengthsWeaknesses(data.strengths_weaknesses);
+
+            // Детальный расчет
+            displayFairPriceDetails(data.fair_price_analysis, data.market_statistics);
+        }
+
+        function displayComparisonChart(chartData) {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+
+            // Уничтожить предыдущий график если есть
+            if (window.comparisonChart) {
+                window.comparisonChart.destroy();
+            }
+
+            window.comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Сравнение цен за м² (млн ₽)',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Цена за м² (млн ₽)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayScenarios(scenarios) {
+            const container = document.getElementById('scenarios-container');
+            let html = '';
+
+            scenarios.forEach(scenario => {
+                const finalPrice = (scenario.expected_final_price / 1000000).toFixed(1);
+                const startPrice = (scenario.start_price / 1000000).toFixed(1);
+
+                html += `
+                    <div class="scenario-card">
+                        <h4>${scenario.name}</h4>
+                        <p style="color: #7f8c8d; margin-bottom: 15px;">${scenario.description}</p>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <strong>Стартовая цена:</strong> ${startPrice} млн ₽
+                            </div>
+                            <div>
+                                <strong>Ожидаемая финальная:</strong> ${finalPrice} млн ₽
+                            </div>
+                            <span class="probability">${scenario.probability}% успеха</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #7f8c8d;">
+                            <div><strong>Срок:</strong> ${scenario.time_months} мес.</div>
+                            <div><strong>Скидка:</strong> ${((1 - scenario.expected_final_price / scenario.start_price) * 100).toFixed(1)}%</div>
+                        </div>
+
+                        <div class="progress-bar-custom" style="margin-top: 15px;">
+                            <div class="progress-fill" style="width: ${scenario.probability}%;">
+                                ${scenario.probability}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function displayScenariosChart(scenarios) {
+            const ctx = document.getElementById('scenariosChart').getContext('2d');
+
+            if (window.scenariosChart) {
+                window.scenariosChart.destroy();
+            }
+
+            const datasets = scenarios.map((scenario, index) => {
+                const colors = [
+                    'rgb(102, 126, 234)',
+                    'rgb(118, 75, 162)',
+                    'rgb(52, 152, 219)',
+                    'rgb(231, 76, 60)'
+                ];
+
+                return {
+                    label: scenario.name,
+                    data: scenario.steps.map(step => ({
+                        x: step.month,
+                        y: step.price / 1000000
+                    })),
+                    borderColor: colors[index],
+                    backgroundColor: colors[index],
+                    tension: 0.3
+                };
+            });
+
+            window.scenariosChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Динамика цен по месяцам',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Месяцы'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Цена (млн ₽)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayStrengthsWeaknesses(data) {
+            // Сильные стороны
+            let strengthsHtml = '';
+            data.strengths.forEach(strength => {
+                strengthsHtml += `
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${strength.factor}</strong>
+                            <span class="stat-badge success">+${strength.premium_percent}%</span>
+                        </div>
+                        <div class="progress-bar-custom" style="height: 20px;">
+                            <div class="progress-fill" style="width: ${strength.impact * 10}%; background: var(--success-color);"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('strengths-list').innerHTML = strengthsHtml || '<p style="color: #999;">Сильные стороны не выявлены</p>';
+
+            // Слабые стороны
+            let weaknessesHtml = '';
+            data.weaknesses.forEach(weakness => {
+                weaknessesHtml += `
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${weakness.factor}</strong>
+                            <span class="stat-badge danger">-${weakness.discount_percent}%</span>
+                        </div>
+                        <div class="progress-bar-custom" style="height: 20px;">
+                            <div class="progress-fill" style="width: ${weakness.impact * 10}%; background: var(--danger-color);"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('weaknesses-list').innerHTML = weaknessesHtml || '<p style="color: #999;">Слабые стороны не выявлены</p>';
+
+            // Итоговая корректировка
+            const netAdjustment = data.net_adjustment;
+            const alertDiv = document.getElementById('net-adjustment-alert');
+
+            if (netAdjustment > 0) {
+                alertDiv.className = 'alert-custom success';
+                document.getElementById('net-adjustment-text').innerHTML =
+                    `+${netAdjustment.toFixed(1)}% (преимущество сильных сторон)`;
+            } else if (netAdjustment < 0) {
+                alertDiv.className = 'alert-custom danger';
+                document.getElementById('net-adjustment-text').innerHTML =
+                    `${netAdjustment.toFixed(1)}% (доминируют слабые стороны)`;
+            } else {
+                alertDiv.className = 'alert-custom warning';
+                document.getElementById('net-adjustment-text').innerHTML =
+                    `Баланс (сильные и слабые стороны уравновешены)`;
+            }
+        }
+
+        function displayFairPriceDetails(fairPrice, marketStats) {
+            let html = `
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Параметр</th>
+                            <th>Значение</th>
+                            <th>Описание</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Базовая цена за м²</strong></td>
+                            <td>${(fairPrice.base_price_per_sqm / 1000000).toFixed(3)} млн ₽</td>
+                            <td>Средняя по аналогам с дизайном</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Итоговый коэффициент</strong></td>
+                            <td>${fairPrice.final_multiplier.toFixed(3)}</td>
+                            <td>Учет всех корректировок</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Справедливая цена за м²</strong></td>
+                            <td>${(fairPrice.fair_price_per_sqm / 1000000).toFixed(3)} млн ₽</td>
+                            <td>После применения корректировок</td>
+                        </tr>
+                        <tr style="background: #f0f8ff;">
+                            <td><strong>Справедливая цена объекта</strong></td>
+                            <td><strong>${(fairPrice.fair_price_total / 1000000).toFixed(1)} млн ₽</strong></td>
+                            <td>Рекомендуемая цена</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Текущая цена</strong></td>
+                            <td>${(fairPrice.current_price / 1000000).toFixed(1)} млн ₽</td>
+                            <td>Заявленная продавцом</td>
+                        </tr>
+                        <tr style="background: ${fairPrice.overpricing_percent > 10 ? '#ffe0e0' : '#e0ffe0'};">
+                            <td><strong>Переоценка</strong></td>
+                            <td><strong>${fairPrice.overpricing_percent.toFixed(1)}%</strong></td>
+                            <td>${(fairPrice.overpricing_amount / 1000000).toFixed(1)} млн ₽ ${fairPrice.overpricing_percent > 10 ? '(завышена)' : '(в пределах нормы)'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert-custom ${fairPrice.overpricing_percent > 15 ? 'danger' : fairPrice.overpricing_percent > 5 ? 'warning' : 'success'}" style="margin-top: 20px;">
+                    <div style="font-size: 2rem;">${fairPrice.overpricing_percent > 15 ? '⚠️' : fairPrice.overpricing_percent > 5 ? '⚡' : '✅'}</div>
+                    <div>
+                        <strong>Рекомендация:</strong>
+                        ${fairPrice.overpricing_percent > 15 ?
+                            'Цена существенно завышена. Рекомендуется снижение на ' + ((fairPrice.overpricing_amount / fairPrice.current_price) * 100).toFixed(0) + '% для успешной продажи.' :
+                            fairPrice.overpricing_percent > 5 ?
+                            'Цена завышена умеренно. Небольшая корректировка увеличит шансы на продажу.' :
+                            'Цена находится в справедливом диапазоне. Объект конкурентоспособен на рынке.'
+                        }
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('fair-price-details').innerHTML = html;
+        }
+
+        // Загрузить аналоги при загрузке страницы
+        window.onload = function() {
+            loadDefaultComparables();
+        };
+    </script>
+</body>
+</html>

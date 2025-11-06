@@ -1,0 +1,437 @@
+"""
+Движок умных рекомендаций для анализа недвижимости
+
+Генерирует персонализированные рекомендации на основе анализа объекта:
+- Критичные (цена)
+- Важные (улучшения с ROI)
+- Средние (презентация)
+- Информационные (стратегия)
+"""
+
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass
+class Recommendation:
+    """Модель рекомендации"""
+    priority: int  # 1=CRITICAL, 2=HIGH, 3=MEDIUM, 4=INFO
+    icon: str
+    title: str
+    message: str
+    action: str
+    expected_result: str
+    roi: Optional[float] = None
+    financial_impact: Optional[Dict] = None
+    category: str = 'general'
+
+    def to_dict(self) -> Dict:
+        """Конвертация в словарь для JSON"""
+        return {
+            'priority': self.priority,
+            'priority_label': self._get_priority_label(),
+            'icon': self.icon,
+            'title': self.title,
+            'message': self.message,
+            'action': self.action,
+            'expected_result': self.expected_result,
+            'roi': self.roi,
+            'financial_impact': self.financial_impact or {},
+            'category': self.category
+        }
+
+    def _get_priority_label(self) -> str:
+        """Получить текстовую метку приоритета"""
+        labels = {
+            1: 'КРИТИЧНО',
+            2: 'ВАЖНО',
+            3: 'СРЕДНЕ',
+            4: 'ИНФО'
+        }
+        return labels.get(self.priority, 'ИНФО')
+
+
+class RecommendationEngine:
+    """
+    Генератор персонализированных рекомендаций
+
+    Анализирует результаты оценки недвижимости и генерирует
+    конкретные действия с расчетом ROI и финансового эффекта
+    """
+
+    # Приоритеты
+    CRITICAL = 1
+    HIGH = 2
+    MEDIUM = 3
+    INFO = 4
+
+    # Константы для расчетов
+    DESIGN_COST = 500_000  # Средняя стоимость дизайн-ремонта
+    PHOTO_SESSION_COST = 15_000  # Профессиональная фотосессия
+    OPPORTUNITY_RATE = 0.08  # Годовая ставка упущенной выгоды
+
+    def __init__(self, analysis_result: Dict):
+        """
+        Args:
+            analysis_result: Результат анализа из RealEstateAnalyzer
+        """
+        self.analysis = analysis_result
+        self.target = analysis_result.get('target_property', {})
+        self.fair_price_analysis = analysis_result.get('fair_price_analysis', {})
+        self.scenarios = analysis_result.get('price_scenarios', [])
+
+    def generate(self) -> List[Recommendation]:
+        """
+        Генерация всех рекомендаций
+
+        Returns:
+            Список рекомендаций, отсортированных по приоритету
+        """
+        recommendations = []
+
+        # 1. Критичные рекомендации по цене
+        recommendations.extend(self._check_pricing())
+
+        # 2. Важные рекомендации по улучшениям с ROI
+        recommendations.extend(self._check_improvements())
+
+        # 3. Средние рекомендации по презентации
+        recommendations.extend(self._check_presentation())
+
+        # 4. Информационные рекомендации по стратегии
+        recommendations.extend(self._check_strategy())
+
+        # Сортируем по приоритету
+        return sorted(recommendations, key=lambda r: (r.priority, -r.roi if r.roi else 0))
+
+    def _check_pricing(self) -> List[Recommendation]:
+        """
+        Проверка ценообразования
+
+        Критичные рекомендации по корректировке цены
+        """
+        recs = []
+        overpricing = self.fair_price_analysis.get('overpricing_percent', 0)
+        current_price = self.target.get('price', 0)
+        fair_price = self.fair_price_analysis.get('fair_price_total', 0)
+
+        if overpricing > 15:
+            # КРИТИЧНО: Сильная переоценка
+            opportunity_cost_12m = self._calc_opportunity_cost(current_price, 12)
+            opportunity_cost_4m = self._calc_opportunity_cost(current_price, 4)
+            savings = opportunity_cost_12m - opportunity_cost_4m
+
+            recs.append(Recommendation(
+                priority=self.CRITICAL,
+                icon='⚠️',
+                title='КРИТИЧНО: Сильная переоценка',
+                message=f'Объект переоценен на {overpricing:.1f}%. Высокий риск не продать в течение года.',
+                action=f'Снизить цену до рыночной: {fair_price:,.0f} ₽',
+                expected_result='Продажа за 2-4 месяца с вероятностью 75%',
+                category='pricing',
+                financial_impact={
+                    'current_scenario': 'Не продано 12+ месяцев',
+                    'with_action': 'Продано за 4 месяца',
+                    'time_saved_months': 8,
+                    'opportunity_cost_saved': savings,
+                    'recommendation': f'Снизить на {abs(overpricing):.1f}%'
+                }
+            ))
+
+        elif overpricing > 10:
+            # ВАЖНО: Умеренная переоценка
+            recs.append(Recommendation(
+                priority=self.HIGH,
+                icon='⚠️',
+                title='Умеренная переоценка',
+                message=f'Цена выше рынка на {overpricing:.1f}%. Снижает вероятность продажи.',
+                action=f'Рассмотреть снижение на 5-7% до {current_price * 0.93:,.0f} ₽',
+                expected_result='Увеличение вероятности продажи на 30-40%',
+                category='pricing',
+                financial_impact={
+                    'price_reduction': current_price * 0.07,
+                    'probability_increase': '30-40%',
+                    'expected_time_reduction': '2-3 месяца'
+                }
+            ))
+
+        elif overpricing > 5:
+            # СРЕДНЕ: Небольшая переоценка
+            recs.append(Recommendation(
+                priority=self.MEDIUM,
+                icon='💡',
+                title='Небольшая переоценка',
+                message=f'Цена выше рынка на {overpricing:.1f}%. В пределах нормы, но можно оптимизировать.',
+                action='Держать цену, но быть готовым к торгу',
+                expected_result='Продажа за 4-6 месяцев',
+                category='pricing'
+            ))
+
+        elif overpricing < -5:
+            # ИНФО: Недооценка
+            recs.append(Recommendation(
+                priority=self.INFO,
+                icon='💰',
+                title='Цена ниже рынка',
+                message=f'Объект недооценен на {abs(overpricing):.1f}%. Можно продать дороже.',
+                action=f'Рассмотреть повышение цены до {fair_price:,.0f} ₽',
+                expected_result='Дополнительная прибыль при сохранении скорости продажи',
+                category='pricing',
+                financial_impact={
+                    'potential_gain': fair_price - current_price,
+                    'risk_level': 'Низкий'
+                }
+            ))
+
+        return recs
+
+    def _check_improvements(self) -> List[Recommendation]:
+        """
+        Проверка возможностей улучшения
+
+        Важные рекомендации по улучшениям с ROI
+        """
+        recs = []
+
+        # Дизайн-ремонт
+        if not self.target.get('has_design', False):
+            cost = self.DESIGN_COST
+            area = self.target.get('total_area', 0)
+            base_price_per_sqm = self.fair_price_analysis.get('base_price_per_sqm', 0)
+
+            # Расчет прироста стоимости от дизайна (+8%)
+            gain = area * base_price_per_sqm * 0.08
+            roi = ((gain - cost) / cost * 100) if cost > 0 else 0
+
+            if roi > 50:  # Окупается
+                recs.append(Recommendation(
+                    priority=self.HIGH,
+                    icon='🎨',
+                    title='Дизайн-ремонт окупится',
+                    message=f'Инвестируя {cost:,.0f} ₽ в дизайнерскую отделку, получите +{gain:,.0f} ₽ к стоимости.',
+                    action='Заказать дизайн-проект и ремонт',
+                    expected_result=f'ROI: {roi:.0f}%. Срок окупаемости: немедленно при продаже.',
+                    roi=roi,
+                    category='improvement',
+                    financial_impact={
+                        'investment': cost,
+                        'return': gain,
+                        'net_profit': gain - cost,
+                        'payback_period': 'При продаже'
+                    }
+                ))
+
+        # Парковка (если премиум и нет парковки)
+        if self.target.get('premium_location') and not self.target.get('parking'):
+            area = self.target.get('total_area', 0)
+            base_price_per_sqm = self.fair_price_analysis.get('base_price_per_sqm', 0)
+            parking_premium = area * base_price_per_sqm * 0.04  # +4% за парковку
+
+            recs.append(Recommendation(
+                priority=self.HIGH,
+                icon='🚗',
+                title='Парковка повысит ликвидность',
+                message=f'В премиум локации наличие парковки критично. Добавит {parking_premium:,.0f} ₽ к стоимости.',
+                action='Арендовать или купить машиноместо в доме',
+                expected_result='Увеличение привлекательности для покупателей на 40%',
+                category='improvement',
+                financial_impact={
+                    'value_increase': parking_premium,
+                    'liquidity_boost': '40%'
+                }
+            ))
+
+        # Высокие потолки (если низкие и премиум)
+        ceiling = self.target.get('ceiling_height', 2.7)
+        if ceiling < 2.8 and self.target.get('total_area', 0) > 100:
+            recs.append(Recommendation(
+                priority=self.MEDIUM,
+                icon='📏',
+                title='Указать высоту потолков',
+                message='Если потолки выше 2.8м, обязательно укажите это в описании.',
+                action='Проверить фактическую высоту и добавить в характеристики',
+                expected_result='Дополнительная привлекательность для сегмента покупателей',
+                category='improvement'
+            ))
+
+        return recs
+
+    def _check_presentation(self) -> List[Recommendation]:
+        """
+        Проверка презентации объявления
+
+        Средние рекомендации по фото, описанию, контенту
+        """
+        recs = []
+
+        # Профессиональные фото
+        images_count = len(self.target.get('images', []))
+        renders_only = self.target.get('renders_only', False)
+
+        if renders_only or images_count < 10:
+            cost = self.PHOTO_SESSION_COST
+
+            # Эффект от качественных фото
+            views_increase = 40  # %
+            conversion_increase = 15  # %
+
+            # Примерный ROI (1 фотосессия vs потеря покупателей)
+            current_price = self.target.get('price', 0)
+            opportunity_cost_1m = self._calc_opportunity_cost(current_price, 1)
+            roi = ((opportunity_cost_1m - cost) / cost * 100) if cost > 0 else 0
+
+            recs.append(Recommendation(
+                priority=self.MEDIUM,
+                icon='📸',
+                title='Улучшить фотографии',
+                message=f'{"Рендеры снижают доверие на 3%." if renders_only else f"Только {images_count} фото - недостаточно."} Качественные фото увеличивают просмотры на {views_increase}%.',
+                action=f'Заказать профессиональную фотосессию (~{cost:,.0f} ₽)',
+                expected_result=f'Увеличение просмотров на {views_increase}%, конверсии на {conversion_increase}%',
+                roi=roi,
+                category='presentation',
+                financial_impact={
+                    'investment': cost,
+                    'views_increase_percent': views_increase,
+                    'conversion_boost_percent': conversion_increase,
+                    'estimated_time_reduction': '1-2 месяца'
+                }
+            ))
+
+        # Описание
+        description = self.target.get('description', '')
+        if not description or len(description) < 200:
+            recs.append(Recommendation(
+                priority=self.MEDIUM,
+                icon='📝',
+                title='Улучшить описание',
+                message='Краткое или отсутствующее описание снижает доверие покупателей.',
+                action='Написать подробное описание (300-500 символов) с акцентом на уникальные особенности',
+                expected_result='Увеличение времени просмотра объявления на 50%',
+                category='presentation'
+            ))
+
+        # Видео-обзор
+        if self.target.get('price', 0) > 30_000_000:
+            recs.append(Recommendation(
+                priority=self.MEDIUM,
+                icon='🎥',
+                title='Добавить видео-обзор',
+                message='Для премиум сегмента (>30 млн) видео критично важно.',
+                action='Снять профессиональное видео квартиры (3-5 минут)',
+                expected_result='Увеличение серьезных обращений на 60%',
+                category='presentation',
+                financial_impact={
+                    'investment': 30_000,
+                    'serious_inquiries_boost': '60%'
+                }
+            ))
+
+        return recs
+
+    def _check_strategy(self) -> List[Recommendation]:
+        """
+        Проверка стратегии продажи
+
+        Информационные рекомендации по выбору оптимального сценария
+        """
+        recs = []
+
+        if not self.scenarios:
+            return recs
+
+        # Найти оптимальный сценарий (максимальная чистая прибыль)
+        best_scenario = max(
+            self.scenarios,
+            key=lambda s: s.get('financials', {}).get('net_after_opportunity', 0)
+        )
+
+        best_name = best_scenario.get('name', '')
+        best_months = best_scenario.get('time_months', 0)
+        best_profit = best_scenario.get('financials', {}).get('net_after_opportunity', 0)
+        best_prob = best_scenario.get('base_probability', 0)
+
+        recs.append(Recommendation(
+            priority=self.INFO,
+            icon='📊',
+            title='Оптимальная стратегия продажи',
+            message=f'Сценарий "{best_name}" дает максимальную чистую прибыль с учетом всех факторов.',
+            action=f'Следовать стратегии "{best_name}"',
+            expected_result=f'Продажа за {best_months} мес. с вероятностью {best_prob}%. Чистая прибыль: {best_profit:,.0f} ₽',
+            category='strategy',
+            financial_impact={
+                'scenario': best_name,
+                'expected_time_months': best_months,
+                'probability_percent': best_prob,
+                'net_profit': best_profit
+            }
+        ))
+
+        # Сравнение быстрой vs максимальной цены
+        fast_scenario = next((s for s in self.scenarios if s.get('type') == 'fast'), None)
+        max_scenario = next((s for s in self.scenarios if s.get('type') == 'maximum'), None)
+
+        if fast_scenario and max_scenario:
+            fast_profit = fast_scenario.get('financials', {}).get('net_after_opportunity', 0)
+            max_profit = max_scenario.get('financials', {}).get('net_after_opportunity', 0)
+
+            if fast_profit > max_profit:
+                diff = fast_profit - max_profit
+                recs.append(Recommendation(
+                    priority=self.INFO,
+                    icon='⚡',
+                    title='Быстрая продажа выгоднее',
+                    message=f'Попытка "выжать максимум" обойдется дороже на {diff:,.0f} ₽ из-за упущенной выгоды.',
+                    action='Не затягивать с продажей',
+                    expected_result='Экономия времени и денег',
+                    category='strategy',
+                    financial_impact={
+                        'fast_scenario_profit': fast_profit,
+                        'max_scenario_profit': max_profit,
+                        'difference': diff
+                    }
+                ))
+
+        return recs
+
+    def _calc_opportunity_cost(self, price: float, months: int) -> float:
+        """
+        Расчет упущенной выгоды
+
+        Args:
+            price: Цена объекта
+            months: Количество месяцев
+
+        Returns:
+            Упущенная выгода в рублях
+        """
+        return price * self.OPPORTUNITY_RATE * (months / 12)
+
+    def get_summary(self) -> Dict:
+        """
+        Получить сводку рекомендаций
+
+        Returns:
+            Словарь с количеством рекомендаций по приоритетам
+        """
+        recommendations = self.generate()
+
+        summary = {
+            'total': len(recommendations),
+            'by_priority': {
+                'critical': len([r for r in recommendations if r.priority == self.CRITICAL]),
+                'high': len([r for r in recommendations if r.priority == self.HIGH]),
+                'medium': len([r for r in recommendations if r.priority == self.MEDIUM]),
+                'info': len([r for r in recommendations if r.priority == self.INFO])
+            },
+            'by_category': {}
+        }
+
+        # Группировка по категориям
+        for rec in recommendations:
+            category = rec.category
+            if category not in summary['by_category']:
+                summary['by_category'][category] = 0
+            summary['by_category'][category] += 1
+
+        return summary

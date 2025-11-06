@@ -1,0 +1,44 @@
+# Test files
+test_*.py
+debug_*.py
+*_test.py
+quick_test.py
+analyze_*.py
+
+# Development
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+venv/
+env/
+
+# Documentation (optional, keep summaries)
+# *.md
+
+# Data files
+neo4j_data/
+redis_data/
+*.db
+*.sqlite
+
+# Logs
+*.log
