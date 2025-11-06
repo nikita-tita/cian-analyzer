@@ -1,0 +1,33 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pip install -r requirements.txt"
+  },
+  "deploy": {
+    "startCommand": "gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 index:app",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "services": [
+    {
+      "name": "cian-analyzer",
+      "source": {
+        "repo": "nikita-tita/cian-analyzer",
+        "branch": "claude/review-project-011CUrTS5jNGPrP8p61s7prx"
+      }
+    }
+  ],
+  "plugins": [
+    {
+      "type": "redis",
+      "name": "redis"
+    },
+    {
+      "type": "postgresql",
+      "name": "postgres"
+    }
+  ]
+}

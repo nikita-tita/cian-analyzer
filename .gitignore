@@ -37,6 +37,7 @@ ENV/
 *.json
 !vercel.json
 !package*.json
+!railway.json
 *.csv
 *.xlsx
 results/
