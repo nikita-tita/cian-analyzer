@@ -29,12 +29,30 @@ app.secret_key = os.urandom(24)
 # Хранилище сессий (в production использовать Redis)
 sessions_storage = {}
 
+# Middleware для логирования всех запросов
+@app.before_request
+def log_request():
+    worker_id = os.getpid()
+    logger.info(f"🌐 [{worker_id}] {request.method} {request.path}")
+    if request.is_json:
+        body = request.get_json(silent=True)
+        if body and 'session_id' in body:
+            logger.info(f"🔑 [{worker_id}] Session ID в запросе: {body['session_id']}")
+
+@app.after_request
+def log_response(response):
+    worker_id = os.getpid()
+    logger.info(f"✓ [{worker_id}] {request.path} → {response.status_code}")
+    return response
+
 # Логируем запуск приложения
+worker_id = os.getpid()
 logger.info("=" * 60)
-logger.info("🚀 Cian Analyzer v2.0 - Railway Deployment")
+logger.info(f"🚀 Cian Analyzer v2.0 - Railway Deployment [Worker: {worker_id}]")
 logger.info("=" * 60)
 logger.info(f"📊 Parser: SimpleParser (Railway-optimized)")
 logger.info(f"📊 Cache: In-memory (sessions_storage)")
+logger.info(f"📊 Worker ID: {worker_id}")
 logger.info("=" * 60)
 
 
