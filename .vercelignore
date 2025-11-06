@@ -1,11 +1,4 @@
-# Test files
-test_*.py
-debug_*.py
-*_test.py
-quick_test.py
-analyze_*.py
-
-# Development
+# Development files
 __pycache__/
 *.pyc
 *.pyo
@@ -16,8 +9,11 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-.pytest_cache/
-.mypy_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
 
 # IDE
 .vscode/
@@ -25,20 +21,24 @@ build/
 *.swp
 *.swo
 
+# Logs
+logs/
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitignore
+
 # Environment
 .env
 .env.local
-venv/
-env/
 
-# Documentation (optional, keep summaries)
-# *.md
-
-# Data files
-neo4j_data/
-redis_data/
-*.db
-*.sqlite
-
-# Logs
-*.log
+# Large files
+webapp/
+*.txt
+!requirements.txt

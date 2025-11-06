@@ -19,7 +19,13 @@
   "functions": {
     "index.py": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 60
     }
-  }
+  },
+  "env": {
+    "FLASK_ENV": "production",
+    "LOG_LEVEL": "INFO",
+    "CACHE_ENABLED": "true"
+  },
+  "regions": ["iad1"]
 }
