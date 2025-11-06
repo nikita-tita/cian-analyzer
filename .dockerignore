@@ -1,0 +1,81 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Test files
+test_*/
+tests/
+*.test.py
+pytest_cache/
+.pytest_cache/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Examples and debug
+examples/
+debug_*.html
+example_*.jpg
+cleaned_photos/
+test_images/
+page_debug.html
+
+# Deployment configs (not needed in container)
+.vercelignore
+vercel.json
+railway.json
+railway.toml
+render.yaml
+fly.toml
+cloudbuild.yaml
+.gcloudignore
+Procfile
+
+# Scripts (runtime not needed)
+*.sh
+QUICK_RUN.sh
+start_*.sh
+check_*.sh
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
