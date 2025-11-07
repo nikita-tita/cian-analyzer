@@ -3,358 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOUSLER — Премиум-агентство продаж недвижимости в Санкт-Петербурге</title>
-    <meta name="description" content="Премиум-агентство продаж недвижимости в Санкт-Петербурге. Не размещаем объявления — ставим объекты на сцену. Диагностика, сценография, история, спрос.">
+    <title>HOUSLER — Премиум-агентство недвижимости в Санкт-Петербурге</title>
+    <meta name="description" content="Премиум-агентство продаж недвижимости в Санкт-Петербурге. Профессиональная упаковка и продажа элитной недвижимости.">
     <link rel="stylesheet" href="/static/css/landing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-content">
+                <div class="logo">HOUSLER</div>
+                <div class="nav-links">
+                    <a href="#services">Услуги</a>
+                    <a href="#process">Процесс</a>
+                    <a href="#pricing">Стоимость</a>
+                    <a href="#contact">Контакты</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
     <!-- Hero Section -->
     <section class="hero">
-        <div class="hero-overlay"></div>
         <div class="container">
-            <div class="hero-content">
-                <h1 class="hero-title">HOUSLER</h1>
-                <p class="hero-subtitle">Премиум-агентство продаж в Санкт-Петербурге</p>
-                <p class="hero-description">
-                    Мы не «размещаем объявления». Мы ставим объект на сцену:
-                    <span class="highlight">диагностика</span> →
-                    <span class="highlight">сценография</span> →
-                    <span class="highlight">история</span> →
-                    <span class="highlight">спрос</span>.
-                </p>
-                <p class="hero-result">
-                    Результат — быстрые офферы по правильной цене. Без суеты. Без странных условий.
-                </p>
-                <div class="hero-cta">
-                    <a href="#calculator" class="btn btn-primary btn-large">Оценить мою квартиру</a>
-                    <a href="#contact" class="btn btn-secondary btn-large">Бесплатная верификация</a>
-                </div>
+            <h1>Продаём недвижимость<br>по справедливой цене</h1>
+            <p class="hero-subtitle">Премиум-агентство в Санкт-Петербурге.<br>Профессиональная упаковка, точная оценка, быстрая продажа.</p>
+            <div class="hero-cta">
+                <a href="/calculator" class="btn btn-primary">Оценить квартиру</a>
+                <a href="#contact" class="btn btn-secondary">Связаться</a>
             </div>
-        </div>
-        <div class="scroll-indicator">
-            <span>Узнать больше</span>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4L10 16M10 16L16 10M10 16L4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
         </div>
     </section>
 
-    <!-- What You Get Section -->
-    <section class="section section-light">
+    <!-- Services Section -->
+    <section class="section" id="services">
         <div class="container">
-            <h2 class="section-title">Что вы получаете</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🔬</div>
-                    <h3 class="feature-title">Диагностика</h3>
-                    <p class="feature-description">
-                        Конструкция, инженерия, юрчистота, потенциал перепланировки.
-                        Цифрами, а не словами.
-                    </p>
+            <h2 class="section-title">Что мы делаем</h2>
+            <div class="services-grid">
+                <div class="service-card">
+                    <h3>Диагностика</h3>
+                    <p>Юридическая проверка, техническая экспертиза, оценка потенциала объекта.</p>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎬</div>
-                    <h3 class="feature-title">Сценография</h3>
-                    <p class="feature-description">
-                        Светлый лайт-стейджинг, проф-фото/видео, дрон, ночные кадры,
-                        3D-тур, интерактив-план.
-                    </p>
+                <div class="service-card">
+                    <h3>Упаковка</h3>
+                    <p>Профессиональная фото и видеосъёмка, staging, создание презентации объекта.</p>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📖</div>
-                    <h3 class="feature-title">История объекта</h3>
-                    <p class="feature-description">
-                        Короткий нарратив, который продает плюсы, а не метры.
-                    </p>
+                <div class="service-card">
+                    <h3>Ценообразование</h3>
+                    <p>Аналитика рынка, расчёт справедливой цены, стратегия ценообразования.</p>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">💻</div>
-                    <h3 class="feature-title">Цифровой кабинет</h3>
-                    <p class="feature-description">
-                        Все документы, показы, отклики и офферы в одном месте,
-                        статус в реальном времени.
-                    </p>
+                <div class="service-card">
+                    <h3>Продажа</h3>
+                    <p>Размещение на всех площадках, организация показов, ведение переговоров.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- How We Work Section -->
-    <section class="section section-dark">
+    <!-- Process Section -->
+    <section class="section section-gray" id="process">
         <div class="container">
-            <h2 class="section-title">Как мы работаем (3 недели)</h2>
-            <div class="timeline">
-                <div class="timeline-item">
-                    <div class="timeline-marker">1</div>
-                    <div class="timeline-content">
-                        <h3>Неделя 1</h3>
-                        <p>Проверка, упаковка, цена старта, запуск каналов.</p>
-                    </div>
+            <h2 class="section-title">Процесс работы</h2>
+            <div class="process-timeline">
+                <div class="process-step">
+                    <div class="step-number">01</div>
+                    <h3>Неделя 1</h3>
+                    <p>Диагностика объекта, проверка документов, съёмка, создание презентации</p>
                 </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">2</div>
-                    <div class="timeline-content">
-                        <h3>Неделя 2</h3>
-                        <p>Активные показы, работа с лидами, микрокоррекции.</p>
-                    </div>
+                <div class="process-step">
+                    <div class="step-number">02</div>
+                    <h3>Неделя 2</h3>
+                    <p>Запуск рекламы, размещение на площадках, организация показов</p>
                 </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">3</div>
-                    <div class="timeline-content">
-                        <h3>Неделя 3</h3>
-                        <p>Переговоры, лучшая ставка, сделка. Все прозрачно, шаги видны в кабинете.</p>
-                    </div>
+                <div class="process-step">
+                    <div class="step-number">03</div>
+                    <h3>Неделя 3</h3>
+                    <p>Работа с предложениями, переговоры, выбор лучшего покупателя</p>
+                </div>
+                <div class="process-step">
+                    <div class="step-number">04</div>
+                    <h3>Сделка</h3>
+                    <p>Юридическое сопровождение, безопасные расчёты, передача объекта</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Pricing Section -->
-    <section class="section section-light">
+    <section class="section" id="pricing">
         <div class="container">
-            <h2 class="section-title">Пакеты по цене объекта и форматы договора</h2>
-            <p class="section-subtitle">
-                Честные, простые, без «мелкого»: фиксированная комиссия <strong>2%</strong>
-                или <strong>гибкая предоплата</strong>, которая засчитывается в комиссию,
-                если покупателя привели мы <strong>и</strong> проводим сделку с нашим участием.
-            </p>
+            <h2 class="section-title">Стоимость услуг</h2>
+            <p class="section-description">Прозрачное ценообразование. Комиссия 2% от стоимости объекта или фиксированная предоплата.</p>
 
-            <div class="pricing-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Диапазон цены</th>
-                            <th>Что входит</th>
-                            <th>Срок</th>
-                            <th>Опция A — 2%</th>
-                            <th>Опция B — Предоплата</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>до 25 млн</strong></td>
-                            <td>
-                                Диагностика, лайт-стейджинг, проф-фото/видео, 3D-тур,
-                                ЦИАН/Авито (подъемы), соцсети района, отчет каждую неделю
-                            </td>
-                            <td>7–14 дней</td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>2%</strong>
-                                    <small>без предоплат</small>
-                                </div>
-                            </td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>100 000 ₽</strong>
-                                    <small>при нашей находке — доплата до 2%</small>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><strong>25–50 млн</strong></td>
-                            <td>
-                                Плюс лендинг объекта, ретаргет/контекст, PR в локальных медиа/Telegram
-                            </td>
-                            <td>10–21 день</td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>2%</strong>
-                                    <small>без предоплат</small>
-                                </div>
-                            </td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>200 000 ₽</strong>
-                                    <small>при нашей находке — доплата до 2%</small>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><strong>50+ млн</strong></td>
-                            <td>
-                                Премиальный стейджинг (в т. ч. мебель в аренду),
-                                дрон + ночные кадры, интерактив-план, персональные показы, датарум
-                            </td>
-                            <td>14–30 дней</td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>2%</strong>
-                                    <small>без предоплат</small>
-                                </div>
-                            </td>
-                            <td class="price-cell">
-                                <div class="price-option">
-                                    <strong>300 000 ₽</strong>
-                                    <small>при нашей находке — доплата до 2%</small>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <p class="pricing-note">
-                <strong>Прямо:</strong> предоплата в Опции B покрывает работу и носители.
-                Рекламные бюджеты согласуем письменно, без сюрпризов.
-            </p>
-        </div>
-    </section>
-
-    <!-- Examples Section -->
-    <section class="section section-gray">
-        <div class="container">
-            <h2 class="section-title">Деньги без недосказанностей</h2>
-            <p class="section-subtitle">3 коротких примера</p>
-
-            <div class="examples-grid">
-                <div class="example-card">
-                    <div class="example-price">20 млн</div>
-                    <div class="example-details">
-                        <p><strong>Опция B</strong>: предоплата 100 тыс</p>
-                        <p>Комиссия 2% = 400 тыс</p>
-                        <p class="highlight-text">При нашей находке и участии → доплата 300 тыс</p>
-                        <p><small>Если не мы и без нас — доплат нет</small></p>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>до 25 млн ₽</h3>
+                    </div>
+                    <div class="pricing-body">
+                        <div class="pricing-option">
+                            <div class="option-label">Опция A</div>
+                            <div class="option-price">2%</div>
+                            <div class="option-note">без предоплаты</div>
+                        </div>
+                        <div class="pricing-divider"></div>
+                        <div class="pricing-option">
+                            <div class="option-label">Опция B</div>
+                            <div class="option-price">100 000 ₽</div>
+                            <div class="option-note">фиксированная сумма</div>
+                        </div>
                     </div>
                 </div>
-                <div class="example-card">
-                    <div class="example-price">36 млн</div>
-                    <div class="example-details">
-                        <p><strong>Опция B</strong>: предоплата 200 тыс</p>
-                        <p>Комиссия 2% = 720 тыс</p>
-                        <p class="highlight-text">При нашей находке и участии → доплата 520 тыс</p>
-                        <p><small>Без нас — только предоплата</small></p>
+
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>25–50 млн ₽</h3>
+                    </div>
+                    <div class="pricing-body">
+                        <div class="pricing-option">
+                            <div class="option-label">Опция A</div>
+                            <div class="option-price">2%</div>
+                            <div class="option-note">без предоплаты</div>
+                        </div>
+                        <div class="pricing-divider"></div>
+                        <div class="pricing-option">
+                            <div class="option-label">Опция B</div>
+                            <div class="option-price">200 000 ₽</div>
+                            <div class="option-note">фиксированная сумма</div>
+                        </div>
                     </div>
                 </div>
-                <div class="example-card">
-                    <div class="example-price">85 млн</div>
-                    <div class="example-details">
-                        <p><strong>Опция B</strong>: предоплата 300 тыс</p>
-                        <p>Комиссия 2% = 1 700 тыс</p>
-                        <p class="highlight-text">При нашей находке и участии → доплата 1 400 тыс</p>
-                        <p><small>Без нас — только предоплата</small></p>
+
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>от 50 млн ₽</h3>
+                    </div>
+                    <div class="pricing-body">
+                        <div class="pricing-option">
+                            <div class="option-label">Опция A</div>
+                            <div class="option-price">2%</div>
+                            <div class="option-note">без предоплаты</div>
+                        </div>
+                        <div class="pricing-divider"></div>
+                        <div class="pricing-option">
+                            <div class="option-label">Опция B</div>
+                            <div class="option-price">300 000 ₽</div>
+                            <div class="option-note">фиксированная сумма</div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <p class="pricing-note">При выборе фиксированной оплаты: если покупателя приводим мы — доплата до полной комиссии 2%. Если покупатель сторонний — только фиксированная сумма.</p>
         </div>
     </section>
 
-    <!-- Our Rules Section -->
-    <section class="section section-light">
+    <!-- Calculator CTA -->
+    <section class="section section-cta">
         <div class="container">
-            <h2 class="section-title">Наши правила игры</h2>
-            <div class="rules-grid">
-                <div class="rule-card">
-                    <div class="rule-number">1</div>
-                    <h3 class="rule-title">Окно спроса</h3>
-                    <p class="rule-description">
-                        Первые 14 дней решают. Мы проектируем пик интереса именно туда.
-                    </p>
-                </div>
-                <div class="rule-card">
-                    <div class="rule-number">2</div>
-                    <h3 class="rule-title">Динамическая цена</h3>
-                    <p class="rule-description">
-                        Цена — рычаг. Спрос растет — поднимаем. Нужна скорость — фиксируем аргументированный шаг вниз.
-                    </p>
-                </div>
-                <div class="rule-card">
-                    <div class="rule-number">3</div>
-                    <h3 class="rule-title">Готовый объект</h3>
-                    <p class="rule-description">
-                        Продаем ощущение «заезжай и живи», а не список ремонта. Это экономит время и поднимает ставку.
-                    </p>
-                </div>
-                <div class="rule-card">
-                    <div class="rule-number">4</div>
-                    <h3 class="rule-title">Прозрачность</h3>
-                    <p class="rule-description">
-                        Все статусы и цифры — в кабинете. Раз в неделю — короткий отчет без канцелярита.
-                    </p>
-                </div>
-                <div class="rule-card">
-                    <div class="rule-number">5</div>
-                    <h3 class="rule-title">Без давления</h3>
-                    <p class="rule-description">
-                        Хотите эксклюзив — окей. Хотите свободу — берите гибкую схему. Мы уверены в собственных результатах.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Why Housler Section -->
-    <section class="section section-dark">
-        <div class="container">
-            <h2 class="section-title">Почему Housler</h2>
-            <div class="why-grid">
-                <div class="why-card">
-                    <h3>🎯 Амбиция без пафоса</h3>
-                    <p>Молодая команда, быстрые решения, чистые процессы.</p>
-                </div>
-                <div class="why-card">
-                    <h3>📸 Контент как актив</h3>
-                    <p>Объект выглядит так, что ему верят и его хотят.</p>
-                </div>
-                <div class="why-card">
-                    <h3>📊 Тактика и цифры</h3>
-                    <p>Решения принимаем по метрикам, не «по ощущению».</p>
-                </div>
-                <div class="why-card">
-                    <h3>🔄 Полный цикл в одни руки</h3>
-                    <p>От проверки до закрытия. Вы — в курсе, мы — в деле.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Calculator CTA Section -->
-    <section class="section section-calculator" id="calculator">
-        <div class="container">
-            <div class="calculator-cta">
-                <h2 class="section-title">Узнайте справедливую цену вашей квартиры</h2>
-                <p class="section-subtitle">
-                    Воспользуйтесь нашим профессиональным калькулятором недвижимости.
-                    Получите точную оценку с учетом всех факторов рынка.
-                </p>
-                <div class="calculator-features">
-                    <div class="calc-feature">✓ Анализ рыночных данных</div>
-                    <div class="calc-feature">✓ Учет всех параметров</div>
-                    <div class="calc-feature">✓ Персонализированные рекомендации</div>
-                    <div class="calc-feature">✓ Сценарии продажи</div>
-                </div>
-                <a href="/calculator" class="btn btn-primary btn-xl">Перейти к калькулятору</a>
+            <div class="cta-content">
+                <h2>Узнайте рыночную стоимость вашей недвижимости</h2>
+                <p>Воспользуйтесь профессиональным калькулятором для точной оценки</p>
+                <a href="/calculator" class="btn btn-primary btn-large">Перейти к калькулятору</a>
             </div>
         </div>
     </section>
 
     <!-- Contact Section -->
-    <section class="section section-contact" id="contact">
+    <section class="section" id="contact">
         <div class="container">
-            <h2 class="section-title">Первый шаг</h2>
-            <p class="section-subtitle">
-                <strong>Бесплатная верификация объекта</strong>: дадим диапазон рыночной цены,
-                оценим потенциал и план на 3 недели.<br>
-                Никаких обязательств. Нормальная взрослая диагностика.
-            </p>
-
+            <h2 class="section-title">Контакты</h2>
             <div class="contact-grid">
-                <div class="contact-card">
-                    <div class="contact-icon">📧</div>
-                    <h3>Email</h3>
+                <div class="contact-item">
+                    <div class="contact-label">Email</div>
                     <a href="mailto:hello@housler.ru">hello@housler.ru</a>
                 </div>
-                <div class="contact-card">
-                    <div class="contact-icon">📱</div>
-                    <h3>Телефон</h3>
+                <div class="contact-item">
+                    <div class="contact-label">Телефон</div>
                     <a href="tel:+78123851234">+7 (812) 385-12-34</a>
                 </div>
-                <div class="contact-card">
-                    <div class="contact-icon">💬</div>
-                    <h3>Telegram</h3>
+                <div class="contact-item">
+                    <div class="contact-label">Telegram</div>
                     <a href="https://t.me/housler_spb" target="_blank">@housler_spb</a>
                 </div>
             </div>
@@ -365,62 +197,22 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <div class="footer-brand">
-                    <h3>HOUSLER</h3>
-                    <p>Премиум-агентство продаж недвижимости в Санкт-Петербурге</p>
-                </div>
-                <div class="footer-links">
-                    <h4>Навигация</h4>
-                    <ul>
-                        <li><a href="#calculator">Калькулятор</a></li>
-                        <li><a href="#contact">Контакты</a></li>
-                        <li><a href="/calculator">Оценить квартиру</a></li>
-                    </ul>
-                </div>
-                <div class="footer-contact">
-                    <h4>Контакты</h4>
-                    <p>hello@housler.ru</p>
-                    <p>+7 (812) 385-12-34</p>
-                    <p>@housler_spb</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 HOUSLER. Все права защищены.</p>
+                <div class="footer-brand">HOUSLER</div>
+                <div class="footer-text">© 2024 Премиум-агентство недвижимости</div>
             </div>
         </div>
     </footer>
 
     <script>
-        // Smooth scroll для якорных ссылок
+        // Smooth scroll
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
+                    target.scrollIntoView({ behavior: 'smooth' });
                 }
             });
-        });
-
-        // Анимация появления элементов при скролле
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-in');
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.feature-card, .timeline-item, .example-card, .rule-card, .why-card').forEach(el => {
-            observer.observe(el);
         });
     </script>
 </body>
