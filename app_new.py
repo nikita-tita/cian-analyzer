@@ -39,13 +39,13 @@ session_storage = get_session_storage()
 
 @app.route('/')
 def index():
-    """Landing page"""
+    """Landing page - Agency website"""
     return render_template('index.html')
 
 
-@app.route('/analyze')
-def analyze_page():
-    """Wizard interface - main analysis tool"""
+@app.route('/calculator')
+def calculator():
+    """Property calculator - main analysis tool"""
     return render_template('wizard.html')
 
 
