@@ -80,6 +80,11 @@ const navigation = {
 
         state.currentStep = step;
 
+        // Обновляем floating кнопки
+        if (window.floatingButtons) {
+            window.floatingButtons.updateButtons();
+        }
+
         // Скроллим наверх
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -703,9 +708,63 @@ const screen3 = {
     }
 };
 
+// Floating buttons
+const floatingButtons = {
+    init() {
+        const nextBtn = document.getElementById('floating-next-btn');
+        const backBtn = document.getElementById('floating-back-btn');
+
+        nextBtn.addEventListener('click', () => {
+            if (state.currentStep === 1) {
+                screen1.updateTargetProperty();
+            } else if (state.currentStep === 2) {
+                navigation.goToStep(3);
+            } else if (state.currentStep === 3) {
+                // На последнем экране кнопка может скачивать отчет
+                utils.showToast('Функция скачивания в разработке', 'info');
+            }
+        });
+
+        backBtn.addEventListener('click', () => {
+            if (state.currentStep > 1) {
+                navigation.goToStep(state.currentStep - 1);
+            }
+        });
+
+        // Обновляем видимость кнопок при смене экрана
+        this.updateButtons();
+    },
+
+    updateButtons() {
+        const nextBtn = document.getElementById('floating-next-btn');
+        const backBtn = document.getElementById('floating-back-btn');
+
+        // Показываем кнопку "Назад" только не на первом экране
+        if (state.currentStep === 1) {
+            backBtn.style.display = 'none';
+        } else {
+            backBtn.style.display = 'flex';
+        }
+
+        // Обновляем текст кнопки "Далее"
+        const nextText = nextBtn.querySelector('span');
+        if (state.currentStep === 1) {
+            nextText.textContent = 'Далее';
+        } else if (state.currentStep === 2) {
+            nextText.textContent = 'К анализу';
+        } else if (state.currentStep === 3) {
+            nextText.textContent = 'Скачать отчет';
+        }
+    }
+};
+
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     screen1.init();
     screen2.init();
     screen3.init();
+    floatingButtons.init();
+
+    // Экспортируем для доступа из navigation
+    window.floatingButtons = floatingButtons;
 });
