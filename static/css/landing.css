@@ -11,7 +11,7 @@
     --color-border: #E5E7EB;
     --color-bg: #FFFFFF;
     --color-bg-gray: #F9FAFB;
-    --color-accent: #3B82F6;
+    --color-accent: #000000;
 }
 
 body {
@@ -184,7 +184,7 @@ body {
 .service-card:hover {
     border-color: var(--color-accent);
     transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
 }
 
 .service-card:hover::before {
@@ -252,7 +252,7 @@ body {
 
 .pricing-card:hover {
     border-color: var(--color-accent);
-    box-shadow: 0 12px 24px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
     transform: translateY(-4px);
 }
 
