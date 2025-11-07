@@ -274,15 +274,32 @@ def api_analyze():
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 8080))
+    use_ssl = os.environ.get('USE_SSL', 'false').lower() == 'true'
+
+    # Определяем протокол
+    protocol = 'https' if use_ssl else 'http'
 
     print("=" * 80)
     print("🚀 Cian Analyzer - Умный анализ недвижимости")
     print("=" * 80)
-    print(f"\n📍 Сервер запущен на: http://0.0.0.0:{port}")
+    print(f"\n📍 Сервер запущен на: {protocol}://0.0.0.0:{port}")
     print("\n📄 Доступные страницы:")
-    print(f"   • http://0.0.0.0:{port}/          - Лендинг")
-    print(f"   • http://0.0.0.0:{port}/calculator - Калькулятор")
-    print(f"   • http://0.0.0.0:{port}/parser     - Простой парсер")
+    print(f"   • {protocol}://0.0.0.0:{port}/          - Лендинг")
+    print(f"   • {protocol}://0.0.0.0:{port}/calculator - Калькулятор")
+    print(f"   • {protocol}://0.0.0.0:{port}/parser     - Простой парсер")
     print("\n")
 
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # Настройка SSL
+    if use_ssl:
+        cert_path = os.path.join(os.path.dirname(__file__), 'cert.pem')
+        key_path = os.path.join(os.path.dirname(__file__), 'key.pem')
+
+        if os.path.exists(cert_path) and os.path.exists(key_path):
+            print("🔒 HTTPS включен (самоподписанный сертификат)")
+            print("   Браузер покажет предупреждение - это нормально для разработки\n")
+            app.run(debug=True, host='0.0.0.0', port=port, ssl_context=(cert_path, key_path))
+        else:
+            print("⚠️  SSL сертификаты не найдены, запускаем без HTTPS\n")
+            app.run(debug=True, host='0.0.0.0', port=port)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=port)

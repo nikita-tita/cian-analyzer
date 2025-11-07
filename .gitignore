@@ -49,3 +49,6 @@ debug_*.py
 # OS
 .DS_Store
 Thumbs.db
+webapp/cert.pem
+webapp/key.pem
+*.pem
