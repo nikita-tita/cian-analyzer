@@ -272,14 +272,17 @@ def api_analyze():
 
 
 if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 8080))
+
     print("=" * 80)
     print("🚀 Cian Analyzer - Умный анализ недвижимости")
     print("=" * 80)
-    print("\n📍 Сервер запущен на: http://0.0.0.0:5000")
+    print(f"\n📍 Сервер запущен на: http://0.0.0.0:{port}")
     print("\n📄 Доступные страницы:")
-    print("   • http://0.0.0.0:5000/          - Лендинг")
-    print("   • http://0.0.0.0:5000/calculator - Калькулятор")
-    print("   • http://0.0.0.0:5000/parser     - Простой парсер")
+    print(f"   • http://0.0.0.0:{port}/          - Лендинг")
+    print(f"   • http://0.0.0.0:{port}/calculator - Калькулятор")
+    print(f"   • http://0.0.0.0:{port}/parser     - Простой парсер")
     print("\n")
 
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=port)
