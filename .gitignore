@@ -49,3 +49,6 @@ debug_*.py
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code plugins (contains node_modules)
+.claude-plugins/
