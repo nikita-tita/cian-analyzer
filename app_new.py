@@ -1,5 +1,6 @@
 """
-Новый улучшенный веб-интерфейс с 3-экранным UX
+Housler - Интеллектуальный анализ недвижимости
+Веб-интерфейс с 3-экранным wizard UX
 """
 
 from flask import Flask, render_template, request, jsonify, session
@@ -9,22 +10,31 @@ import logging
 from typing import Dict, List
 from datetime import datetime
 
-from src.parsers.playwright_parser import PlaywrightParser
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    from src.parsers.playwright_parser import PlaywrightParser
+    Parser = PlaywrightParser
+    logger.info("Using PlaywrightParser")
+except Exception as e:
+    logger.warning(f"Playwright not available, using SimpleParser: {e}")
+    from src.parsers.simple_parser import SimpleParser
+    Parser = SimpleParser
+
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.models.property import (
     TargetProperty,
     ComparableProperty,
     AnalysisRequest
 )
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.utils.session_storage import get_session_storage
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Хранилище сессий (в production использовать Redis)
-sessions_storage = {}
+# Хранилище сессий с поддержкой Redis
+session_storage = get_session_storage()
 
 
 @app.route('/')
@@ -60,8 +70,8 @@ def parse_url():
 
         logger.info(f"Парсинг URL: {url}")
 
-        # Парсинг через Playwright
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
+        # Парсинг через доступный парсер
+        with Parser(headless=True, delay=1.0) as parser:
             parsed_data = parser.parse_detail_page(url)
 
         # Определяем недостающие поля для анализа
@@ -69,12 +79,12 @@ def parse_url():
 
         # Создаем сессию
         session_id = str(uuid.uuid4())
-        sessions_storage[session_id] = {
+        session_storage.set(session_id, {
             'target_property': parsed_data,
             'comparables': [],
-            'created_at': datetime.now(),
+            'created_at': datetime.now().isoformat(),
             'step': 1
-        }
+        })
 
         return jsonify({
             'status': 'success',
@@ -117,12 +127,14 @@ def update_target():
         session_id = payload.get('session_id')
         data = payload.get('data')
 
-        if not session_id or session_id not in sessions_storage:
+        if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
         # Обновляем данные
-        sessions_storage[session_id]['target_property'].update(data)
-        sessions_storage[session_id]['step'] = 2
+        session_data = session_storage.get(session_id)
+        session_data['target_property'].update(data)
+        session_data['step'] = 2
+        session_storage.set(session_id, session_data)
 
         return jsonify({
             'status': 'success',
@@ -163,15 +175,16 @@ def find_similar():
         limit = payload.get('limit', 20)
         search_type = payload.get('search_type', 'building')  # По умолчанию ищем в ЖК
 
-        if not session_id or session_id not in sessions_storage:
+        if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
-        target = sessions_storage[session_id]['target_property']
+        session_data = session_storage.get(session_id)
+        target = session_data['target_property']
 
         logger.info(f"Поиск похожих объектов для сессии {session_id} (тип: {search_type})")
 
         # Поиск аналогов
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
+        with Parser(headless=True, delay=1.0) as parser:
             if search_type == 'building':
                 # Поиск в том же ЖК
                 similar = parser.search_similar_in_building(target, limit=limit)
@@ -182,7 +195,8 @@ def find_similar():
                 residential_complex = None
 
         # Сохраняем в сессию
-        sessions_storage[session_id]['comparables'] = similar
+        session_data['comparables'] = similar
+        session_storage.set(session_id, session_data)
 
         return jsonify({
             'status': 'success',
@@ -222,17 +236,19 @@ def add_comparable():
         session_id = payload.get('session_id')
         url = payload.get('url')
 
-        if not session_id or session_id not in sessions_storage:
+        if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
         logger.info(f"Добавление аналога: {url}")
 
         # Парсим аналог
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
+        with Parser(headless=True, delay=1.0) as parser:
             comparable_data = parser.parse_detail_page(url)
 
         # Добавляем в список
-        sessions_storage[session_id]['comparables'].append(comparable_data)
+        session_data = session_storage.get(session_id)
+        session_data['comparables'].append(comparable_data)
+        session_storage.set(session_id, session_data)
 
         return jsonify({
             'status': 'success',
@@ -268,13 +284,15 @@ def exclude_comparable():
         session_id = payload.get('session_id')
         index = payload.get('index')
 
-        if not session_id or session_id not in sessions_storage:
+        if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
-        comparables = sessions_storage[session_id]['comparables']
+        session_data = session_storage.get(session_id)
+        comparables = session_data['comparables']
 
         if 0 <= index < len(comparables):
             comparables[index]['excluded'] = True
+            session_storage.set(session_id, session_data)
 
         return jsonify({'status': 'success'})
 
@@ -310,10 +328,10 @@ def analyze():
         filter_outliers = payload.get('filter_outliers', True)
         use_median = payload.get('use_median', True)
 
-        if not session_id or session_id not in sessions_storage:
+        if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
-        session_data = sessions_storage[session_id]
+        session_data = session_storage.get(session_id)
 
         logger.info(f"Анализ для сессии {session_id}")
 
@@ -351,8 +369,9 @@ def analyze():
         result_dict['metrics'] = metrics
 
         # Сохраняем в сессию
-        sessions_storage[session_id]['analysis'] = result_dict
-        sessions_storage[session_id]['step'] = 3
+        session_data['analysis'] = result_dict
+        session_data['step'] = 3
+        session_storage.set(session_id, session_data)
 
         return jsonify({
             'status': 'success',
@@ -378,12 +397,12 @@ def get_session(session_id):
             "data": {...}
         }
     """
-    if session_id not in sessions_storage:
+    if not session_storage.exists(session_id):
         return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
     return jsonify({
         'status': 'success',
-        'data': sessions_storage[session_id]
+        'data': session_storage.get(session_id)
     })
 
 
