@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List
 from datetime import datetime
 
-from src.parsers.playwright_parser import PlaywrightParser
+from src.parsers.simple_parser import SimpleParser
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.models.property import (
     TargetProperty,
@@ -60,9 +60,9 @@ def parse_url():
 
         logger.info(f"Парсинг URL: {url}")
 
-        # Парсинг через Playwright
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
-            parsed_data = parser.parse_detail_page(url)
+        # Парсинг через SimpleParser (для Railway/Production)
+        parser = SimpleParser()
+        parsed_data = parser.parse_property(url)
 
         # Определяем недостающие поля для анализа
         missing_fields = _identify_missing_fields(parsed_data)
@@ -170,16 +170,16 @@ def find_similar():
 
         logger.info(f"Поиск похожих объектов для сессии {session_id} (тип: {search_type})")
 
-        # Поиск аналогов
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
-            if search_type == 'building':
-                # Поиск в том же ЖК
-                similar = parser.search_similar_in_building(target, limit=limit)
-                residential_complex = target.get('residential_complex', 'Неизвестно')
-            else:
-                # Широкий поиск по городу
-                similar = parser.search_similar(target, limit=limit)
-                residential_complex = None
+        # Поиск аналогов через SimpleParser (для Railway/Production)
+        parser = SimpleParser()
+        if search_type == 'building':
+            # SimpleParser возвращает демо-данные для аналогов
+            similar = parser.parse_comparables("", limit=limit)
+            residential_complex = target.get('residential_complex', 'Демо ЖК')
+        else:
+            # Широкий поиск по городу (демо-данные)
+            similar = parser.parse_comparables("", limit=limit)
+            residential_complex = None
 
         # Сохраняем в сессию
         sessions_storage[session_id]['comparables'] = similar
@@ -227,9 +227,9 @@ def add_comparable():
 
         logger.info(f"Добавление аналога: {url}")
 
-        # Парсим аналог
-        with PlaywrightParser(headless=True, delay=1.0) as parser:
-            comparable_data = parser.parse_detail_page(url)
+        # Парсим аналог через SimpleParser (для Railway/Production)
+        parser = SimpleParser()
+        comparable_data = parser.parse_property(url)
 
         # Добавляем в список
         sessions_storage[session_id]['comparables'].append(comparable_data)
