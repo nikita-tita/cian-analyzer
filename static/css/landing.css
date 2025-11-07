@@ -311,6 +311,16 @@ body {
     line-height: 1.6;
 }
 
+/* Why Housler */
+.why-description {
+    text-align: center;
+    font-size: 20px;
+    line-height: 1.7;
+    max-width: 900px;
+    margin: 0 auto;
+    color: var(--color-text);
+}
+
 /* CTA Section */
 .section-cta {
     background: var(--color-bg-gray);
