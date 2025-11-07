@@ -39,7 +39,13 @@ session_storage = get_session_storage()
 
 @app.route('/')
 def index():
-    """Главная страница - Экран 1: Парсинг"""
+    """Landing page"""
+    return render_template('index.html')
+
+
+@app.route('/analyze')
+def analyze_page():
+    """Wizard interface - main analysis tool"""
     return render_template('wizard.html')
 
 

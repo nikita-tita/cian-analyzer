@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Housler — Интеллектуальный анализ недвижимости</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --white: #FFFFFF;
+            --gray-light: #F5F5F5;
+            --gray-medium: #999999;
+            --gray-dark: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: var(--white);
+            color: var(--black);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Header */
+        .header {
+            padding: 40px 60px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        /* Hero Section */
+        .hero {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 120px 60px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 72px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 24px;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            color: var(--gray-dark);
+            margin-bottom: 60px;
+            font-weight: 400;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 20px 48px;
+            background: var(--black);
+            color: var(--white);
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 0;
+            transition: all 0.3s ease;
+            border: 2px solid var(--black);
+        }
+
+        .cta-button:hover {
+            background: var(--white);
+            color: var(--black);
+        }
+
+        /* Features */
+        .features {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 120px 60px;
+            background: var(--gray-light);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 60px;
+            margin-top: 80px;
+        }
+
+        .feature {
+            text-align: left;
+        }
+
+        .feature-number {
+            font-size: 14px;
+            color: var(--gray-medium);
+            margin-bottom: 20px;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+        }
+
+        .feature h3 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        .feature p {
+            font-size: 16px;
+            color: var(--gray-dark);
+            line-height: 1.7;
+        }
+
+        /* How it works */
+        .how-it-works {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 120px 60px;
+        }
+
+        .section-title {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 80px;
+            letter-spacing: -0.02em;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 80px;
+        }
+
+        .step {
+            position: relative;
+        }
+
+        .step-number {
+            font-size: 96px;
+            font-weight: 700;
+            color: var(--gray-light);
+            margin-bottom: 20px;
+            line-height: 1;
+        }
+
+        .step h4 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.01em;
+        }
+
+        .step p {
+            font-size: 16px;
+            color: var(--gray-dark);
+            line-height: 1.7;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 120px 60px;
+            text-align: center;
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .cta-section h2 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            letter-spacing: -0.02em;
+        }
+
+        .cta-button-white {
+            display: inline-block;
+            padding: 20px 48px;
+            background: var(--white);
+            color: var(--black);
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid var(--white);
+        }
+
+        .cta-button-white:hover {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        /* Footer */
+        .footer {
+            padding: 60px;
+            border-top: 1px solid var(--gray-light);
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: 14px;
+            color: var(--gray-medium);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 48px;
+            }
+
+            .subtitle {
+                font-size: 20px;
+            }
+
+            .features-grid,
+            .steps {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .section-title {
+                font-size: 36px;
+            }
+
+            .cta-section h2 {
+                font-size: 36px;
+            }
+
+            .hero,
+            .features,
+            .how-it-works,
+            .cta-section {
+                padding: 60px 30px;
+            }
+
+            .header {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">Housler</div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Интеллектуальный<br>анализ недвижимости</h1>
+        <p class="subtitle">Точный расчет справедливой цены на основе сравнительного анализа</p>
+        <a href="/analyze" class="cta-button">Начать анализ</a>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <h2 class="section-title">Возможности</h2>
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-number">01</div>
+                <h3>Точный расчет</h3>
+                <p>Определение справедливой цены на основе медианного метода сравнительного анализа с учетом всех параметров квартиры.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-number">02</div>
+                <h3>Умные коэффициенты</h3>
+                <p>Алгоритм учитывает реальное влияние ремонта и вида из окна на стоимость в конкретном доме.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-number">03</div>
+                <h3>Сценарии продажи</h3>
+                <p>Четыре реалистичных сценария с разными условиями торга и сроками — от быстрой до максимальной выручки.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how-it-works">
+        <h2 class="section-title">Как это работает</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h4>Загрузка объекта</h4>
+                <p>Вставьте ссылку на объявление с Cian.ru — система автоматически извлечет все характеристики.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h4>Подбор аналогов</h4>
+                <p>Находим похожие квартиры в том же доме для точного сравнительного анализа.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h4>Получение отчета</h4>
+                <p>Детальный анализ с расчетом справедливой цены, графиками и сценариями продажи.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <h2>Узнайте реальную стоимость<br>вашей недвижимости</h2>
+        <a href="/analyze" class="cta-button-white">Начать анализ</a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-text">© 2025 Housler. Интеллектуальный анализ недвижимости.</p>
+    </footer>
+</body>
+</html>
