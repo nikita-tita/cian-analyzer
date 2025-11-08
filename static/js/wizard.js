@@ -663,7 +663,7 @@ const screen2 = {
                 headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
-                    limit: 20
+                    limit: 50  // Увеличено до 50 чтобы не терять объекты
                 })
             });
 
