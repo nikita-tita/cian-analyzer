@@ -22,3 +22,12 @@ scipy>=1.11.0
 
 # Production server
 gunicorn>=21.2.0
+
+# Caching
+redis>=5.0.0
+
+# Browser automation (for parser)
+playwright>=1.40.0
+
+# Rate limiting and security
+Flask-Limiter>=3.5.0

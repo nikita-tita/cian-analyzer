@@ -5,12 +5,77 @@
 import time
 import logging
 from typing import Optional, List, Dict
+from functools import wraps
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
 
 from .base_parser import BaseCianParser, ParsingError
 
 logger = logging.getLogger(__name__)
+
+
+def detect_region_from_url(url: str) -> str:
+    """
+    Автоопределение региона по URL объекта
+
+    Args:
+        url: URL объявления
+
+    Returns:
+        'msk' или 'spb'
+    """
+    # Парсим URL для поиска региона
+    import re
+
+    # Ищем упоминание городов
+    if 'moskva' in url.lower() or 'moscow' in url.lower():
+        return 'msk'
+    elif 'sankt-peterburg' in url.lower() or 'spb' in url.lower():
+        return 'spb'
+
+    # По умолчанию - СПб
+    return 'spb'
+
+
+def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0):
+    """
+    Декоратор для повторных попыток с экспоненциальной задержкой
+
+    Args:
+        max_retries: Максимальное количество попыток
+        base_delay: Базовая задержка между попытками (секунды)
+        max_delay: Максимальная задержка между попытками (секунды)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+
+                    if attempt < max_retries - 1:
+                        # Экспоненциальная задержка: 1s, 2s, 4s, ...
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        logger.warning(
+                            f"Попытка {attempt + 1}/{max_retries} провалилась: {e}. "
+                            f"Повтор через {delay:.1f}s..."
+                        )
+                        time.sleep(delay)
+                    else:
+                        logger.error(
+                            f"Все {max_retries} попытки провалились. "
+                            f"Последняя ошибка: {e}"
+                        )
+
+            # Если все попытки провалились, пробрасываем последнее исключение
+            raise last_exception
+
+        return wrapper
+    return decorator
 
 
 class PlaywrightParser(BaseCianParser):
@@ -21,21 +86,41 @@ class PlaywrightParser(BaseCianParser):
     - Браузер запускается один раз на всю сессию
     - Context переиспользуется
     - Блокируются ненужные ресурсы (картинки, шрифты)
+    - Redis кэширование парсинга
     """
 
-    def __init__(self, headless: bool = True, delay: float = 2.0, block_resources: bool = True):
+    def __init__(
+        self,
+        headless: bool = True,
+        delay: float = 2.0,
+        block_resources: bool = True,
+        cache=None,
+        region: str = 'spb'
+    ):
         """
         Args:
             headless: Запускать браузер в фоновом режиме
             delay: Задержка между запросами
             block_resources: Блокировать картинки/шрифты для ускорения
+            cache: PropertyCache instance (опционально)
+            region: Регион поиска ('spb' или 'msk')
         """
-        super().__init__(delay)
+        super().__init__(delay, cache=cache)
         self.headless = headless
         self.block_resources = block_resources
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
+
+        # Маппинг регионов на коды Cian
+        self.region_codes = {
+            'spb': '2',  # Санкт-Петербург
+            'msk': '1',  # Москва
+        }
+        self.region = region
+        self.region_code = self.region_codes.get(region, '2')  # Default: SPB
+
+        logger.info(f"Регион: {region} (код: {self.region_code})")
 
     def __enter__(self):
         """Context manager вход"""
@@ -52,60 +137,88 @@ class PlaywrightParser(BaseCianParser):
             logger.warning("Браузер уже запущен")
             return
 
-        logger.info("🚀 Запуск Playwright браузера...")
-        self.playwright = sync_playwright().start()
+        try:
+            logger.info("🚀 Запуск Playwright браузера...")
+            self.playwright = sync_playwright().start()
 
-        self.browser = self.playwright.chromium.launch(
-            headless=self.headless,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-            ]
-        )
-
-        self.context = self.browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
-            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            locale='ru-RU',
-            timezone_id='Europe/Moscow',
-        )
-
-        # Скрываем автоматизацию
-        self.context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            window.chrome = { runtime: {} };
-        """)
-
-        # Блокируем ненужные ресурсы для ускорения
-        if self.block_resources:
-            self.context.route(
-                "**/*.{png,jpg,jpeg,gif,svg,webp,woff,woff2,ttf,mp4,mp3,pdf}",
-                lambda route: route.abort()
+            self.browser = self.playwright.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                ]
             )
 
-        logger.info("✓ Браузер запущен и готов к работе")
+            self.context = self.browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                locale='ru-RU',
+                timezone_id='Europe/Moscow',
+            )
+
+            # Скрываем автоматизацию
+            self.context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                window.chrome = { runtime: {} };
+            """)
+
+            # Блокируем ненужные ресурсы для ускорения
+            if self.block_resources:
+                self.context.route(
+                    "**/*.{png,jpg,jpeg,gif,svg,webp,woff,woff2,ttf,mp4,mp3,pdf}",
+                    lambda route: route.abort()
+                )
+
+            logger.info("✓ Браузер запущен и готов к работе")
+
+        except Exception as e:
+            logger.error(f"Ошибка при запуске браузера: {e}")
+            # Гарантируем очистку ресурсов при ошибке
+            self.close()
+            raise
 
     def close(self):
-        """Закрытие браузера"""
+        """Закрытие браузера с гарантированной очисткой ресурсов"""
+        errors = []
+
+        # Закрываем context
         if self.context:
-            self.context.close()
-            self.context = None
+            try:
+                self.context.close()
+            except Exception as e:
+                errors.append(f"Context: {e}")
+            finally:
+                self.context = None
 
+        # Закрываем browser
         if self.browser:
-            self.browser.close()
-            self.browser = None
+            try:
+                self.browser.close()
+            except Exception as e:
+                errors.append(f"Browser: {e}")
+            finally:
+                self.browser = None
 
+        # Останавливаем playwright
         if self.playwright:
-            self.playwright.stop()
-            self.playwright = None
+            try:
+                self.playwright.stop()
+            except Exception as e:
+                errors.append(f"Playwright: {e}")
+            finally:
+                self.playwright = None
 
-        logger.info("Браузер закрыт")
+        if errors:
+            logger.warning(f"Ошибки при закрытии браузера: {', '.join(errors)}")
+        else:
+            logger.info("Браузер закрыт")
 
+    @retry_with_exponential_backoff(max_retries=3, base_delay=2.0, max_delay=10.0)
     def _get_page_content(self, url: str) -> Optional[str]:
         """
         Получить HTML контент через Playwright
@@ -115,6 +228,9 @@ class PlaywrightParser(BaseCianParser):
 
         Returns:
             HTML контент или None
+
+        Raises:
+            Exception: После 3 неудачных попыток загрузки
         """
         if not self.context:
             raise RuntimeError("Браузер не запущен. Используйте with context или вызовите .start()")
@@ -141,12 +257,15 @@ class PlaywrightParser(BaseCianParser):
 
             html = page.content()
 
+            if not html or len(html) < 1000:
+                raise ValueError(f"Получен пустой или слишком короткий HTML ({len(html) if html else 0} символов)")
+
             logger.info(f"✓ Страница загружена ({len(html)} символов)")
             return html
 
         except Exception as e:
-            logger.error(f"Ошибка при загрузке {url}: {e}", exc_info=True)
-            return None
+            logger.error(f"Ошибка при загрузке {url}: {e}")
+            raise  # Пробрасываем для retry-механизма
 
         finally:
             page.close()
@@ -448,7 +567,7 @@ class PlaywrightParser(BaseCianParser):
             'deal_type': 'sale',
             'offer_type': 'flat',
             'engine_version': '2',
-            'region': '2',  # Санкт-Петербург
+            'region': self.region_code,
             'text': encoded_query,
         }
 
@@ -544,7 +663,7 @@ class PlaywrightParser(BaseCianParser):
             'price_max': int(target_price * 1.5),
             'minArea': int(target_area * 0.6),
             'maxArea': int(target_area * 1.4),
-            'region': '2',  # Санкт-Петербург (настраивается)
+            'region': self.region_code,
         }
 
         # Комнаты (диапазон ±1)

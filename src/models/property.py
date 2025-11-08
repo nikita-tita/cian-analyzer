@@ -280,3 +280,173 @@ class AnalysisResult(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# УТИЛИТЫ ДЛЯ НОРМАЛИЗАЦИИ И ВАЛИДАЦИИ ДАННЫХ
+# ═══════════════════════════════════════════════════════════════════════
+
+def normalize_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Нормализация данных недвижимости с умными дефолтами
+
+    Применяет контекстно-зависимые дефолты на основе известных параметров:
+    - Высота потолков зависит от года постройки и типа дома
+    - Количество санузлов зависит от площади и комнат
+    - Характеристики отделки зависят от ЖК и цены
+
+    Args:
+        data: Сырые данные объекта
+
+    Returns:
+        Нормализованные данные с заполненными пропусками
+    """
+    normalized = data.copy()
+
+    # 1. Базовые расчеты
+    if normalized.get('price') and normalized.get('total_area'):
+        if not normalized.get('price_per_sqm'):
+            normalized['price_per_sqm'] = normalized['price'] / normalized['total_area']
+
+    # 2. Умные дефолты для высоты потолков
+    if not normalized.get('ceiling_height'):
+        build_year = normalized.get('build_year')
+        house_type = normalized.get('house_type', '').lower()
+
+        # Современные монолиты
+        if build_year and build_year >= 2010:
+            if 'монолит' in house_type:
+                normalized['ceiling_height'] = 3.0
+            elif 'кирпич' in house_type:
+                normalized['ceiling_height'] = 2.8
+            else:
+                normalized['ceiling_height'] = 2.7
+        # Старый фонд
+        elif build_year and build_year < 1970:
+            normalized['ceiling_height'] = 3.2  # Сталинки
+        # Хрущевки/брежневки
+        elif build_year and 1960 <= build_year < 1990:
+            normalized['ceiling_height'] = 2.5
+        # Средний дефолт
+        else:
+            normalized['ceiling_height'] = 2.7
+
+    # 3. Умные дефолты для санузлов
+    if not normalized.get('bathrooms'):
+        rooms = normalized.get('rooms', 1)
+        total_area = normalized.get('total_area', 0)
+
+        if total_area > 120 or rooms >= 4:
+            normalized['bathrooms'] = 2
+        elif total_area > 80 or rooms >= 3:
+            normalized['bathrooms'] = 1
+        else:
+            normalized['bathrooms'] = 1
+
+    # 4. Дефолты для типа отделки
+    if not normalized.get('repair_level'):
+        price_per_sqm = normalized.get('price_per_sqm', 0)
+        # Премиум (> 300к/м²)
+        if price_per_sqm > 300000:
+            normalized['repair_level'] = 'премиум'
+        # Улучшенная (200-300к)
+        elif price_per_sqm > 200000:
+            normalized['repair_level'] = 'улучшенная'
+        # Стандартная
+        else:
+            normalized['repair_level'] = 'стандартная'
+
+    # 5. Дефолты для типа окон
+    if not normalized.get('window_type'):
+        build_year = normalized.get('build_year')
+        if build_year and build_year >= 2010:
+            normalized['window_type'] = 'пластиковые'
+        elif build_year and build_year < 1960:
+            normalized['window_type'] = 'деревянные'
+        else:
+            normalized['window_type'] = 'пластиковые'
+
+    # 6. Дефолт для количества лифтов
+    if not normalized.get('elevator_count'):
+        total_floors = normalized.get('total_floors', 0)
+        if total_floors >= 16:
+            normalized['elevator_count'] = 'два'
+        elif total_floors >= 6:
+            normalized['elevator_count'] = 'один'
+        else:
+            normalized['elevator_count'] = 'нет'
+
+    # 7. Дефолт для статуса объекта
+    if not normalized.get('object_status'):
+        photo_type = normalized.get('photo_type', 'реальные')
+        if 'стройка' in photo_type or 'рендер' in photo_type:
+            normalized['object_status'] = 'строительство'
+        else:
+            normalized['object_status'] = 'готов'
+
+    # 8. Дефолт для типа фото
+    if not normalized.get('photo_type'):
+        object_status = normalized.get('object_status', 'готов')
+        if object_status in ['строительство', 'котлован', 'проект']:
+            normalized['photo_type'] = 'только_рендеры'
+        else:
+            normalized['photo_type'] = 'реальные'
+
+    return normalized
+
+
+def validate_property_consistency(prop: TargetProperty) -> List[str]:
+    """
+    Проверка консистентности данных объекта
+
+    Returns:
+        Список предупреждений (warnings), пустой если все ОК
+    """
+    warnings = []
+
+    # 1. Проверка площадей
+    if prop.living_area and prop.total_area:
+        living_percent = (prop.living_area / prop.total_area) * 100
+        if living_percent < 40:
+            warnings.append(
+                f"Низкая доля жилой площади: {living_percent:.1f}% "
+                f"({prop.living_area}м² из {prop.total_area}м²)"
+            )
+        elif living_percent > 95:
+            warnings.append(
+                f"Подозрительно высокая доля жилой площади: {living_percent:.1f}%"
+            )
+
+    # 2. Проверка этажности
+    if prop.floor and prop.total_floors:
+        if prop.floor > prop.total_floors:
+            warnings.append(
+                f"Этаж ({prop.floor}) больше общего количества ({prop.total_floors})"
+            )
+
+    # 3. Проверка цены
+    if prop.price_per_sqm:
+        if prop.price_per_sqm < 50000:
+            warnings.append(f"Подозрительно низкая цена: {prop.price_per_sqm:,.0f} ₽/м²")
+        elif prop.price_per_sqm > 1000000:
+            warnings.append(f"Подозрительно высокая цена: {prop.price_per_sqm:,.0f} ₽/м²")
+
+    # 4. Проверка высоты потолков
+    if prop.ceiling_height:
+        if prop.ceiling_height < 2.3:
+            warnings.append(f"Низкие потолки: {prop.ceiling_height}м")
+        elif prop.ceiling_height > 4.5:
+            warnings.append(f"Подозрительно высокие потолки: {prop.ceiling_height}м")
+
+    # 5. Проверка года постройки
+    if prop.build_year:
+        current_year = datetime.now().year
+        if prop.build_year > current_year + 2:
+            warnings.append(
+                f"Год постройки в будущем: {prop.build_year} "
+                f"(сейчас {current_year})"
+            )
+        elif prop.build_year < 1800:
+            warnings.append(f"Слишком старый год постройки: {prop.build_year}")
+
+    return warnings
