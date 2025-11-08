@@ -888,43 +888,6 @@ canvas {
     }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   Фиксированная бегущая строка с советами
-   ══════════════════════════════════════════════════════════════ */
-
-.advice-ticker {
-    position: fixed;
-    bottom: 80px;
-    left: 0;
-    right: 0;
-    background: #000;
-    border-top: 1px solid #fff;
-    border-bottom: 1px solid #fff;
-    overflow: hidden;
-    z-index: 999;
-    height: 35px;
-    display: flex;
-    align-items: center;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.advice-ticker.ticker-hidden {
-    opacity: 0;
-    transform: translateY(100%);
-    pointer-events: none;
-}
-
-.advice-ticker-track {
-    display: inline-block;
-    white-space: nowrap;
-    animation: marquee 60s linear infinite;
-    font-family: 'Press Start 2P', 'Courier New', monospace;
-    font-size: 10px;
-    color: #fff;
-    letter-spacing: 1px;
-    padding: 0 100%;
-}
-
 /* Responsive для pixel loader */
 @media (max-width: 768px) {
     .pixel-marquee-track {
@@ -938,14 +901,5 @@ canvas {
     .pixel-icon {
         width: 60px;
         height: 60px;
-    }
-
-    .advice-ticker {
-        bottom: 120px;
-        height: 35px;
-    }
-
-    .advice-ticker-track {
-        font-size: 10px;
     }
 }
