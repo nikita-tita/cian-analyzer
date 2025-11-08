@@ -75,6 +75,12 @@ class PropertyLog:
     fair_price_result: Dict[str, Any] = field(default_factory=dict)
     scenarios: List[Dict[str, Any]] = field(default_factory=list)
 
+    # Новые метрики
+    price_range: Dict[str, Any] = field(default_factory=dict)
+    attractiveness_index: Dict[str, Any] = field(default_factory=dict)
+    time_forecast: Dict[str, Any] = field(default_factory=dict)
+    price_sensitivity: List[Dict[str, Any]] = field(default_factory=list)
+
     # Метрики производительности
     metrics: Dict[str, Any] = field(default_factory=dict)
 
