@@ -1,0 +1,190 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint black isort mypy
+
+    - name: Run Flake8
+      run: |
+        flake8 src/ app_new.py \
+          --count \
+          --select=E9,F63,F7,F82 \
+          --show-source \
+          --statistics
+      continue-on-error: true
+
+    - name: Run Flake8 (full report)
+      run: |
+        flake8 src/ app_new.py \
+          --count \
+          --max-complexity=10 \
+          --max-line-length=127 \
+          --statistics \
+          --exit-zero
+
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff src/ app_new.py || true
+
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff src/ app_new.py || true
+
+    - name: Run MyPy type checking
+      run: |
+        mypy src/ app_new.py \
+          --ignore-missing-imports \
+          --no-strict-optional \
+          --warn-return-any \
+          --warn-unused-ignores || true
+
+  complexity:
+    name: Code Complexity Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install analysis tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install radon xenon
+
+    - name: Calculate cyclomatic complexity
+      run: |
+        radon cc src/ app_new.py -a -s
+
+    - name: Calculate maintainability index
+      run: |
+        radon mi src/ app_new.py -s
+
+    - name: Check complexity threshold
+      run: |
+        xenon --max-absolute B --max-modules B --max-average A src/ app_new.py || true
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install documentation tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydocstyle interrogate
+
+    - name: Check docstring coverage
+      run: |
+        interrogate -v src/ app_new.py \
+          --ignore-init-method \
+          --ignore-init-module \
+          --fail-under=50 || true
+
+    - name: Check docstring style
+      run: |
+        pydocstyle src/ || true
+
+  code-metrics:
+    name: Code Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Count lines of code
+      run: |
+        echo "## Code Statistics" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Lines of Code" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        find src/ -name "*.py" | xargs wc -l | tail -1 >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Count test coverage
+      run: |
+        echo "### Test Files" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        find tests/ -name "*.py" | xargs wc -l | tail -1 >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install pip-audit
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-audit
+
+    - name: Audit dependencies
+      run: |
+        pip install -r requirements.txt
+        pip-audit --desc || true
+
+  pre-commit:
+    name: Pre-commit Hooks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install pre-commit
+      run: |
+        python -m pip install --upgrade pip
+        pip install pre-commit
+
+    - name: Run pre-commit hooks
+      run: |
+        pre-commit run --all-files || true
+      continue-on-error: true

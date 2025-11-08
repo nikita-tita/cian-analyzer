@@ -1,0 +1,56 @@
+# Bandit security scanner configuration
+# https://bandit.readthedocs.io/
+
+[bandit]
+# Exclude paths from scanning
+exclude_dirs = [
+    '/venv/',
+    '/env/',
+    '/.venv/',
+    '/tests/',
+    '/htmlcov/',
+    '/.pytest_cache/',
+    '/node_modules/',
+    '/build/',
+    '/dist/'
+]
+
+# Test IDs to skip (false positives or intentional)
+skips = [
+    # B101: assert_used - asserts are OK in tests
+    # B601: paramiko_calls - we don't use paramiko
+    # B603: subprocess_without_shell_equals_true - we validate shell=False explicitly
+]
+
+# Test IDs to run
+# Leave empty to run all tests
+tests = []
+
+# Severity level: low, medium, high
+severity = medium
+
+# Confidence level: low, medium, high
+confidence = medium
+
+# Output format: csv, custom, html, json, screen, txt, xml, yaml
+format = txt
+
+# Recursively scan subdirectories
+recursive = true
+
+# Report only issues of a given confidence level or higher
+# Options: low, medium, high
+# confidence_level = medium
+
+# Report only issues of a given severity level or higher
+# Options: low, medium, high
+# severity_level = medium
+
+# Plugins to load
+# plugins = []
+
+# Blacklist imports
+# blacklist_imports = []
+
+# Blacklist calls
+# blacklist_calls = []
