@@ -28,18 +28,43 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Header */
+/* Header with Navigation */
 .header {
     background: var(--white);
-    padding: 40px 60px;
     border-bottom: 1px solid var(--border-color);
+    padding: 0;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .logo {
     font-size: 24px;
-    font-weight: 700;
+    font-weight: 600;
+    color: var(--black);
     letter-spacing: -0.02em;
-    text-align: center;
+}
+
+.header-nav {
+    display: flex;
+    gap: 32px;
+}
+
+.nav-link {
+    color: var(--gray-dark);
+    text-decoration: none;
+    font-size: 16px;
+    transition: color var(--transition-base);
+}
+
+.nav-link:hover {
+    color: var(--black);
 }
 
 /* Progress Bar */
@@ -502,21 +527,65 @@ body {
 }
 
 /* Toast */
+/* Toast Notifications - Black & White Premium */
 .toast {
-    background: var(--white);
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    background: var(--black);
+    color: var(--white);
+    border: 1px solid var(--gray-700);
+    border-left-width: 4px;
+    box-shadow: var(--shadow-toast);
     border-radius: 0;
+}
+
+.toast-header {
+    background: transparent;
+    color: var(--white);
+    border-bottom: 1px solid var(--gray-700);
+}
+
+.toast-body {
+    color: var(--white);
+}
+
+/* Toast types with colored left border */
+.toast.toast-success {
+    border-left-color: var(--success);
+}
+
+.toast.toast-error {
+    border-left-color: var(--error);
+}
+
+.toast.toast-warning {
+    border-left-color: var(--warning);
+}
+
+.toast.toast-info {
+    border-left-color: var(--info);
+}
+
+/* White close button for dark background */
+.toast .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+}
+
+.toast .btn-close:hover {
+    opacity: 1;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-    .header {
-        padding: 24px;
+    .header-content {
+        padding: 16px 24px;
     }
 
     .logo {
         font-size: 20px;
+    }
+
+    .nav-link {
+        font-size: 14px;
     }
 
     .progress-container {
@@ -848,7 +917,7 @@ canvas {
 .advice-ticker-track {
     display: inline-block;
     white-space: nowrap;
-    animation: marquee 180s linear infinite;
+    animation: marquee 60s linear infinite;
     font-family: 'Press Start 2P', 'Courier New', monospace;
     font-size: 10px;
     color: #fff;
