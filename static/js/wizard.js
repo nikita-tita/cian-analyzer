@@ -673,19 +673,39 @@ const screen3 = {
                 })
             });
 
+            // Проверяем HTTP статус
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const result = await response.json();
 
             if (result.status === 'success') {
+                // Валидация данных перед отображением
+                if (!result.analysis) {
+                    throw new Error('Отсутствуют данные анализа в ответе сервера');
+                }
+
                 state.analysis = result.analysis;
-                this.displayAnalysis(result.analysis);
-                utils.showToast('Анализ завершен!', 'success');
+
+                try {
+                    this.displayAnalysis(result.analysis);
+                    utils.showToast('Анализ завершен!', 'success');
+                } catch (displayError) {
+                    console.error('Display error:', displayError);
+                    // Показываем частичные результаты, если возможно
+                    utils.showToast(
+                        `Анализ завершен, но есть проблемы с отображением: ${displayError.message}`,
+                        'warning'
+                    );
+                }
             } else {
                 const errorData = getErrorMessage(result.message || 'analysis_failed');
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Analysis error:', error);
-            const errorData = getErrorMessage('network_error');
+            const errorData = getErrorMessage(error.message || 'network_error');
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
@@ -693,26 +713,79 @@ const screen3 = {
     },
 
     displayAnalysis(analysis) {
+        // Валидация данных
+        if (!analysis) {
+            throw new Error('Данные анализа отсутствуют');
+        }
+
         document.getElementById('analysis-results').style.display = 'block';
 
         // Сводная информация
-        this.renderSummary(analysis);
+        try {
+            this.renderSummary(analysis);
+        } catch (e) {
+            console.error('Error rendering summary:', e);
+            document.getElementById('summary-info').innerHTML = '<p class="text-danger">Ошибка отображения сводной информации</p>';
+        }
 
         // Справедливая цена
-        this.renderFairPrice(analysis.fair_price_analysis);
+        try {
+            if (analysis.fair_price_analysis) {
+                this.renderFairPrice(analysis.fair_price_analysis);
+            } else {
+                document.getElementById('fair-price-details').innerHTML = '<p class="text-warning">Данные о справедливой цене отсутствуют</p>';
+            }
+        } catch (e) {
+            console.error('Error rendering fair price:', e);
+            document.getElementById('fair-price-details').innerHTML = '<p class="text-danger">Ошибка отображения справедливой цены</p>';
+        }
 
         // Сценарии
-        this.renderScenarios(analysis.price_scenarios);
+        try {
+            if (analysis.price_scenarios && Array.isArray(analysis.price_scenarios)) {
+                this.renderScenarios(analysis.price_scenarios);
+            } else {
+                document.getElementById('scenarios-list').innerHTML = '<p class="text-warning">Сценарии продажи отсутствуют</p>';
+            }
+        } catch (e) {
+            console.error('Error rendering scenarios:', e);
+            document.getElementById('scenarios-list').innerHTML = '<p class="text-danger">Ошибка отображения сценариев</p>';
+        }
 
         // Сильные/слабые стороны
-        this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+        try {
+            if (analysis.strengths_weaknesses) {
+                this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+            } else {
+                document.getElementById('strengths-weaknesses').innerHTML = '<p class="text-warning">Данные об оценке отсутствуют</p>';
+            }
+        } catch (e) {
+            console.error('Error rendering strengths/weaknesses:', e);
+            document.getElementById('strengths-weaknesses').innerHTML = '<p class="text-danger">Ошибка отображения оценки</p>';
+        }
 
         // График
-        this.renderChart(analysis.comparison_chart_data);
+        try {
+            if (analysis.comparison_chart_data) {
+                this.renderChart(analysis.comparison_chart_data);
+            } else {
+                console.warn('Chart data is missing');
+            }
+        } catch (e) {
+            console.error('Error rendering chart:', e);
+            // График не критичен, можно продолжить без него
+        }
     },
 
     renderSummary(analysis) {
         const summaryInfo = document.getElementById('summary-info');
+
+        // Валидация данных
+        if (!analysis.target_property || !analysis.market_statistics || !analysis.market_statistics.all) {
+            summaryInfo.innerHTML = '<p class="text-warning">Недостаточно данных для отображения сводки</p>';
+            return;
+        }
+
         const target = analysis.target_property;
         const stats = analysis.market_statistics.all;
 
@@ -742,10 +815,19 @@ const screen3 = {
 
     renderFairPrice(fairPrice) {
         const container = document.getElementById('fair-price-details');
-        const overpricing = fairPrice.overpricing_percent || 0;
 
+        // Валидация данных
+        if (!fairPrice || typeof fairPrice !== 'object') {
+            container.innerHTML = '<p class="text-warning">Данные о справедливой цене недоступны</p>';
+            return;
+        }
+
+        const overpricing = fairPrice.overpricing_percent || 0;
         const overpricingClass = overpricing > 10 ? 'danger' : overpricing > 5 ? 'warning' : 'success';
         const overpricingIcon = overpricing > 0 ? 'arrow-up' : 'arrow-down';
+
+        // Проверяем наличие корректировок
+        const hasAdjustments = fairPrice.adjustments && Object.keys(fairPrice.adjustments).length > 0;
 
         container.innerHTML = `
             <div class="row mb-3">
@@ -767,6 +849,7 @@ const screen3 = {
                 ${utils.formatNumber(Math.abs(overpricing), 2)}%
                 ${overpricing > 0 ? '(цена выше справедливой)' : '(цена ниже справедливой)'}
             </div>
+            ${hasAdjustments ? `
             <div class="mt-3">
                 <h6>Примененные корректировки:</h6>
                 <div class="table-responsive">
@@ -778,7 +861,7 @@ const screen3 = {
                             </tr>
                         </thead>
                         <tbody>
-                            ${Object.entries(fairPrice.adjustments || {}).map(([key, adj]) => `
+                            ${Object.entries(fairPrice.adjustments).map(([key, adj]) => `
                                 <tr>
                                     <td><strong>${utils.formatNumber((adj.value - 1) * 100, 2)}%</strong></td>
                                     <td>${adj.description || ''}</td>
@@ -788,70 +871,100 @@ const screen3 = {
                     </table>
                 </div>
             </div>
+            ` : '<p class="text-muted mt-3">Корректировки не применялись</p>'}
         `;
     },
 
     renderScenarios(scenarios) {
         const container = document.getElementById('scenarios-list');
 
-        container.innerHTML = scenarios.map(scenario => `
-            <div class="scenario-card">
-                <div class="scenario-header">
-                    <div class="scenario-title">${scenario.name}</div>
-                    <span class="scenario-badge badge" style="background: var(--black); color: var(--white);">${scenario.time_months} мес</span>
+        // Валидация данных
+        if (!scenarios || !Array.isArray(scenarios) || scenarios.length === 0) {
+            container.innerHTML = '<p class="text-warning">Сценарии продажи недоступны</p>';
+            return;
+        }
+
+        container.innerHTML = scenarios.map(scenario => {
+            // Защита от неполных данных сценария
+            const name = scenario.name || 'Сценарий';
+            const timeMonths = scenario.time_months || 0;
+            const description = scenario.description || '';
+            const startPrice = scenario.start_price || 0;
+            const expectedFinalPrice = scenario.expected_final_price || 0;
+            const baseProbability = scenario.base_probability || 0;
+            const netAfterOpportunity = scenario.financials?.net_after_opportunity || 0;
+
+            return `
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <div class="scenario-title">${name}</div>
+                        <span class="scenario-badge badge" style="background: var(--black); color: var(--white);">${timeMonths} мес</span>
+                    </div>
+                    <div class="scenario-description">${description}</div>
+                    <div class="scenario-metrics">
+                        <div class="metric-item">
+                            <div class="metric-label">Начальная цена</div>
+                            <div class="metric-value">${utils.formatPrice(startPrice)}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Ожидаемая итоговая</div>
+                            <div class="metric-value text-success">${utils.formatPrice(expectedFinalPrice)}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Вероятность</div>
+                            <div class="metric-value">${baseProbability}%</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Чистый доход</div>
+                            <div class="metric-value">${utils.formatPrice(netAfterOpportunity)}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="scenario-description">${scenario.description}</div>
-                <div class="scenario-metrics">
-                    <div class="metric-item">
-                        <div class="metric-label">Начальная цена</div>
-                        <div class="metric-value">${utils.formatPrice(scenario.start_price)}</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Ожидаемая итоговая</div>
-                        <div class="metric-value text-success">${utils.formatPrice(scenario.expected_final_price)}</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Вероятность</div>
-                        <div class="metric-value">${scenario.base_probability}%</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Чистый доход</div>
-                        <div class="metric-value">${utils.formatPrice(scenario.financials.net_after_opportunity)}</div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     },
 
     renderStrengthsWeaknesses(data) {
         const container = document.getElementById('strengths-weaknesses');
 
+        // Валидация данных
+        if (!data || typeof data !== 'object') {
+            container.innerHTML = '<p class="text-warning">Данные об оценке недоступны</p>';
+            return;
+        }
+
+        const strengths = data.strengths || [];
+        const weaknesses = data.weaknesses || [];
+        const totalPremium = data.total_premium_percent || 0;
+        const totalDiscount = data.total_discount_percent || 0;
+        const netAdjustment = data.net_adjustment || 0;
+
         container.innerHTML = `
             <div class="row">
                 <div class="col-md-6">
                     <h6 class="text-success"><i class="bi bi-check-circle me-2"></i>Сильные стороны</h6>
-                    ${data.strengths.map(s => `
+                    ${strengths.map(s => `
                         <div class="strength-item">
-                            <span class="factor-name">${s.factor}</span>
-                            <span class="factor-impact">+${s.premium_percent}%</span>
+                            <span class="factor-name">${s.factor || 'Фактор'}</span>
+                            <span class="factor-impact">+${s.premium_percent || 0}%</span>
                         </div>
                     `).join('')}
-                    ${data.strengths.length === 0 ? '<p class="text-muted">Нет выраженных сильных сторон</p>' : ''}
+                    ${strengths.length === 0 ? '<p class="text-muted">Нет выраженных сильных сторон</p>' : ''}
                 </div>
                 <div class="col-md-6">
                     <h6 class="text-danger"><i class="bi bi-x-circle me-2"></i>Слабые стороны</h6>
-                    ${data.weaknesses.map(w => `
+                    ${weaknesses.map(w => `
                         <div class="weakness-item">
-                            <span class="factor-name">${w.factor}</span>
-                            <span class="factor-impact">-${w.discount_percent}%</span>
+                            <span class="factor-name">${w.factor || 'Фактор'}</span>
+                            <span class="factor-impact">-${w.discount_percent || 0}%</span>
                         </div>
                     `).join('')}
-                    ${data.weaknesses.length === 0 ? '<p class="text-muted">Нет выраженных слабых сторон</p>' : ''}
+                    ${weaknesses.length === 0 ? '<p class="text-muted">Нет выраженных слабых сторон</p>' : ''}
                 </div>
             </div>
             <div class="mt-3 alert alert-info">
-                <strong>Итого:</strong> Премия ${data.total_premium_percent}% - Скидка ${data.total_discount_percent}% =
-                <strong>${data.net_adjustment > 0 ? '+' : ''}${data.net_adjustment}%</strong>
+                <strong>Итого:</strong> Премия ${totalPremium}% - Скидка ${totalDiscount}% =
+                <strong>${netAdjustment > 0 ? '+' : ''}${netAdjustment}%</strong>
             </div>
         `;
     },
@@ -859,32 +972,50 @@ const screen3 = {
     renderChart(chartData) {
         const ctx = document.getElementById('comparison-chart');
 
-        if (window.comparisonChart) {
-            window.comparisonChart.destroy();
+        // Валидация данных
+        if (!ctx) {
+            console.warn('Chart canvas element not found');
+            return;
         }
 
-        window.comparisonChart = new Chart(ctx, {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        display: false
+        if (!chartData || typeof chartData !== 'object') {
+            console.warn('Chart data is invalid or missing');
+            return;
+        }
+
+        try {
+            // Уничтожаем предыдущий график если есть
+            if (window.comparisonChart) {
+                window.comparisonChart.destroy();
+            }
+
+            // Создаем новый график
+            window.comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Сравнение цен за м² (млн ₽)'
+                        }
                     },
-                    title: {
-                        display: true,
-                        text: 'Сравнение цен за м² (млн ₽)'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('Error creating chart:', error);
+            // График не критичен для работы приложения
+        }
     }
 };
 

@@ -1114,13 +1114,47 @@ def analyze():
                 'error_type': 'validation_error',
                 'message': str(ve)
             }), 422
+        except Exception as analysis_error:
+            # Любые другие ошибки анализа
+            logger.error(f"Ошибка во время анализа: {analysis_error}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'error_type': 'analysis_error',
+                'message': f'Ошибка анализа: {str(analysis_error)}'
+            }), 500
 
         # Конвертируем в JSON
-        result_dict = result.dict()
+        try:
+            result_dict = result.dict()
+        except Exception as dict_error:
+            logger.error(f"Ошибка конвертации результата в dict: {dict_error}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'error_type': 'serialization_error',
+                'message': 'Ошибка обработки результатов анализа'
+            }), 500
+
+        # Валидация результата перед отправкой
+        required_fields = ['market_statistics', 'fair_price_analysis', 'price_scenarios',
+                          'strengths_weaknesses', 'target_property']
+        missing_fields = [field for field in required_fields if not result_dict.get(field)]
+
+        if missing_fields:
+            logger.warning(f"Результат анализа не содержит обязательных полей: {missing_fields}")
+            # Добавляем пустые значения для отсутствующих полей
+            for field in missing_fields:
+                if field == 'price_scenarios':
+                    result_dict[field] = []
+                else:
+                    result_dict[field] = {}
 
         # Метрики
-        metrics = analyzer.get_metrics()
-        result_dict['metrics'] = metrics
+        try:
+            metrics = analyzer.get_metrics()
+            result_dict['metrics'] = metrics
+        except Exception as metrics_error:
+            logger.warning(f"Ошибка получения метрик: {metrics_error}")
+            result_dict['metrics'] = {}
 
         # Сохраняем в сессию
         session_data['analysis'] = result_dict
