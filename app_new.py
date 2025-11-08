@@ -817,7 +817,7 @@ def find_similar():
     try:
         payload = request.json
         session_id = payload.get('session_id')
-        limit = payload.get('limit', 20)
+        limit = payload.get('limit', 50)  # Увеличено до 50 по умолчанию
         search_type = payload.get('search_type', 'building')  # По умолчанию ищем в ЖК
 
         if not session_id or not session_storage.exists(session_id):
