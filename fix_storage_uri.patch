@@ -1,0 +1,11 @@
+--- a/app_new.py
++++ b/app_new.py
+@@ -64,7 +64,7 @@ limiter = Limiter(
+     strategy="fixed-window"
+ )
+
+-logger.info(f"Rate limiting initialized: {limiter.storage_uri[:20]}...")
++logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
+
+
+ @app.route('/')
