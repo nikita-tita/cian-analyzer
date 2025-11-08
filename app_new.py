@@ -11,18 +11,23 @@ from typing import Dict, List
 from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
     from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url
+    from src.parsers.browser_pool import BrowserPool
     Parser = PlaywrightParser
+    PLAYWRIGHT_AVAILABLE = True
     logger.info("Using PlaywrightParser")
 except Exception as e:
     logger.warning(f"Playwright not available, using SimpleParser: {e}")
     from src.parsers.simple_parser import SimpleParser
     Parser = SimpleParser
+    PLAYWRIGHT_AVAILABLE = False
+    BrowserPool = None
     # Fallback для detect_region
     def detect_region_from_url(url):
         return 'spb'
@@ -48,6 +53,14 @@ if not app.secret_key:
     # Development fallback (will be different on each restart)
     app.secret_key = os.urandom(24)
 
+# SECURITY: CSRF Protection (защита от Cross-Site Request Forgery)
+csrf = CSRFProtect(app)
+# Настройка CSRF
+app.config['WTF_CSRF_TIME_LIMIT'] = None  # Token doesn't expire (session-based)
+app.config['WTF_CSRF_SSL_STRICT'] = os.getenv('FLASK_ENV') == 'production'
+app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
+logger.info("CSRF protection enabled")
+
 # Инициализация Redis кэша
 # В продакшене параметры берутся из env переменных
 property_cache = init_cache(
@@ -61,6 +74,23 @@ property_cache = init_cache(
 
 # Хранилище сессий с поддержкой Redis
 session_storage = get_session_storage()
+
+# SECURITY & PERFORMANCE: Browser Pool для контроля ресурсов Playwright
+# Ограничивает количество одновременно открытых браузеров
+# Защищает от DoS атак и утечек памяти
+browser_pool = None
+if PLAYWRIGHT_AVAILABLE:
+    max_browsers = int(os.getenv('MAX_BROWSERS', '3'))  # Production: 3-5 браузеров
+    browser_pool = BrowserPool(
+        max_browsers=max_browsers,
+        max_age_seconds=3600,  # 1 час
+        headless=True,
+        block_resources=True
+    )
+    browser_pool.start()
+    logger.info(f"Browser pool initialized with max_browsers={max_browsers}")
+else:
+    logger.warning("Browser pool not available (Playwright not installed)")
 
 # Rate limiting configuration
 # SECURITY: Комбинированный ключ для защиты от обхода через прокси
@@ -402,9 +432,15 @@ def health_check():
         test_data = session_storage.get(test_session_id)
         session_storage.delete(test_session_id)
 
+        # Получаем статистику хранилища
+        storage_stats = session_storage.get_stats()
+
         health_status['components']['session_storage'] = {
             'status': 'healthy',
-            'type': type(session_storage).__name__
+            'type': type(session_storage).__name__,
+            'backend': storage_stats['backend'],
+            'total_sessions': storage_stats['total_sessions'],
+            'hit_rate_percent': storage_stats['hit_rate_percent']
         }
     except Exception as e:
         health_status['components']['session_storage'] = {
@@ -430,6 +466,25 @@ def health_check():
         all_healthy = False
         health_status['status'] = 'unhealthy'
 
+    # Проверка browser pool
+    if browser_pool:
+        try:
+            pool_stats = browser_pool.get_stats()
+            health_status['components']['browser_pool'] = {
+                'status': 'healthy',
+                'pool_size': pool_stats['pool_size'],
+                'max_browsers': pool_stats['max_browsers'],
+                'browsers_in_use': pool_stats['browsers_in_use'],
+                'browsers_free': pool_stats['browsers_free']
+            }
+        except Exception as e:
+            health_status['components']['browser_pool'] = {
+                'status': 'degraded',
+                'error': str(e)
+            }
+            if health_status['status'] != 'unhealthy':
+                health_status['status'] = 'degraded'
+
     # Определяем HTTP статус
     if health_status['status'] == 'healthy':
         http_status = 200
@@ -439,6 +494,21 @@ def health_check():
         http_status = 503  # Service Unavailable
 
     return jsonify(health_status), http_status
+
+
+@app.route('/api/csrf-token', methods=['GET'])
+def get_csrf_token():
+    """
+    SECURITY: Endpoint для получения CSRF токена
+
+    Генерирует CSRF token для использования в AJAX запросах
+
+    Returns:
+        JSON с CSRF токеном
+    """
+    from flask_wtf.csrf import generate_csrf
+    token = generate_csrf()
+    return jsonify({'csrf_token': token})
 
 
 @app.route('/metrics', methods=['GET'])
@@ -519,7 +589,7 @@ def parse_url():
         # SECURITY: Парсинг с timeout (защита от DoS)
         try:
             with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
-                with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
+                with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
                     parsed_data = parser.parse_detail_page(url)
         except TimeoutError as e:
             logger.error(f"Parsing timeout for {url}: {e}")
@@ -750,7 +820,7 @@ def find_similar():
         logger.info(f"Поиск похожих объектов для сессии {session_id} (тип: {search_type}, регион: {region})")
 
         # Поиск аналогов с кэшем и регионом
-        with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
+        with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
             if search_type == 'building':
                 # Поиск в том же ЖК
                 similar = parser.search_similar_in_building(target, limit=limit)
@@ -847,7 +917,7 @@ def add_comparable():
         # SECURITY: Парсим с timeout (защита от DoS)
         try:
             with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
-                with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
+                with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
                     comparable_data = parser.parse_detail_page(url)
         except TimeoutError as e:
             logger.error(f"Parsing timeout for {url}: {e}")
@@ -1206,5 +1276,35 @@ def _identify_missing_fields(parsed_data: Dict) -> List[Dict]:
     return missing
 
 
+# CLEANUP: Shutdown handler для browser pool
+import atexit
+import signal
+
+def shutdown_browser_pool():
+    """Закрывает browser pool при завершении приложения"""
+    if browser_pool:
+        logger.info("Shutting down browser pool...")
+        try:
+            browser_pool.shutdown()
+        except Exception as e:
+            logger.error(f"Error shutting down browser pool: {e}")
+
+# Регистрируем обработчики завершения
+atexit.register(shutdown_browser_pool)
+
+def signal_handler(signum, frame):
+    """Обработчик сигналов для graceful shutdown"""
+    logger.info(f"Received signal {signum}, shutting down...")
+    shutdown_browser_pool()
+    exit(0)
+
+# Регистрируем обработчики сигналов
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5002)
+    try:
+        app.run(debug=True, host='0.0.0.0', port=5002)
+    finally:
+        shutdown_browser_pool()
