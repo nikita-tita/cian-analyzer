@@ -1,0 +1,56 @@
+/* ============================================
+   HOUSLER ADVICE TICKER
+   Unified component for all pages
+   ============================================ */
+
+.advice-ticker {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #000;
+    border-top: 1px solid #fff;
+    overflow: hidden;
+    z-index: 999;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.advice-ticker.hidden {
+    opacity: 0;
+    transform: translateY(100%);
+    pointer-events: none;
+}
+
+.advice-ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 180s linear infinite;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+    padding: 0 100%;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+    .advice-ticker {
+        height: 30px;
+    }
+
+    .advice-ticker-track {
+        font-size: 9px;
+    }
+}
