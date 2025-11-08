@@ -53,6 +53,14 @@ const ERROR_MESSAGES = {
         title: 'Ошибка загрузки',
         message: 'Не удалось загрузить данные с Cian. Проверьте корректность ссылки.'
     },
+    'parsing_error': {
+        title: 'Ошибка обработки',
+        message: 'Не удалось обработать объявление. Попробуйте другую ссылку или введите данные вручную.'
+    },
+    'signal_error': {
+        title: 'Технический сбой',
+        message: 'Произошел технический сбой при обработке запроса. Попробуйте еще раз через несколько секунд.'
+    },
     'no_comparables': {
         title: 'Аналоги не найдены',
         message: 'Не удалось найти похожие объекты для сравнения. Попробуйте изменить параметры поиска.'
@@ -98,19 +106,76 @@ const ERROR_MESSAGES = {
 };
 
 /**
+ * Translate technical error message to user-friendly Russian message
+ * @param {string} technicalMessage - Technical error message (possibly in English)
+ * @returns {string} - Error key from ERROR_MESSAGES
+ */
+function translateTechnicalError(technicalMessage) {
+    if (!technicalMessage) {
+        return 'unknown_error';
+    }
+
+    const msg = technicalMessage.toLowerCase();
+
+    // Signal/threading errors
+    if (msg.includes('signal') && msg.includes('main thread')) {
+        return 'signal_error';
+    }
+
+    // Parsing errors
+    if (msg.includes('parse') || msg.includes('парсинг')) {
+        return 'parsing_error';
+    }
+
+    // Network errors
+    if (msg.includes('network') || msg.includes('connection') || msg.includes('соединени')) {
+        return 'network_error';
+    }
+
+    // Timeout errors
+    if (msg.includes('timeout') || msg.includes('время')) {
+        return 'timeout';
+    }
+
+    // Not found
+    if (msg.includes('not found') || msg.includes('не найден')) {
+        return 'no_data';
+    }
+
+    // Invalid data
+    if (msg.includes('invalid') || msg.includes('некорректн')) {
+        return 'parsing_failed';
+    }
+
+    // Server errors
+    if (msg.includes('500') || msg.includes('internal server error')) {
+        return 'server_error';
+    }
+
+    return 'unknown_error';
+}
+
+/**
  * Get formatted error message
- * @param {string} errorKey - Error key from ERROR_MESSAGES
+ * @param {string} errorKey - Error key from ERROR_MESSAGES or technical message
  * @param {string} fallbackMessage - Optional fallback message if key not found
  * @returns {Object} - {title, message}
  */
 function getErrorMessage(errorKey, fallbackMessage = null) {
+    // First, try to use as direct key
     if (ERROR_MESSAGES[errorKey]) {
         return ERROR_MESSAGES[errorKey];
     }
 
+    // Try to translate technical error
+    const translatedKey = translateTechnicalError(errorKey);
+    if (ERROR_MESSAGES[translatedKey]) {
+        return ERROR_MESSAGES[translatedKey];
+    }
+
     return {
         title: 'Произошла ошибка',
-        message: fallbackMessage || errorKey
+        message: fallbackMessage || 'Что-то пошло не так. Попробуйте еще раз.'
     };
 }
 
@@ -185,6 +250,7 @@ function validateField(field, value) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         ERROR_MESSAGES,
+        translateTechnicalError,
         getErrorMessage,
         showErrorToast,
         validateField

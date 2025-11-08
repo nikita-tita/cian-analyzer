@@ -191,11 +191,13 @@ const screen1 = {
                 this.displayParseResult(result.data, result.missing_fields || []);
                 utils.showToast('Объект создан!', 'success');
             } else {
-                utils.showToast(result.message || 'Ошибка создания объекта', 'error');
+                const errorData = getErrorMessage(result.message || 'parsing_error');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Manual input error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
         }
@@ -232,11 +234,15 @@ const screen1 = {
                 this.displayParseResult(result.data, result.missing_fields);
                 utils.showToast('Объект успешно загружен!', 'success');
             } else {
-                utils.showToast(result.message || 'Ошибка парсинга', 'error');
+                // Используем getErrorMessage для перевода технических ошибок
+                const errorData = getErrorMessage(result.message || 'parsing_error');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Parse error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
+            // Используем getErrorMessage для обработки любых ошибок
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
         }
@@ -406,11 +412,13 @@ const screen1 = {
                     // Переходим на шаг 2
                     navigation.goToStep(2);
                 } else {
-                    utils.showToast(result.message || 'Ошибка сохранения', 'error');
+                    const errorData = getErrorMessage(result.message || 'parsing_error');
+                    utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
                 }
             } catch (error) {
                 console.error('Update error:', error);
-                utils.showToast('Ошибка соединения с сервером', 'error');
+                const errorData = getErrorMessage('network_error');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             } finally {
                 pixelLoader.hide();
             }
@@ -450,11 +458,13 @@ const screen2 = {
                 this.renderComparables();
                 utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
             } else {
-                utils.showToast(result.message || 'Ошибка поиска', 'error');
+                const errorData = getErrorMessage(result.message || 'no_comparables');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Find similar error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
         }
@@ -488,11 +498,13 @@ const screen2 = {
                 document.getElementById('add-comparable-input').value = '';
                 utils.showToast('Объект добавлен', 'success');
             } else {
-                utils.showToast(result.message || 'Ошибка добавления', 'error');
+                const errorData = getErrorMessage(result.message || 'parsing_error');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Add comparable error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
         }
@@ -585,7 +597,8 @@ const screen2 = {
             utils.showToast('Объект исключен из анализа', 'info');
         } catch (error) {
             console.error('Exclude error:', error);
-            utils.showToast('Ошибка исключения', 'error');
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         }
     },
 
@@ -624,11 +637,13 @@ const screen3 = {
                 this.displayAnalysis(result.analysis);
                 utils.showToast('Анализ завершен!', 'success');
             } else {
-                utils.showToast(result.message || 'Ошибка анализа', 'error');
+                const errorData = getErrorMessage(result.message || 'analysis_failed');
+                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error('Analysis error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
+            const errorData = getErrorMessage('network_error');
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
         }
