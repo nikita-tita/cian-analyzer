@@ -599,35 +599,51 @@ body {
 }
 
 /* ===== ALERTS ===== */
+/* Alert Components - Black & White Premium Design */
 .alert {
-    padding: 15px 20px;
-    border-radius: 8px;
-    margin: 20px 0;
-    border-left: 4px solid;
+    background: #000000;
+    color: #FFFFFF;
+    border: 1px solid #4A4A4A;
+    border-left-width: 4px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 0;
+    display: flex;
+    align-items: start;
+    gap: 12px;
 }
 
+.alert-content {
+    flex: 1;
+}
+
+.alert-title {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.alert-message {
+    font-size: 14px;
+    line-height: 1.5;
+    opacity: 0.9;
+}
+
+/* Alert types with colored left border */
 .alert-info {
-    background: #e3f2fd;
-    border-left-color: var(--info-color);
-    color: #1976d2;
+    border-left-color: #3B82F6;
 }
 
 .alert-success {
-    background: #e8f5e9;
-    border-left-color: var(--success-color);
-    color: #388e3c;
+    border-left-color: #4ADE80;
 }
 
 .alert-warning {
-    background: #fff3e0;
-    border-left-color: var(--warning-color);
-    color: #f57c00;
+    border-left-color: #F59E0B;
 }
 
 .alert-danger {
-    background: #ffebee;
-    border-left-color: var(--danger-color);
-    color: #d32f2f;
+    border-left-color: #EF4444;
 }
 
 /* ===== FLOATING ACTION BAR ===== */
