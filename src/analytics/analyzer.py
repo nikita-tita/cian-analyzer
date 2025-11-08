@@ -236,19 +236,29 @@ class RealEstateAnalyzer:
         if len(comparables) < 2:
             return comparables
 
+        # Собираем цены за кв.м для статистического анализа
         prices_per_sqm = [c.price_per_sqm for c in comparables if c.price_per_sqm and not c.excluded]
 
         if len(prices_per_sqm) < 2:
-            return comparables
+            # Если нет достаточно данных для статистики, возвращаем все не excluded
+            return [c for c in comparables if not c.excluded]
 
         mean = statistics.mean(prices_per_sqm)
         stdev = statistics.stdev(prices_per_sqm)
 
-        # Фильтруем: оставляем только те, что в пределах ±3σ
-        filtered = [
-            c for c in comparables
-            if not c.excluded and c.price_per_sqm and abs(c.price_per_sqm - mean) <= 3 * stdev
-        ]
+        # Фильтруем выбросы, но СОХРАНЯЕМ объявления без price_per_sqm
+        filtered = []
+        for c in comparables:
+            if c.excluded:
+                continue  # Пропускаем уже excluded
+
+            if not c.price_per_sqm:
+                # Нет price_per_sqm - сохраняем (может быть полезно для других характеристик)
+                filtered.append(c)
+            elif abs(c.price_per_sqm - mean) <= 3 * stdev:
+                # В пределах ±3σ - сохраняем
+                filtered.append(c)
+            # Иначе отбрасываем как выброс
 
         return filtered
 
