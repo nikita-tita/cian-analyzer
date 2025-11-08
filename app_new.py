@@ -128,7 +128,7 @@ limiter = Limiter(
     strategy="moving-window"  # Более строгая стратегия
 )
 
-logger.info(f"Rate limiting initialized: {limiter.storage_uri[:20]}...")
+logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
