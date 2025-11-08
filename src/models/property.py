@@ -333,8 +333,16 @@ def normalize_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 3. Умные дефолты для санузлов
     if not normalized.get('bathrooms'):
-        rooms = normalized.get('rooms', 1)
-        total_area = normalized.get('total_area', 0)
+        # Безопасное преобразование в числа
+        try:
+            rooms = int(normalized.get('rooms', 1)) if normalized.get('rooms') else 1
+        except (ValueError, TypeError):
+            rooms = 1
+
+        try:
+            total_area = float(normalized.get('total_area', 0)) if normalized.get('total_area') else 0
+        except (ValueError, TypeError):
+            total_area = 0
 
         if total_area > 120 or rooms >= 4:
             normalized['bathrooms'] = 2
@@ -345,7 +353,12 @@ def normalize_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 4. Дефолты для типа отделки
     if not normalized.get('repair_level'):
-        price_per_sqm = normalized.get('price_per_sqm', 0)
+        # Безопасное преобразование в число
+        try:
+            price_per_sqm = float(normalized.get('price_per_sqm', 0)) if normalized.get('price_per_sqm') else 0
+        except (ValueError, TypeError):
+            price_per_sqm = 0
+
         # Премиум (> 300к/м²)
         if price_per_sqm > 300000:
             normalized['repair_level'] = 'премиум'
