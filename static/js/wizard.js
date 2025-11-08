@@ -9,7 +9,8 @@ const state = {
     sessionId: null,
     targetProperty: null,
     comparables: [],
-    analysis: null
+    analysis: null,
+    csrfToken: null  // SECURITY: CSRF token for POST requests
 };
 
 // Утилиты
@@ -85,6 +86,34 @@ const utils = {
     setInnerHTML(element, html) {
         if (!element) return;
         element.innerHTML = this.sanitizeHtml(html);
+    },
+
+    /**
+     * SECURITY: Fetch CSRF token from server
+     */
+    async fetchCsrfToken() {
+        try {
+            const response = await fetch('/api/csrf-token');
+            const data = await response.json();
+            state.csrfToken = data.csrf_token;
+            console.log('CSRF token fetched successfully');
+        } catch (error) {
+            console.error('Failed to fetch CSRF token:', error);
+            utils.showToast('Ошибка получения токена безопасности', 'error');
+        }
+    },
+
+    /**
+     * SECURITY: Get headers with CSRF token for POST requests
+     */
+    getCsrfHeaders() {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (state.csrfToken) {
+            headers['X-CSRFToken'] = state.csrfToken;
+        }
+        return headers;
     }
 };
 
@@ -172,7 +201,7 @@ const screen1 = {
         try {
             const response = await fetch('/api/create-manual', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify(formData)
             });
 
@@ -212,7 +241,7 @@ const screen1 = {
         try {
             const response = await fetch('/api/parse', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({ url })
             });
 
@@ -382,7 +411,7 @@ const screen1 = {
             try {
                 const response = await fetch('/api/update-target', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: utils.getCsrfHeaders(),
                     body: JSON.stringify({
                         session_id: state.sessionId,
                         data
@@ -432,7 +461,7 @@ const screen2 = {
         try {
             const response = await fetch('/api/find-similar', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     limit: 20
@@ -469,7 +498,7 @@ const screen2 = {
         try {
             const response = await fetch('/api/add-comparable', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     url
@@ -569,7 +598,7 @@ const screen2 = {
         try {
             await fetch('/api/exclude-comparable', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     index
@@ -585,10 +614,24 @@ const screen2 = {
         }
     },
 
-    includeComparable(index) {
-        state.comparables[index].excluded = false;
-        this.renderComparables();
-        utils.showToast('Объект возвращен в анализ', 'success');
+    async includeComparable(index) {
+        try {
+            await fetch('/api/include-comparable', {
+                method: 'POST',
+                headers: utils.getCsrfHeaders(),
+                body: JSON.stringify({
+                    session_id: state.sessionId,
+                    index
+                })
+            });
+
+            state.comparables[index].excluded = false;
+            this.renderComparables();
+            utils.showToast('Объект возвращен в анализ', 'success');
+        } catch (error) {
+            console.error('Include error:', error);
+            utils.showToast('Ошибка включения', 'error');
+        }
     }
 };
 
@@ -605,7 +648,7 @@ const screen3 = {
         try {
             const response = await fetch('/api/analyze', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     filter_outliers: true,
@@ -877,7 +920,10 @@ const floatingButtons = {
 };
 
 // Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // SECURITY: Fetch CSRF token first
+    await utils.fetchCsrfToken();
+
     screen1.init();
     screen2.init();
     screen3.init();
