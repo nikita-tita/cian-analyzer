@@ -315,6 +315,16 @@ const navigation = {
             window.location.hash = `#step-${step}`;
         }
 
+        // Автоматический запуск анализа при переходе на шаг 3
+        if (step === 3 && state.sessionId && state.comparables.length > 0) {
+            // Запускаем анализ автоматически, если есть данные
+            setTimeout(() => {
+                if (window.screen3) {
+                    screen3.runAnalysis();
+                }
+            }, 300); // Небольшая задержка для плавного перехода
+        }
+
         // Обновляем floating кнопки
         if (window.floatingButtons) {
             window.floatingButtons.updateButtons();
@@ -832,7 +842,7 @@ const screen2 = {
 // Экран 3: Анализ
 const screen3 = {
     init() {
-        document.getElementById('run-analysis-btn').addEventListener('click', this.runAnalysis.bind(this));
+        // Кнопка "Рассчитать анализ" удалена - анализ запускается автоматически
     },
 
     async runAnalysis() {
