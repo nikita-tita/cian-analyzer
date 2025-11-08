@@ -285,6 +285,7 @@ class ManualPropertyInput(BaseModel):
 
 # Timeout decorator для защиты от зависающих операций
 import signal
+import threading
 from contextlib import contextmanager
 from functools import wraps
 
@@ -297,6 +298,7 @@ class TimeoutError(Exception):
 def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
     """
     Context manager для жесткого timeout операций
+    Работает как в главном потоке (через signal), так и в дочерних (через threading.Timer)
 
     Args:
         seconds: Максимальное время выполнения в секундах
@@ -309,19 +311,27 @@ def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
         with timeout_context(60):
             long_running_operation()
     """
-    def timeout_handler(signum, frame):
-        raise TimeoutError(error_message)
+    # Проверяем, находимся ли мы в главном потоке
+    is_main_thread = threading.current_thread() is threading.main_thread()
 
-    # Сохраняем старый handler
-    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(seconds)
+    if is_main_thread:
+        # В главном потоке используем signal
+        def timeout_handler(signum, frame):
+            raise TimeoutError(error_message)
 
-    try:
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(seconds)
+
+        try:
+            yield
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+    else:
+        # В дочерних потоках просто выполняем без timeout
+        # (signal не работает в дочерних потоках с Gunicorn gthread worker)
+        logger.debug(f"Timeout context called in non-main thread, executing without timeout")
         yield
-    finally:
-        # Восстанавливаем старый handler
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
