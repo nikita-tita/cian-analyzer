@@ -43,9 +43,12 @@ ENV/
 *.xlsx
 results/
 logs/
-test_*.py
-debug_*.py
-*_test.py
+# Ignore test files in root and other dirs, but not in tests/
+/**/test_*.py
+/**/debug_*.py
+/**/*_test.py
+!tests/test_*.py
+!tests/*_test.py
 
 # OS
 .DS_Store
