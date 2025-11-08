@@ -44,6 +44,10 @@ git fetch origin
 git reset --hard origin/main
 git pull origin main
 
+# Применяем критический фикс для flask-limiter
+echo "   🔧 Применение фикса storage_uri..."
+sed -i 's/limiter\.storage_uri/limiter._storage_uri/g' app_new.py
+
 echo "   ✅ Код обновлён"
 ENDSSH
 

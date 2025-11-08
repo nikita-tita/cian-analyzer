@@ -486,7 +486,7 @@ const screen2 = {
         // Форматируем цену за кв.м
         let pricePerSqmText = '';
         if (comp.price_per_sqm) {
-            pricePerSqmText = `<div class="detail-item text-primary"><i class="bi bi-cash-stack"></i> ${utils.formatNumber(comp.price_per_sqm)} ₽/м²</div>`;
+            pricePerSqmText = `<div class="detail-item" style="font-weight: 600; color: var(--black);"><i class="bi bi-cash-stack"></i> ${utils.formatNumber(comp.price_per_sqm)} ₽/м²</div>`;
         }
 
         // Форматируем ремонт
@@ -513,7 +513,7 @@ const screen2 = {
                 </div>
                 ${comp.address ? `<div class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> ${comp.address}</div>` : ''}
                 <div class="property-actions">
-                    <a href="${comp.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <a href="${comp.url}" target="_blank" class="btn btn-sm btn-outline-dark">
                         <i class="bi bi-box-arrow-up-right"></i> Открыть
                     </a>
                     ${!excluded ? `
@@ -701,7 +701,7 @@ const screen3 = {
             <div class="scenario-card">
                 <div class="scenario-header">
                     <div class="scenario-title">${scenario.name}</div>
-                    <span class="scenario-badge badge bg-primary">${scenario.time_months} мес</span>
+                    <span class="scenario-badge badge" style="background: var(--black); color: var(--white);">${scenario.time_months} мес</span>
                 </div>
                 <div class="scenario-description">${scenario.description}</div>
                 <div class="scenario-metrics">
