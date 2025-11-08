@@ -233,6 +233,9 @@ class RealEstateAnalyzer:
         Returns:
             Отфильтрованный список
         """
+        # Debug logging - before filtering
+        logger.info(f"🔍 DEBUG _filter_outliers: Input {len(comparables)} comparables")
+
         if len(comparables) < 2:
             return comparables
 
@@ -241,13 +244,18 @@ class RealEstateAnalyzer:
 
         if len(prices_per_sqm) < 2:
             # Если нет достаточно данных для статистики, возвращаем все не excluded
-            return [c for c in comparables if not c.excluded]
+            result = [c for c in comparables if not c.excluded]
+            logger.info(f"🔍 DEBUG _filter_outliers: Not enough price data, returning {len(result)} non-excluded")
+            return result
 
         mean = statistics.mean(prices_per_sqm)
         stdev = statistics.stdev(prices_per_sqm)
 
         # Фильтруем выбросы, но СОХРАНЯЕМ объявления без price_per_sqm
         filtered = []
+        outliers_count = 0
+        no_price_count = 0
+
         for c in comparables:
             if c.excluded:
                 continue  # Пропускаем уже excluded
@@ -255,10 +263,16 @@ class RealEstateAnalyzer:
             if not c.price_per_sqm:
                 # Нет price_per_sqm - сохраняем (может быть полезно для других характеристик)
                 filtered.append(c)
+                no_price_count += 1
             elif abs(c.price_per_sqm - mean) <= 3 * stdev:
                 # В пределах ±3σ - сохраняем
                 filtered.append(c)
-            # Иначе отбрасываем как выброс
+            else:
+                # Отбрасываем как выброс
+                outliers_count += 1
+
+        # Debug logging - after filtering
+        logger.info(f"🔍 DEBUG _filter_outliers: Output {len(filtered)} comparables (kept {no_price_count} without price, removed {outliers_count} outliers)")
 
         return filtered
 

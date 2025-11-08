@@ -670,7 +670,13 @@ const screen2 = {
             const result = await response.json();
 
             if (result.status === 'success') {
+                // Debug logging - trace object count
+                console.log('🔍 DEBUG: Received comparables from API:', result.comparables.length);
+                console.log('🔍 DEBUG: API reported count:', result.count);
+
                 state.comparables = result.comparables;
+                console.log('🔍 DEBUG: State comparables set to:', state.comparables.length);
+
                 this.renderComparables();
                 utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
             } else {
