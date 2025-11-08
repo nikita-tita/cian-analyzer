@@ -836,6 +836,13 @@ canvas {
     height: 35px;
     display: flex;
     align-items: center;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.advice-ticker.ticker-hidden {
+    opacity: 0;
+    transform: translateY(100%);
+    pointer-events: none;
 }
 
 .advice-ticker-track {

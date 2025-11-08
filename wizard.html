@@ -12,10 +12,9 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/static/images/favicon-192.png">
     <link rel="manifest" href="/static/manifest.json">
 
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/static/css/wizard.css?v=20251108154000">
+    <link rel="stylesheet" href="/static/css/wizard.css">
 </head>
 <body>
     <!-- Header -->
@@ -65,15 +64,15 @@
                         >
                         <div class="form-text">Пример: https://www.cian.ru/sale/flat/315831388/</div>
                     </div>
-                    <button id="parse-btn" class="btn btn-dark btn-lg w-100">
-                        Загрузить объект
+                    <button id="parse-btn" class="btn btn-primary btn-lg w-100">
+                        Спарсить объект
                     </button>
 
                     <div class="divider my-3">
                         <span>или</span>
                     </div>
 
-                    <button id="manual-input-btn" class="btn btn-outline-dark btn-lg w-100">
+                    <button id="manual-input-btn" class="btn btn-outline-primary btn-lg w-100">
                         Ввести данные вручную
                     </button>
                 </div>
@@ -82,7 +81,7 @@
             <!-- Форма ручного ввода -->
             <div id="manual-input-form" class="mt-4" style="display: none;">
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background: var(--black); color: var(--white); border-bottom: 1px solid var(--border-color);">
+                    <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">Введите данные объекта</h5>
                     </div>
                     <div class="card-body">
@@ -224,10 +223,10 @@
                             </div>
 
                             <div class="d-flex gap-3 mt-3">
-                                <button type="button" id="cancel-manual-btn" class="btn btn-outline-dark">
+                                <button type="button" id="cancel-manual-btn" class="btn btn-outline-secondary">
                                     Отмена
                                 </button>
-                                <button type="submit" class="btn btn-dark flex-grow-1">
+                                <button type="submit" class="btn btn-primary flex-grow-1">
                                     Продолжить с этими данными
                                 </button>
                             </div>
@@ -239,7 +238,7 @@
             <!-- Результат парсинга -->
             <div id="parse-result" class="mt-4" style="display: none;">
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background: var(--black); color: var(--white); border-bottom: 1px solid var(--border-color);">
+                    <div class="card-header bg-success text-white">
                         <h5 class="mb-0">Объект загружен</h5>
                     </div>
                     <div class="card-body">
@@ -252,7 +251,7 @@
                 <!-- Недостающие поля -->
                 <div id="missing-fields" class="mt-4" style="display: none;">
                     <div class="card shadow-sm">
-                        <div class="card-header" style="background: var(--gray-light); color: var(--black); border-bottom: 1px solid var(--border-color);">
+                        <div class="card-header bg-warning">
                             <h5 class="mb-0">Заполните дополнительные поля</h5>
                         </div>
                         <div class="card-body">
@@ -264,6 +263,12 @@
                     </div>
                 </div>
 
+                <!-- Кнопка "Далее" -->
+                <div id="next-step-btn-container" class="mt-4" style="display: none;">
+                    <button id="next-to-comparables-btn" class="btn btn-success btn-lg w-100">
+                        Далее: Подбор аналогов
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -276,7 +281,7 @@
 
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <button id="find-similar-btn" class="btn btn-dark btn-lg w-100">
+                    <button id="find-similar-btn" class="btn btn-primary btn-lg w-100">
                         Автоматически найти похожие объекты
                     </button>
 
@@ -291,7 +296,7 @@
                             id="add-comparable-input"
                             placeholder="Добавить объект по ссылке"
                         >
-                        <button id="add-comparable-btn" class="btn btn-outline-dark">
+                        <button id="add-comparable-btn" class="btn btn-outline-primary">
                              Добавить
                         </button>
                     </div>
@@ -307,7 +312,7 @@
                 <button id="back-to-parse-btn" class="btn btn-outline-secondary">
                     Назад
                 </button>
-                <button id="next-to-analysis-btn" class="btn btn-dark flex-grow-1">
+                <button id="next-to-analysis-btn" class="btn btn-success flex-grow-1">
                     Перейти к анализу 
                 </button>
             </div>
@@ -320,7 +325,7 @@
                 <p class="text-muted">Детальный анализ объекта недвижимости</p>
             </div>
 
-            <button id="run-analysis-btn" class="btn btn-dark btn-lg w-100 mb-4">
+            <button id="run-analysis-btn" class="btn btn-primary btn-lg w-100 mb-4">
                 Рассчитать анализ
             </button>
 
@@ -328,7 +333,7 @@
             <div id="analysis-results" style="display: none;">
                 <!-- Сводная информация -->
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-dark text-white">
+                    <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">Сводная информация</h5>
                     </div>
                     <div class="card-body">
@@ -417,25 +422,13 @@
         </div>
     </div>
 
-    <!-- Pixel Loader -->
-    <div id="pixel-loader" class="pixel-loader" style="display: none;">
-        <div class="pixel-loader-content">
-            <div class="pixel-loader-screen">
-                <!-- Бегущая строка с пиксельным текстом -->
-                <div class="pixel-marquee">
-                    <div class="pixel-marquee-track" id="pixel-text">
-                        🏃 Загрузка...
-                    </div>
-                </div>
-
-                <!-- Пиксельный прогресс бар -->
-                <div class="pixel-progress-bar">
-                    <div class="pixel-progress-fill"></div>
-                </div>
-
-                <!-- Пиксельная иконка -->
-                <div class="pixel-icon agent"></div>
+    <!-- Loading spinner -->
+    <div id="loading-overlay" style="display: none;">
+        <div class="spinner-container">
+            <div class="spinner-border text-primary" style="width: 4rem; height: 4rem;" role="status">
+                <span class="visually-hidden">Загрузка...</span>
             </div>
+            <p class="mt-3 text-white fw-bold" id="loading-text">Загрузка...</p>
         </div>
     </div>
 
@@ -452,20 +445,13 @@
         </div>
     </div>
 
-    <!-- Фиксированная бегущая строка с советами -->
-    <div class="advice-ticker" id="advice-ticker">
-        <div class="advice-ticker-track" id="advice-text">
-            ЕГРН: права, обременения, запреты на сделки ⚡ История собственников за 10 лет и основания перехода ⚡ Согласие супруга/и при браке или подтверждение раздельности ⚡ Доли и дети: опека, нотариус, выделение долей заранее ⚡ Маткапитал: целевое использование и обязательства на детей ⚡ Ипотека: согласие банка, эскроу/аккредитив, закладная ⚡ Проверка продавца: ФНС, ФССП, банкротство, исполнительные ⚡ Доверенность: реестр, объем полномочий, без перепоручения ⚡ Перепланировка: акты БТИ, узаконивание до сделки ⚡ Ограничения по земле/дому: ПЗЗ, охранные и санитарные зоны ⚡ Судебные споры: проверки по адресу и собственнику ⚡ Долги: коммуналка, капремонт, порядок погашения в договоре ⚡ Третьи лица: зарегистрированные жильцы, арендаторы, право прохода/проезда ⚡ Наследство: все наследники, обязательные доли, сроки принятия ⚡ Налоги: срок владения, НДФЛ, вычет, подтвержденные расходы ⚡ Расчеты: без крупных наличных, только эскроу/аккредитив ⚡ Расписки: дата, сумма, ФИО, паспорт, назначение платежа ⚡ Предварительный договор: предмет, цена, сроки, штрафы ⚡ Электронная регистрация: кто подает, контроль пакета, уведомления ⚡ Земельные границы: межевание, кадастровые ошибки, пересечения соседей ⚡ ЕГРН: права, обременения, запреты на сделки ⚡ История собственников за 10 лет и основания перехода ⚡ Согласие супруга/и при браке или подтверждение раздельности ⚡ Доли и дети: опека, нотариус, выделение долей заранее ⚡ Маткапитал: целевое использование и обязательства на детей ⚡ Ипотека: согласие банка, эскроу/аккредитив, закладная ⚡ Проверка продавца: ФНС, ФССП, банкротство, исполнительные ⚡ Доверенность: реестр, объем полномочий, без перепоручения ⚡ Перепланировка: акты БТИ, узаконивание до сделки ⚡ Ограничения по земле/дому: ПЗЗ, охранные и санитарные зоны ⚡ Судебные споры: проверки по адресу и собственнику ⚡ Долги: коммуналка, капремонт, порядок погашения в договоре ⚡ Третьи лица: зарегистрированные жильцы, арендаторы, право прохода/проезда ⚡ Наследство: все наследники, обязательные доли, сроки принятия ⚡ Налоги: срок владения, НДФЛ, вычет, подтвержденные расходы ⚡ Расчеты: без крупных наличных, только эскроу/аккредитив ⚡ Расписки: дата, сумма, ФИО, паспорт, назначение платежа ⚡ Предварительный договор: предмет, цена, сроки, штрафы ⚡ Электронная регистрация: кто подает, контроль пакета, уведомления ⚡ Земельные границы: межевание, кадастровые ошибки, пересечения соседей
-        </div>
-    </div>
-
     <!-- Floating Navigation Buttons -->
     <div class="floating-buttons" id="floating-buttons">
         <button class="floating-btn floating-btn-secondary" id="floating-back-btn" style="display: none;">
             
             <span>Назад</span>
         </button>
-        <button class="floating-btn floating-btn-dark" id="floating-next-btn">
+        <button class="floating-btn floating-btn-primary" id="floating-next-btn">
             <span>Далее</span>
             
         </button>
@@ -473,31 +459,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- DOMPurify for XSS protection -->
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
-    <script src="/static/js/wizard.js?v=20251108154000"></script>
-
-    <script>
-        // Hide ticker when scrolling near bottom of page
-        const ticker = document.getElementById('advice-ticker');
-
-        function handleTickerVisibility() {
-            if (!ticker) return;
-
-            const scrollPosition = window.scrollY + window.innerHeight;
-            const documentHeight = document.documentElement.scrollHeight;
-
-            // Hide ticker when within 300px of bottom
-            if (scrollPosition >= documentHeight - 300) {
-                ticker.classList.add('ticker-hidden');
-            } else {
-                ticker.classList.remove('ticker-hidden');
-            }
-        }
-
-        window.addEventListener('scroll', handleTickerVisibility);
-        window.addEventListener('resize', handleTickerVisibility);
-        handleTickerVisibility(); // Check on page load
-    </script>
+    <script src="/static/js/wizard.js"></script>
 </body>
 </html>
