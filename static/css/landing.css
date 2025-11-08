@@ -398,6 +398,54 @@ body {
     color: var(--color-text-light);
 }
 
+/* Mobile Swipe Container */
+.swipe-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 24px;
+    margin: 0 -24px;
+    padding: 0 24px;
+}
+
+.swipe-container::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.swipe-wrapper {
+    display: flex;
+    gap: 16px;
+}
+
+.swipe-item {
+    flex: 0 0 85%; /* 85% width shows peek of next item */
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+/* Scroll hint indicator */
+.scroll-hint {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--color-text-light);
+    display: none;
+}
+
+.scroll-hint::after {
+    content: '→';
+    margin-left: 8px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .services-grid,
@@ -446,13 +494,6 @@ body {
         padding: 60px 0;
     }
 
-    .services-grid,
-    .process-timeline,
-    .pricing-grid,
-    .contact-grid {
-        grid-template-columns: 1fr;
-    }
-
     .section-title,
     .cta-content h2 {
         font-size: 28px;
@@ -462,5 +503,57 @@ body {
         flex-direction: column;
         gap: 16px;
         text-align: center;
+    }
+
+    /* Enable swipe mode for mobile */
+    .mobile-swipe .services-grid,
+    .mobile-swipe .process-timeline,
+    .mobile-swipe .pricing-grid {
+        display: flex;
+        gap: 16px;
+        grid-template-columns: none;
+    }
+
+    .mobile-swipe .service-card,
+    .mobile-swipe .process-step,
+    .mobile-swipe .pricing-card {
+        flex: 0 0 85%;
+        scroll-snap-align: start;
+    }
+
+    .mobile-swipe .scroll-hint {
+        display: block;
+    }
+
+    /* Contact grid stays 1-column on mobile */
+    .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero h1 {
+        font-size: 32px;
+    }
+
+    .section-title,
+    .cta-content h2 {
+        font-size: 24px;
+    }
+
+    .mobile-swipe .service-card,
+    .mobile-swipe .process-step,
+    .mobile-swipe .pricing-card {
+        flex: 0 0 90%; /* Slightly larger on small phones */
+    }
+
+    .container {
+        padding: 0 20px;
+    }
+
+    .swipe-container {
+        margin: 0 -20px;
+        padding: 0 20px;
     }
 }
