@@ -97,9 +97,6 @@ const screen1 = {
         document.getElementById('manual-input-btn').addEventListener('click', this.showManualForm.bind(this));
         document.getElementById('cancel-manual-btn').addEventListener('click', this.hideManualForm.bind(this));
         document.getElementById('manual-property-form').addEventListener('submit', this.submitManualForm.bind(this));
-        document.getElementById('next-to-comparables-btn').addEventListener('click', () => {
-            this.updateTargetProperty();
-        });
     },
 
     showManualForm() {
@@ -132,7 +129,7 @@ const screen1 = {
             view_type: document.getElementById('manual-view').value || 'улица'
         };
 
-        utils.showLoading('Создание объекта...');
+        pixelLoader.show('parsing');
 
         try {
             const response = await fetch('/api/create-manual', {
@@ -147,6 +144,11 @@ const screen1 = {
                 state.sessionId = result.session_id;
                 state.targetProperty = result.data;
 
+                // Обновляем кнопки навигации
+                if (window.floatingButtons) {
+                    floatingButtons.updateButtons();
+                }
+
                 // Скрываем форму
                 this.hideManualForm();
 
@@ -160,7 +162,7 @@ const screen1 = {
             console.error('Manual input error:', error);
             utils.showToast('Ошибка соединения с сервером', 'error');
         } finally {
-            utils.hideLoading();
+            pixelLoader.hide();
         }
     },
 
@@ -172,7 +174,7 @@ const screen1 = {
             return;
         }
 
-        utils.showLoading('Парсинг объявления...');
+        pixelLoader.show('parsing');
 
         try {
             const response = await fetch('/api/parse', {
@@ -187,6 +189,11 @@ const screen1 = {
                 state.sessionId = result.session_id;
                 state.targetProperty = result.data;
 
+                // Обновляем кнопки навигации
+                if (window.floatingButtons) {
+                    floatingButtons.updateButtons();
+                }
+
                 this.displayParseResult(result.data, result.missing_fields);
                 utils.showToast('Объект успешно загружен!', 'success');
             } else {
@@ -196,7 +203,7 @@ const screen1 = {
             console.error('Parse error:', error);
             utils.showToast('Ошибка соединения с сервером', 'error');
         } finally {
-            utils.hideLoading();
+            pixelLoader.hide();
         }
     },
 
@@ -264,9 +271,6 @@ const screen1 = {
         if (missingFields && missingFields.length > 0) {
             document.getElementById('missing-fields').style.display = 'block';
             this.renderMissingFields(missingFields);
-        } else {
-            // Если нет недостающих полей, сразу показываем кнопку "Далее"
-            document.getElementById('next-step-btn-container').style.display = 'block';
         }
     },
 
@@ -342,7 +346,7 @@ const screen1 = {
 
         // Если есть данные для сохранения
         if (Object.keys(data).length > 0) {
-            utils.showLoading('Сохранение данных...');
+            pixelLoader.show('parsing');
 
             try {
                 const response = await fetch('/api/update-target', {
@@ -362,10 +366,10 @@ const screen1 = {
                     // Скрываем форму недостающих полей
                     document.getElementById('missing-fields').style.display = 'none';
 
-                    // Показываем кнопку "Далее"
-                    document.getElementById('next-step-btn-container').style.display = 'block';
-
                     utils.showToast('Данные сохранены', 'success');
+
+                    // Переходим на шаг 2
+                    navigation.goToStep(2);
                 } else {
                     utils.showToast(result.message || 'Ошибка сохранения', 'error');
                 }
@@ -373,7 +377,7 @@ const screen1 = {
                 console.error('Update error:', error);
                 utils.showToast('Ошибка соединения с сервером', 'error');
             } finally {
-                utils.hideLoading();
+                pixelLoader.hide();
             }
         } else {
             // Нет данных для сохранения, просто переходим
@@ -392,7 +396,7 @@ const screen2 = {
     },
 
     async findSimilar() {
-        utils.showLoading('Поиск похожих объектов...');
+        pixelLoader.show('searching');
 
         try {
             const response = await fetch('/api/find-similar', {
@@ -417,7 +421,7 @@ const screen2 = {
             console.error('Find similar error:', error);
             utils.showToast('Ошибка соединения с сервером', 'error');
         } finally {
-            utils.hideLoading();
+            pixelLoader.hide();
         }
     },
 
@@ -429,7 +433,7 @@ const screen2 = {
             return;
         }
 
-        utils.showLoading('Добавление объекта...');
+        pixelLoader.show('searching');
 
         try {
             const response = await fetch('/api/add-comparable', {
@@ -455,7 +459,7 @@ const screen2 = {
             console.error('Add comparable error:', error);
             utils.showToast('Ошибка соединения с сервером', 'error');
         } finally {
-            utils.hideLoading();
+            pixelLoader.hide();
         }
     },
 
@@ -565,7 +569,7 @@ const screen3 = {
     },
 
     async runAnalysis() {
-        utils.showLoading('Выполняется анализ...');
+        pixelLoader.show('analyzing');
 
         try {
             const response = await fetch('/api/analyze', {
@@ -591,7 +595,7 @@ const screen3 = {
             console.error('Analysis error:', error);
             utils.showToast('Ошибка соединения с сервером', 'error');
         } finally {
-            utils.hideLoading();
+            pixelLoader.hide();
         }
     },
 
@@ -829,6 +833,13 @@ const floatingButtons = {
             backBtn.style.display = 'flex';
         }
 
+        // Кнопка "Далее" показывается только если есть sessionId
+        if (state.currentStep === 1 && !state.sessionId) {
+            nextBtn.style.display = 'none';
+        } else {
+            nextBtn.style.display = 'flex';
+        }
+
         // Обновляем текст кнопки "Далее"
         const nextText = nextBtn.querySelector('span');
         if (state.currentStep === 1) {
@@ -838,6 +849,135 @@ const floatingButtons = {
         } else if (state.currentStep === 3) {
             nextText.textContent = 'Скачать отчет';
         }
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// Pixel Loader - Веселые пиксельные лоадеры
+// ══════════════════════════════════════════════════════════════
+
+const pixelLoader = {
+    // Смешные тексты для разных этапов
+    messages: {
+        // Парсинг объекта
+        parsing: [
+            '🏃 Звоню агенту узнать как дела...',
+            '📞 Агент говорит "перезвоните через 5 минут"...',
+            '🏢 Бегу в Росреестр за выпиской ЕГРН...',
+            '📋 Очередь в Росреестр... стою 47-й...',
+            '🔍 Проверяю есть ли у квартиры долги...',
+            '💰 Смотрю кто платит за ЖКХ...',
+            '🏠 Изучаю планировку через замочную скважину...',
+            '📐 Меряю площадь лазерной рулеткой...',
+            '🚪 Стучусь к соседям узнать про шум...',
+            '🔎 Ищу подвох в объявлении...',
+        ],
+
+        // Поиск аналогов
+        searching: [
+            '🧬 Применяю технику клонирования...',
+            '👥 Отлично, меня теперь 100!',
+            '🏃‍♂️ Бегаю по району смотрю похожие квартиры...',
+            '🗺️ Изучаю карту района как таксист...',
+            '🔍 Заглядываю в окна соседних домов...',
+            '📱 Листаю Циан как Instagram...',
+            '🎯 Нашел! Нет, это не то...',
+            '🔎 Ищу иголку в стоге сена...',
+            '🏘️ Обхожу весь ЖК пешком...',
+            '👀 Смотрю на объявления соседей...',
+            '📊 Считаю сколько окон на этаж...',
+            '🚶 Меряю расстояние до метро шагами...',
+        ],
+
+        // Анализ
+        analyzing: [
+            '🧮 Включаю режим гения математики...',
+            '📊 Строю графики как безумный ученый...',
+            '🔬 Анализирую данные под микроскопом...',
+            '🤓 Надеваю очки для умных...',
+            '📈 Рисую тренды цен на салфетке...',
+            '💡 Эврика! Или нет...',
+            '🎓 Применяю знания из универа...',
+            '🧠 Активирую все нейроны...',
+            '📐 Вывожу сложные формулы...',
+            '⚡ Считаю быстрее калькулятора...',
+            '🎯 Вычисляю идеальную цену...',
+            '💰 Определяю стоит ли оно того...',
+        ]
+    },
+
+    currentLoader: null,
+    currentMessageIndex: 0,
+    messageInterval: null,
+
+    // Показать лоадер
+    show(type = 'parsing') {
+        // Создаем лоадер если его нет
+        const loader = document.getElementById('pixel-loader');
+        if (!loader) {
+            console.error('Pixel loader element not found');
+            return;
+        }
+
+        const textElement = document.getElementById('pixel-text');
+        const iconElement = loader.querySelector('.pixel-icon');
+
+        // Устанавливаем тип лоадера
+        loader.className = 'pixel-loader ' + type;
+        this.currentLoader = type;
+        this.currentMessageIndex = 0;
+
+        // Устанавливаем иконку в зависимости от типа
+        const icons = {
+            parsing: 'agent',
+            searching: 'house',
+            analyzing: 'document'
+        };
+        iconElement.className = 'pixel-icon ' + icons[type];
+
+        // Показываем первое сообщение
+        const messages = this.messages[type] || this.messages.parsing;
+        textElement.textContent = messages[0] + ' ⚡ ' + messages[0] + ' ⚡ '; // Дублируем для бесшовной анимации
+
+        // Показываем лоадер
+        loader.style.display = 'flex';
+
+        // Запускаем смену сообщений
+        this.startMessageRotation(type);
+    },
+
+    // Скрыть лоадер
+    hide() {
+        const loader = document.getElementById('pixel-loader');
+        if (loader) {
+            loader.style.display = 'none';
+        }
+
+        // Останавливаем смену сообщений
+        if (this.messageInterval) {
+            clearInterval(this.messageInterval);
+            this.messageInterval = null;
+        }
+    },
+
+    // Ротация сообщений
+    startMessageRotation(type) {
+        const messages = this.messages[type] || this.messages.parsing;
+        const textElement = document.getElementById('pixel-text');
+
+        // Останавливаем предыдущий интервал
+        if (this.messageInterval) {
+            clearInterval(this.messageInterval);
+        }
+
+        // Меняем сообщение каждые 3 секунды
+        this.messageInterval = setInterval(() => {
+            this.currentMessageIndex = (this.currentMessageIndex + 1) % messages.length;
+            const message = messages[this.currentMessageIndex];
+
+            // Дублируем текст для бесшовной бегущей строки
+            textElement.textContent = message + ' ⚡ ' + message + ' ⚡ ';
+        }, 3000);
     }
 };
 
