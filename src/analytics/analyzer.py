@@ -5,9 +5,11 @@
 import statistics
 import math
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 from functools import lru_cache
+import numpy as np
+from scipy import stats as scipy_stats
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +131,22 @@ class RealEstateAnalyzer:
                 for c in self.filtered_comparables
             ]
 
+        # Проверка на достаточное количество аналогов
+        min_comparables_required = 3
+        if len(self.filtered_comparables) < min_comparables_required:
+            error_msg = (
+                f"Недостаточно аналогов для анализа: найдено {len(self.filtered_comparables)}, "
+                f"требуется минимум {min_comparables_required}. "
+                f"Попробуйте расширить критерии поиска или выбрать другой объект."
+            )
+            if self.enable_tracking:
+                self._log_event(EventType.ANALYSIS_COMPLETED,
+                    f"Анализ прерван: {error_msg}",
+                    {'error': 'insufficient_comparables'})
+                self.tracker.complete_property(self.property_id, "failed")
+
+            raise ValueError(error_msg)
+
         # Расчеты
         market_stats = self.calculate_market_statistics()
         fair_price = self.calculate_fair_price()
@@ -189,6 +207,46 @@ class RealEstateAnalyzer:
 
         return filtered
 
+    def _calculate_confidence_interval(
+        self,
+        data: List[float],
+        confidence: float = 0.95
+    ) -> Tuple[float, float]:
+        """
+        Расчет доверительного интервала для среднего
+
+        Args:
+            data: Список значений
+            confidence: Уровень доверия (0.95 = 95%)
+
+        Returns:
+            (нижняя граница, верхняя граница)
+        """
+        if not data or len(data) < 2:
+            return (0.0, 0.0)
+
+        n = len(data)
+        mean = statistics.mean(data)
+        stdev = statistics.stdev(data)
+
+        # t-распределение Стьюдента для малых выборок (n < 30)
+        # Для больших выборок (n >= 30) можно использовать нормальное
+        if n < 30:
+            # Степени свободы
+            df = n - 1
+            # t-критерий для заданного уровня доверия
+            t_critical = scipy_stats.t.ppf((1 + confidence) / 2, df)
+            margin = t_critical * (stdev / math.sqrt(n))
+        else:
+            # z-критерий для нормального распределения
+            z_critical = scipy_stats.norm.ppf((1 + confidence) / 2)
+            margin = z_critical * (stdev / math.sqrt(n))
+
+        lower = mean - margin
+        upper = mean + margin
+
+        return (lower, upper)
+
     @lru_cache(maxsize=128)
     def calculate_market_statistics(self) -> Dict:
         """
@@ -211,6 +269,11 @@ class RealEstateAnalyzer:
         prices_with_design = [c.price_per_sqm for c in with_design if c.price_per_sqm]
         prices_without_design = [c.price_per_sqm for c in without_design if c.price_per_sqm]
 
+        # Расчет доверительных интервалов (95%)
+        ci_95_lower, ci_95_upper = self._calculate_confidence_interval(
+            prices_per_sqm, confidence=0.95
+        ) if len(prices_per_sqm) >= 3 else (0, 0)
+
         stats = {
             'all': {
                 'mean': statistics.mean(prices_per_sqm) if prices_per_sqm else 0,
@@ -219,7 +282,13 @@ class RealEstateAnalyzer:
                 'max': max(prices_per_sqm) if prices_per_sqm else 0,
                 'stdev': statistics.stdev(prices_per_sqm) if len(prices_per_sqm) > 1 else 0,
                 'count': len(prices_per_sqm),
-                'filtered_out': self.metrics['comparables_filtered']
+                'filtered_out': self.metrics['comparables_filtered'],
+                # Доверительные интервалы
+                'confidence_interval_95': {
+                    'lower': ci_95_lower,
+                    'upper': ci_95_upper,
+                    'margin': (ci_95_upper - ci_95_lower) / 2 if ci_95_upper > 0 else 0
+                }
             },
             'with_design': {
                 'mean': statistics.mean(prices_with_design) if prices_with_design else 0,
@@ -276,6 +345,36 @@ class RealEstateAnalyzer:
             base_price_per_sqm=base_price_per_sqm,
             method=method
         )
+
+        # Добавляем доверительные интервалы для справедливой цены
+        if target.total_area and len(self.filtered_comparables) >= 3:
+            # Получаем цены/м² аналогов
+            prices_per_sqm = [c.price_per_sqm for c in self.filtered_comparables if c.price_per_sqm]
+
+            # Рассчитываем CI для базовой цены/м²
+            ci_lower_sqm, ci_upper_sqm = self._calculate_confidence_interval(prices_per_sqm, confidence=0.95)
+
+            # Применяем тот же multiplier к границам интервала
+            multiplier = result.get('final_multiplier', 1.0)
+            area = target.total_area
+
+            fair_price_ci_lower = ci_lower_sqm * multiplier * area
+            fair_price_ci_upper = ci_upper_sqm * multiplier * area
+            fair_price_margin = (fair_price_ci_upper - fair_price_ci_lower) / 2
+
+            result['confidence_interval_95'] = {
+                'lower': fair_price_ci_lower,
+                'upper': fair_price_ci_upper,
+                'margin': fair_price_margin,
+                'margin_percent': (fair_price_margin / result['fair_price_total'] * 100) if result['fair_price_total'] > 0 else 0,
+                'description': f"{result['fair_price_total']:,.0f} ± {fair_price_margin:,.0f} ₽ (95% доверия)"
+            }
+
+            logger.info(
+                f"Доверительный интервал 95%: "
+                f"{fair_price_ci_lower:,.0f} - {fair_price_ci_upper:,.0f} ₽ "
+                f"(±{fair_price_margin:,.0f} ₽)"
+            )
 
         # Логирование справедливой цены
         if self.enable_tracking and self.property_log:

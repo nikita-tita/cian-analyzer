@@ -1,0 +1,73 @@
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 ИСПРАВЛЕНИЕ КАЛЬКУЛЯТОРА НА HOUSLER.RU                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+ПРОБЛЕМА:
+  Калькулятор не работает из-за отсутствия SSL сертификата
+  и nginx конфигурации.
+
+РЕШЕНИЕ (3 минуты):
+  
+  1. На VPS перейдите в директорию проекта:
+     cd /path/to/housler
+
+  2. Загрузите обновления:
+     git pull origin main
+
+  3. Запустите скрипт установки SSL (от root):
+     sudo ./setup_ssl.sh
+
+  4. Проверьте:
+     curl https://housler.ru/health
+     
+  5. Откройте в браузере:
+     https://housler.ru/calculator
+
+ГОТОВО! ✅
+
+╔══════════════════════════════════════════════════════════════╗
+║  ЕСЛИ НУЖНА ПОМОЩЬ:                                        ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Смотрите детальные инструкции:
+  - QUICK_FIX_HOUSLER.md - быстрое решение
+  - PRODUCTION_SETUP.md - полное руководство
+  - FIX_SUMMARY.md - технический отчёт
+
+  Или выполните вручную:
+  
+  # 1. Установите SSL
+  sudo apt-get install certbot
+  docker-compose down
+  sudo certbot certonly --standalone -d housler.ru -d www.housler.ru
+  
+  # 2. Скопируйте сертификаты
+  sudo mkdir -p nginx/ssl
+  sudo cp /etc/letsencrypt/live/housler.ru/*.pem nginx/ssl/
+  sudo chmod 644 nginx/ssl/*.pem
+  
+  # 3. Активируйте HTTPS в nginx/nginx.conf
+  # (раскомментируйте server block для port 443)
+  
+  # 4. Запустите
+  docker-compose --profile production up -d --build
+
+╔══════════════════════════════════════════════════════════════╗
+║  ЧТО БЫЛО ИСПРАВЛЕНО:                                      ║
+╚══════════════════════════════════════════════════════════════╝
+
+  ✅ Создана nginx конфигурация (nginx/nginx.conf)
+  ✅ Создан скрипт установки SSL (setup_ssl.sh)
+  ✅ Обновлён docker-compose.yml для production
+  ✅ Создана полная документация
+
+╔══════════════════════════════════════════════════════════════╗
+║  ПРОВЕРКА ПОСЛЕ УСТАНОВКИ:                                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+  curl https://housler.ru/health
+  curl -I https://housler.ru/static/css/wizard.css
+  curl -I https://housler.ru/static/js/wizard.js
+  
+  Все должны вернуть 200 OK
+

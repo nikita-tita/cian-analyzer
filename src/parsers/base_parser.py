@@ -29,20 +29,24 @@ class BaseCianParser(ABC):
     - Обработка ошибок
     - Retry механизм
     - Логирование
+    - Redis кэширование
     """
 
-    def __init__(self, delay: float = 2.0):
+    def __init__(self, delay: float = 2.0, cache=None):
         """
         Args:
             delay: Задержка между запросами в секундах
+            cache: PropertyCache instance (опционально)
         """
         self.delay = delay
         self.base_url = "https://www.cian.ru"
+        self.cache = cache
         self.stats = {
             'requests': 0,
             'errors': 0,
             'retries': 0,
-            'cache_hits': 0
+            'cache_hits': 0,
+            'cache_misses': 0
         }
 
     @abstractmethod
@@ -620,7 +624,7 @@ class BaseCianParser(ABC):
 
     def parse_detail_page(self, url: str) -> Dict:
         """
-        Парсинг детальной страницы объявления
+        Парсинг детальной страницы объявления с кэшированием
 
         Args:
             url: URL объявления
@@ -628,6 +632,16 @@ class BaseCianParser(ABC):
         Returns:
             Словарь с детальными данными
         """
+        # Проверяем кэш
+        if self.cache:
+            cached_data = self.cache.get_property(url)
+            if cached_data:
+                self.stats['cache_hits'] += 1
+                logger.info(f"✅ Cache HIT: {url[:60]}...")
+                return cached_data
+            else:
+                self.stats['cache_misses'] += 1
+
         logger.info(f"Парсинг детальной страницы: {url}")
 
         try:
@@ -679,6 +693,12 @@ class BaseCianParser(ABC):
             self._extract_premium_features(soup, data)
 
             logger.info(f"✓ Успешно спарсен: {data.get('title', 'Без названия')}")
+
+            # Сохраняем в кэш
+            if self.cache:
+                self.cache.set_property(url, data, ttl_hours=24)
+                logger.debug(f"💾 Сохранено в кэш: {url[:60]}...")
+
             return data
 
         except Exception as e:
