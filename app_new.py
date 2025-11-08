@@ -37,7 +37,16 @@ from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+
+# SECURITY: Secret key from environment (CRITICAL FIX)
+# Generate with: openssl rand -hex 32
+app.secret_key = os.getenv('SECRET_KEY')
+if not app.secret_key:
+    logger.error("SECRET_KEY not set in environment! Using temporary key for development only.")
+    if os.getenv('FLASK_ENV') == 'production':
+        raise RuntimeError('SECRET_KEY must be set in production environment')
+    # Development fallback (will be different on each restart)
+    app.secret_key = os.urandom(24)
 
 # Инициализация Redis кэша
 # В продакшене параметры берутся из env переменных
@@ -65,6 +74,247 @@ limiter = Limiter(
 )
 
 logger.info(f"Rate limiting initialized: {limiter.storage_uri[:20]}...")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECURITY UTILITIES (CRITICAL FIX)
+# ═══════════════════════════════════════════════════════════════════════════
+
+from urllib.parse import urlparse
+import ipaddress
+
+# Whitelist разрешенных доменов для парсинга (защита от SSRF)
+ALLOWED_DOMAINS = [
+    'www.cian.ru',
+    'cian.ru',
+    'spb.cian.ru',
+    'moscow.cian.ru'
+]
+
+def validate_url(url: str) -> None:
+    """
+    Validate URL для защиты от SSRF атак
+
+    Args:
+        url: URL для проверки
+
+    Raises:
+        ValueError: если URL опасен
+
+    Защита от:
+    - Internal network scanning
+    - File:// protocol
+    - Localhost/private IP access
+    - Arbitrary domain access
+    """
+    if not url:
+        raise ValueError('URL не может быть пустым')
+
+    # Парсим URL
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        raise ValueError(f'Невалидный URL: {e}')
+
+    # Проверяем протокол
+    if parsed.scheme not in ['http', 'https']:
+        raise ValueError(f'Запрещенный протокол: {parsed.scheme}. Разрешены только http/https')
+
+    # Проверяем наличие hostname
+    if not parsed.hostname:
+        raise ValueError('URL должен содержать hostname')
+
+    # Проверяем whitelist доменов
+    hostname_lower = parsed.hostname.lower()
+    if not any(hostname_lower == domain or hostname_lower.endswith('.' + domain)
+               for domain in ALLOWED_DOMAINS):
+        raise ValueError(f'Домен {parsed.hostname} не разрешен. Разрешены только: {", ".join(ALLOWED_DOMAINS)}')
+
+    # Блокируем private/internal IP адреса
+    try:
+        ip = ipaddress.ip_address(parsed.hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            raise ValueError(f'Запрещен доступ к internal IP: {ip}')
+    except ValueError:
+        # Не IP адрес - это нормально, продолжаем
+        pass
+
+    # Дополнительные проверки
+    if len(url) > 2048:
+        raise ValueError('URL слишком длинный (max 2048 символов)')
+
+    # Блокируем подозрительные паттерны
+    suspicious_patterns = ['localhost', '127.', '192.168.', '10.', '172.16.', '@']
+    for pattern in suspicious_patterns:
+        if pattern in url.lower():
+            raise ValueError(f'URL содержит подозрительный паттерн: {pattern}')
+
+
+def sanitize_string(text: str, max_length: int = 1000) -> str:
+    """
+    Sanitize строку от потенциально опасного контента
+
+    Args:
+        text: Строка для очистки
+        max_length: Максимальная длина
+
+    Returns:
+        Очищенная строка
+    """
+    if not text:
+        return ''
+
+    # Обрезаем до максимальной длины
+    text = str(text).strip()[:max_length]
+
+    # Удаляем null bytes
+    text = text.replace('\x00', '')
+
+    # Удаляем control characters кроме \n, \r, \t
+    text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
+
+    return text
+
+
+# Pydantic models для валидации входных данных
+from pydantic import BaseModel, Field, validator, ValidationError as PydanticValidationError
+
+class ManualPropertyInput(BaseModel):
+    """Валидация данных для ручного ввода объекта недвижимости"""
+    address: str = Field(..., min_length=5, max_length=500, description="Полный адрес")
+    price_raw: float = Field(..., gt=0, lt=1_000_000_000_000, description="Цена в рублях")
+    total_area: float = Field(..., gt=1, lt=10000, description="Общая площадь в м²")
+    rooms: str = Field(..., description="Количество комнат")
+    floor: str = Field(default='', max_length=20, description="Этаж в формате N/M")
+    living_area: float = Field(default=None, gt=0, lt=10000, description="Жилая площадь в м²")
+    kitchen_area: float = Field(default=None, gt=0, lt=500, description="Площадь кухни в м²")
+    repair_level: str = Field(default='стандартная', max_length=50)
+    view_type: str = Field(default='улица', max_length=50)
+
+    @validator('address')
+    def validate_address(cls, v):
+        """Санитизация адреса"""
+        v = sanitize_string(v, max_length=500)
+        if not v or len(v) < 5:
+            raise ValueError('Адрес слишком короткий')
+        # Блокируем SQL injection паттерны
+        dangerous_patterns = ['<script', 'javascript:', 'onerror=', 'onclick=', 'drop table', 'union select']
+        v_lower = v.lower()
+        for pattern in dangerous_patterns:
+            if pattern in v_lower:
+                raise ValueError(f'Адрес содержит недопустимые символы')
+        return v
+
+    @validator('rooms')
+    def validate_rooms(cls, v):
+        """Валидация комнат"""
+        allowed_values = ['Студия', '1', '2', '3', '4', '5', '5+']
+        if v not in allowed_values:
+            raise ValueError(f'Недопустимое значение для комнат: {v}. Разрешены: {allowed_values}')
+        return v
+
+    @validator('living_area')
+    def validate_living_area(cls, v, values):
+        """Проверка что жилая площадь не больше общей"""
+        if v and 'total_area' in values and v > values['total_area']:
+            raise ValueError('Жилая площадь не может быть больше общей')
+        return v
+
+    @validator('kitchen_area')
+    def validate_kitchen_area(cls, v, values):
+        """Проверка что площадь кухни не больше общей"""
+        if v and 'total_area' in values and v > values['total_area']:
+            raise ValueError('Площадь кухни не может быть больше общей')
+        return v
+
+
+# Timeout decorator для защиты от зависающих операций
+import signal
+from contextlib import contextmanager
+from functools import wraps
+
+class TimeoutError(Exception):
+    """Exception raised when operation times out"""
+    pass
+
+
+@contextmanager
+def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
+    """
+    Context manager для жесткого timeout операций
+
+    Args:
+        seconds: Максимальное время выполнения в секундах
+        error_message: Сообщение об ошибке
+
+    Raises:
+        TimeoutError: если операция превысила timeout
+
+    Example:
+        with timeout_context(60):
+            long_running_operation()
+    """
+    def timeout_handler(signum, frame):
+        raise TimeoutError(error_message)
+
+    # Сохраняем старый handler
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+
+    try:
+        yield
+    finally:
+        # Восстанавливаем старый handler
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECURITY HEADERS (CRITICAL FIX)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.after_request
+def set_security_headers(response):
+    """
+    Apply security headers to all responses
+
+    Protection against:
+    - XSS (Content-Security-Policy)
+    - Clickjacking (X-Frame-Options)
+    - MIME sniffing (X-Content-Type-Options)
+    - Information leakage (Referrer-Policy)
+    """
+
+    # Content Security Policy - защита от XSS
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+        "img-src 'self' data: https: http:; "
+        "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+
+    # Запрет на MIME-sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+
+    # Защита от clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+
+    # XSS Protection (legacy, но для старых браузеров)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+
+    # Referrer Policy - не передаем полный URL при переходах
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+    # HSTS - принудительный HTTPS (только в production)
+    if os.getenv('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+    return response
 
 
 @app.route('/')
@@ -230,13 +480,28 @@ def parse_url():
         if not url:
             return jsonify({'status': 'error', 'message': 'URL обязателен'}), 400
 
+        # SECURITY: Валидация URL (защита от SSRF)
+        try:
+            validate_url(url)
+        except ValueError as e:
+            logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+
         # Автоопределение региона
         region = detect_region_from_url(url)
         logger.info(f"Парсинг URL: {url} (регион: {region})")
 
-        # Парсинг через доступный парсер с кэшем и регионом
-        with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
-            parsed_data = parser.parse_detail_page(url)
+        # SECURITY: Парсинг с timeout (защита от DoS)
+        try:
+            with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
+                with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
+                    parsed_data = parser.parse_detail_page(url)
+        except TimeoutError as e:
+            logger.error(f"Parsing timeout for {url}: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Время ожидания истекло. Попробуйте позже или другой объект.'
+            }), 408  # Request Timeout
 
         # Определяем недостающие поля для анализа
         missing_fields = _identify_missing_fields(parsed_data)
@@ -295,30 +560,38 @@ def create_manual():
     try:
         data = request.json
 
-        # Валидация обязательных полей
-        required = ['address', 'price_raw', 'total_area', 'rooms']
-        missing = [f for f in required if not data.get(f)]
-        if missing:
+        # SECURITY: Валидация входных данных через Pydantic
+        try:
+            validated = ManualPropertyInput(**data)
+        except PydanticValidationError as e:
+            logger.warning(f"Validation error from {request.remote_addr}: {e}")
+            # Форматируем ошибки для пользователя
+            errors = []
+            for error in e.errors():
+                field = error['loc'][0]
+                msg = error['msg']
+                errors.append(f"{field}: {msg}")
             return jsonify({
                 'status': 'error',
-                'message': f'Отсутствуют обязательные поля: {", ".join(missing)}'
+                'message': 'Ошибка валидации данных',
+                'errors': errors
             }), 400
 
-        # Создаем объект недвижимости
+        # Создаем объект недвижимости из валидированных данных
         property_data = {
-            'address': data['address'],
-            'price_raw': float(data['price_raw']),
-            'price': f"{int(data['price_raw']):,} ₽".replace(',', ' '),
-            'total_area': float(data['total_area']),
-            'area': f"{data['total_area']} м²",
-            'rooms': data['rooms'],
-            'floor': data.get('floor', ''),
-            'living_area': float(data.get('living_area')) if data.get('living_area') else None,
-            'kitchen_area': float(data.get('kitchen_area')) if data.get('kitchen_area') else None,
-            'repair_level': data.get('repair_level', 'стандартная'),
-            'view_type': data.get('view_type', 'улица'),
+            'address': validated.address,
+            'price_raw': validated.price_raw,
+            'price': f"{int(validated.price_raw):,} ₽".replace(',', ' '),
+            'total_area': validated.total_area,
+            'area': f"{validated.total_area} м²",
+            'rooms': validated.rooms,
+            'floor': validated.floor,
+            'living_area': validated.living_area,
+            'kitchen_area': validated.kitchen_area,
+            'repair_level': validated.repair_level,
+            'view_type': validated.view_type,
             'manual_input': True,
-            'title': data.get('title', f"{data['rooms']}-комн. квартира, {data['total_area']} м²"),
+            'title': f"{validated.rooms}-комн. квартира, {validated.total_area} м²",
             'url': None,  # Нет URL при ручном вводе
             'metro': [],
             'residential_complex': None,
@@ -535,13 +808,28 @@ def add_comparable():
         if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
+        # SECURITY: Валидация URL (защита от SSRF)
+        try:
+            validate_url(url)
+        except ValueError as e:
+            logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+
         # Определяем регион
         region = detect_region_from_url(url)
         logger.info(f"Добавление аналога: {url} (регион: {region})")
 
-        # Парсим аналог с кэшем и регионом
-        with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
-            comparable_data = parser.parse_detail_page(url)
+        # SECURITY: Парсим с timeout (защита от DoS)
+        try:
+            with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
+                with Parser(headless=True, delay=1.0, cache=property_cache, region=region) as parser:
+                    comparable_data = parser.parse_detail_page(url)
+        except TimeoutError as e:
+            logger.error(f"Parsing timeout for {url}: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Время ожидания истекло. Попробуйте позже.'
+            }), 408
 
         # Добавляем в список
         session_data = session_storage.get(session_id)
