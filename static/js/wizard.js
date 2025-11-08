@@ -94,9 +94,74 @@ const navigation = {
 const screen1 = {
     init() {
         document.getElementById('parse-btn').addEventListener('click', this.parse.bind(this));
+        document.getElementById('manual-input-btn').addEventListener('click', this.showManualForm.bind(this));
+        document.getElementById('cancel-manual-btn').addEventListener('click', this.hideManualForm.bind(this));
+        document.getElementById('manual-property-form').addEventListener('submit', this.submitManualForm.bind(this));
         document.getElementById('next-to-comparables-btn').addEventListener('click', () => {
             this.updateTargetProperty();
         });
+    },
+
+    showManualForm() {
+        document.getElementById('manual-input-form').style.display = 'block';
+        // Скроллим к форме
+        document.getElementById('manual-input-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+
+    hideManualForm() {
+        document.getElementById('manual-input-form').style.display = 'none';
+    },
+
+    async submitManualForm(e) {
+        e.preventDefault();
+
+        // Собираем данные из формы
+        const rooms = document.getElementById('manual-rooms').value;
+        const total_area = parseFloat(document.getElementById('manual-area').value);
+        const price_raw = parseFloat(document.getElementById('manual-price').value);
+
+        const formData = {
+            address: document.getElementById('manual-address').value.trim(),
+            price_raw: price_raw,
+            total_area: total_area,
+            rooms: rooms,
+            floor: document.getElementById('manual-floor').value.trim(),
+            living_area: parseFloat(document.getElementById('manual-living-area').value) || null,
+            kitchen_area: parseFloat(document.getElementById('manual-kitchen-area').value) || null,
+            repair_level: document.getElementById('manual-repair').value || 'стандартная',
+            view_type: document.getElementById('manual-view').value || 'улица'
+        };
+
+        utils.showLoading('Создание объекта...');
+
+        try {
+            const response = await fetch('/api/create-manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                state.sessionId = result.session_id;
+                state.targetProperty = result.data;
+
+                // Скрываем форму
+                this.hideManualForm();
+
+                // Показываем результат
+                this.displayParseResult(result.data, result.missing_fields || []);
+                utils.showToast('Объект создан!', 'success');
+            } else {
+                utils.showToast(result.message || 'Ошибка создания объекта', 'error');
+            }
+        } catch (error) {
+            console.error('Manual input error:', error);
+            utils.showToast('Ошибка соединения с сервером', 'error');
+        } finally {
+            utils.hideLoading();
+        }
     },
 
     async parse() {
@@ -199,6 +264,9 @@ const screen1 = {
         if (missingFields && missingFields.length > 0) {
             document.getElementById('missing-fields').style.display = 'block';
             this.renderMissingFields(missingFields);
+        } else {
+            // Если нет недостающих полей, сразу показываем кнопку "Далее"
+            document.getElementById('next-step-btn-container').style.display = 'block';
         }
     },
 
@@ -250,7 +318,9 @@ const screen1 = {
 
     async updateTargetProperty() {
         const form = document.getElementById('missing-fields-form');
-        if (!form) {
+
+        // Если формы нет (нет недостающих полей), сразу переходим на следующий шаг
+        if (!form || !form.querySelector('[name]')) {
             navigation.goToStep(2);
             return;
         }
@@ -270,31 +340,44 @@ const screen1 = {
             }
         });
 
-        utils.showLoading('Сохранение данных...');
+        // Если есть данные для сохранения
+        if (Object.keys(data).length > 0) {
+            utils.showLoading('Сохранение данных...');
 
-        try {
-            const response = await fetch('/api/update-target', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: state.sessionId,
-                    data
-                })
-            });
+            try {
+                const response = await fetch('/api/update-target', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: state.sessionId,
+                        data
+                    })
+                });
 
-            const result = await response.json();
+                const result = await response.json();
 
-            if (result.status === 'success') {
-                Object.assign(state.targetProperty, data);
-                navigation.goToStep(2);
-            } else {
-                utils.showToast(result.message || 'Ошибка сохранения', 'error');
+                if (result.status === 'success') {
+                    Object.assign(state.targetProperty, data);
+
+                    // Скрываем форму недостающих полей
+                    document.getElementById('missing-fields').style.display = 'none';
+
+                    // Показываем кнопку "Далее"
+                    document.getElementById('next-step-btn-container').style.display = 'block';
+
+                    utils.showToast('Данные сохранены', 'success');
+                } else {
+                    utils.showToast(result.message || 'Ошибка сохранения', 'error');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                utils.showToast('Ошибка соединения с сервером', 'error');
+            } finally {
+                utils.hideLoading();
             }
-        } catch (error) {
-            console.error('Update error:', error);
-            utils.showToast('Ошибка соединения с сервером', 'error');
-        } finally {
-            utils.hideLoading();
+        } else {
+            // Нет данных для сохранения, просто переходим
+            navigation.goToStep(2);
         }
     }
 };

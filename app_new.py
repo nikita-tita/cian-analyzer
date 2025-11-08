@@ -265,6 +265,106 @@ def parse_url():
         }), 500
 
 
+@app.route('/api/create-manual', methods=['POST'])
+@limiter.limit("10 per minute")
+def create_manual():
+    """
+    API: Создание объекта вручную без парсинга (Экран 1)
+
+    Body:
+        {
+            "address": "Санкт-Петербург, улица Ленина, 10",
+            "price_raw": 15000000,
+            "total_area": 75.5,
+            "rooms": "2",
+            "floor": "5/10",
+            "living_area": 55.0,
+            "kitchen_area": 12.0,
+            "repair_level": "стандартная",
+            "view_type": "улица"
+        }
+
+    Returns:
+        {
+            "status": "success",
+            "data": {...},
+            "session_id": "uuid",
+            "missing_fields": []
+        }
+    """
+    try:
+        data = request.json
+
+        # Валидация обязательных полей
+        required = ['address', 'price_raw', 'total_area', 'rooms']
+        missing = [f for f in required if not data.get(f)]
+        if missing:
+            return jsonify({
+                'status': 'error',
+                'message': f'Отсутствуют обязательные поля: {", ".join(missing)}'
+            }), 400
+
+        # Создаем объект недвижимости
+        property_data = {
+            'address': data['address'],
+            'price_raw': float(data['price_raw']),
+            'price': f"{int(data['price_raw']):,} ₽".replace(',', ' '),
+            'total_area': float(data['total_area']),
+            'area': f"{data['total_area']} м²",
+            'rooms': data['rooms'],
+            'floor': data.get('floor', ''),
+            'living_area': float(data.get('living_area')) if data.get('living_area') else None,
+            'kitchen_area': float(data.get('kitchen_area')) if data.get('kitchen_area') else None,
+            'repair_level': data.get('repair_level', 'стандартная'),
+            'view_type': data.get('view_type', 'улица'),
+            'manual_input': True,
+            'title': data.get('title', f"{data['rooms']}-комн. квартира, {data['total_area']} м²"),
+            'url': None,  # Нет URL при ручном вводе
+            'metro': [],
+            'residential_complex': None,
+            'characteristics': {}
+        }
+
+        # Пытаемся определить регион из адреса
+        address_lower = data['address'].lower()
+        if 'санкт-петербург' in address_lower or 'спб' in address_lower:
+            region = 'spb'
+        elif 'москва' in address_lower or 'мск' in address_lower:
+            region = 'msk'
+        else:
+            region = 'spb'  # По умолчанию
+
+        property_data['region'] = region
+
+        logger.info(f"Создание объекта вручную: {property_data['address']} (регион: {region})")
+
+        # Определяем недостающие поля (для ручного ввода их меньше)
+        missing_fields = _identify_missing_fields(property_data)
+
+        # Создаем сессию
+        session_id = str(uuid.uuid4())
+        session_storage.set(session_id, {
+            'target_property': property_data,
+            'comparables': [],
+            'created_at': datetime.now().isoformat(),
+            'step': 1
+        })
+
+        return jsonify({
+            'status': 'success',
+            'data': property_data,
+            'session_id': session_id,
+            'missing_fields': missing_fields
+        })
+
+    except Exception as e:
+        logger.error(f"Ошибка создания вручную: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @app.route('/api/update-target', methods=['POST'])
 def update_target():
     """
