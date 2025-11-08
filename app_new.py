@@ -556,7 +556,9 @@ def metrics():
 @app.route('/calculator')
 def calculator():
     """Property calculator - main analysis tool"""
-    return render_template('wizard.html')
+    # Получаем session_id из query параметра (если есть)
+    session_id = request.args.get('session')
+    return render_template('wizard.html', session_id=session_id)
 
 
 @app.route('/api/parse', methods=['POST'])

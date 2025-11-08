@@ -114,6 +114,169 @@ const utils = {
             headers['X-CSRFToken'] = state.csrfToken;
         }
         return headers;
+    },
+
+    /**
+     * Session Management: Save session ID to localStorage
+     */
+    saveSessionToLocalStorage(sessionId) {
+        try {
+            localStorage.setItem('housler_session_id', sessionId);
+            console.log('Session saved to localStorage:', sessionId);
+        } catch (error) {
+            console.error('Failed to save session to localStorage:', error);
+        }
+    },
+
+    /**
+     * Session Management: Get session ID from localStorage
+     */
+    getSessionFromLocalStorage() {
+        try {
+            return localStorage.getItem('housler_session_id');
+        } catch (error) {
+            console.error('Failed to get session from localStorage:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Session Management: Clear session from localStorage
+     */
+    clearSessionFromLocalStorage() {
+        try {
+            localStorage.removeItem('housler_session_id');
+            console.log('Session cleared from localStorage');
+        } catch (error) {
+            console.error('Failed to clear session from localStorage:', error);
+        }
+    },
+
+    /**
+     * Session Management: Update URL with session ID
+     */
+    updateUrlWithSession(sessionId, step = null) {
+        try {
+            const url = new URL(window.location);
+            url.searchParams.set('session', sessionId);
+            if (step) {
+                url.hash = `#step-${step}`;
+            }
+            window.history.replaceState({}, '', url);
+            console.log('URL updated with session:', sessionId);
+        } catch (error) {
+            console.error('Failed to update URL:', error);
+        }
+    },
+
+    /**
+     * Session Management: Load session data from server
+     */
+    async loadSession(sessionId) {
+        try {
+            pixelLoader.show('parsing');
+            console.log('Loading session:', sessionId);
+
+            const response = await fetch(`/api/session/${sessionId}`);
+            const result = await response.json();
+
+            if (result.status === 'success' && result.data) {
+                const sessionData = result.data;
+
+                // Restore state
+                state.sessionId = sessionId;
+                state.targetProperty = sessionData.target_property || null;
+                state.comparables = sessionData.comparables || [];
+                state.analysis = sessionData.analysis || null;
+
+                // Save to localStorage
+                this.saveSessionToLocalStorage(sessionId);
+
+                // Determine which step to go to
+                let targetStep = 1;
+                if (state.analysis) {
+                    targetStep = 3;
+                } else if (state.comparables.length > 0) {
+                    targetStep = 2;
+                } else if (state.targetProperty) {
+                    targetStep = 1;
+                }
+
+                // Check URL hash for step override
+                const hash = window.location.hash;
+                const hashMatch = hash.match(/#step-(\d+)/);
+                if (hashMatch) {
+                    const hashStep = parseInt(hashMatch[1]);
+                    if (hashStep >= 1 && hashStep <= 3) {
+                        targetStep = hashStep;
+                    }
+                }
+
+                // Display data in appropriate screens
+                if (state.targetProperty) {
+                    screen1.displayParseResult(state.targetProperty, []);
+                }
+                if (state.comparables.length > 0) {
+                    screen2.displayComparables(state.comparables);
+                }
+                if (state.analysis) {
+                    screen3.displayAnalysis(state.analysis);
+                }
+
+                // Navigate to the appropriate step
+                navigation.goToStep(targetStep);
+
+                // Update floating buttons
+                if (window.floatingButtons) {
+                    floatingButtons.updateButtons();
+                }
+
+                this.showToast('Сессия загружена успешно', 'success');
+                return true;
+            } else {
+                console.warn('Session not found or expired:', sessionId);
+                this.clearSessionFromLocalStorage();
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load session:', error);
+            this.showToast('Не удалось загрузить сессию', 'error');
+            return false;
+        } finally {
+            pixelLoader.hide();
+        }
+    },
+
+    /**
+     * Session Management: Get current shareable URL
+     */
+    getShareableUrl() {
+        if (!state.sessionId) {
+            return null;
+        }
+        const url = new URL(window.location.origin + '/calculator');
+        url.searchParams.set('session', state.sessionId);
+        url.hash = `#step-${state.currentStep}`;
+        return url.toString();
+    },
+
+    /**
+     * Session Management: Copy shareable URL to clipboard
+     */
+    async copyShareableUrl() {
+        const url = this.getShareableUrl();
+        if (!url) {
+            this.showToast('Нет активной сессии для шаринга', 'warning');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(url);
+            this.showToast('Ссылка скопирована в буфер обмена!', 'success');
+        } catch (error) {
+            console.error('Failed to copy URL:', error);
+            this.showToast('Не удалось скопировать ссылку', 'error');
+        }
     }
 };
 
@@ -143,6 +306,14 @@ const navigation = {
         document.getElementById(`screen-${step}`).classList.add('active');
 
         state.currentStep = step;
+
+        // Session Management: Update URL hash when navigating
+        if (state.sessionId) {
+            utils.updateUrlWithSession(state.sessionId, step);
+        } else {
+            // Just update hash if no session yet
+            window.location.hash = `#step-${step}`;
+        }
 
         // Обновляем floating кнопки
         if (window.floatingButtons) {
@@ -208,6 +379,10 @@ const screen1 = {
                 state.sessionId = result.session_id;
                 state.targetProperty = result.data;
 
+                // Session Management: Save and update URL
+                utils.saveSessionToLocalStorage(state.sessionId);
+                utils.updateUrlWithSession(state.sessionId, 1);
+
                 // Обновляем кнопки навигации
                 if (window.floatingButtons) {
                     floatingButtons.updateButtons();
@@ -254,6 +429,10 @@ const screen1 = {
             if (result.status === 'success') {
                 state.sessionId = result.session_id;
                 state.targetProperty = result.data;
+
+                // Session Management: Save and update URL
+                utils.saveSessionToLocalStorage(state.sessionId);
+                utils.updateUrlWithSession(state.sessionId, 1);
 
                 // Обновляем кнопки навигации
                 if (window.floatingButtons) {
@@ -463,8 +642,6 @@ const screen2 = {
     init() {
         document.getElementById('find-similar-btn').addEventListener('click', this.findSimilar.bind(this));
         document.getElementById('add-comparable-btn').addEventListener('click', this.addComparable.bind(this));
-        document.getElementById('back-to-parse-btn').addEventListener('click', () => navigation.goToStep(1));
-        document.getElementById('next-to-analysis-btn').addEventListener('click', () => navigation.goToStep(3));
     },
 
     async findSimilar() {
@@ -656,7 +833,6 @@ const screen2 = {
 const screen3 = {
     init() {
         document.getElementById('run-analysis-btn').addEventListener('click', this.runAnalysis.bind(this));
-        document.getElementById('back-to-comparables-btn').addEventListener('click', () => navigation.goToStep(2));
     },
 
     async runAnalysis() {
@@ -893,6 +1069,7 @@ const floatingButtons = {
     init() {
         const nextBtn = document.getElementById('floating-next-btn');
         const backBtn = document.getElementById('floating-back-btn');
+        const shareBtn = document.getElementById('share-btn');
 
         nextBtn.addEventListener('click', () => {
             if (state.currentStep === 1) {
@@ -911,6 +1088,13 @@ const floatingButtons = {
             }
         });
 
+        // Session Management: Share button handler
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                utils.copyShareableUrl();
+            });
+        }
+
         // Обновляем видимость кнопок при смене экрана
         this.updateButtons();
     },
@@ -918,6 +1102,7 @@ const floatingButtons = {
     updateButtons() {
         const nextBtn = document.getElementById('floating-next-btn');
         const backBtn = document.getElementById('floating-back-btn');
+        const shareBtn = document.getElementById('share-btn');
 
         // Показываем кнопку "Назад" только не на первом экране
         if (state.currentStep === 1) {
@@ -931,6 +1116,15 @@ const floatingButtons = {
             nextBtn.style.display = 'none';
         } else {
             nextBtn.style.display = 'flex';
+        }
+
+        // Session Management: Show "Share" button only if session exists
+        if (shareBtn) {
+            if (state.sessionId) {
+                shareBtn.style.display = 'inline-block';
+            } else {
+                shareBtn.style.display = 'none';
+            }
         }
 
         // Обновляем текст кнопки "Далее"
@@ -1070,4 +1264,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;
+
+    // Breadcrumbs: Make progress bar clickable
+    document.querySelectorAll('.progress-step').forEach((stepEl) => {
+        stepEl.style.cursor = 'pointer';
+        stepEl.addEventListener('click', () => {
+            const stepNum = parseInt(stepEl.getAttribute('data-step'));
+
+            // Only allow navigation to completed steps or current step
+            if (stepEl.classList.contains('completed') || stepEl.classList.contains('active')) {
+                // For step 2 and 3, require sessionId
+                if (stepNum > 1 && !state.sessionId) {
+                    utils.showToast('Сначала загрузите объект', 'warning');
+                    return;
+                }
+
+                navigation.goToStep(stepNum);
+            } else {
+                utils.showToast('Сначала завершите предыдущие шаги', 'warning');
+            }
+        });
+    });
+
+    // Session Management: Try to restore session
+    let sessionLoaded = false;
+
+    // Priority 1: Check URL parameter (from server or shared link)
+    if (window.SERVER_SESSION_ID) {
+        console.log('Found session in URL from server:', window.SERVER_SESSION_ID);
+        sessionLoaded = await utils.loadSession(window.SERVER_SESSION_ID);
+    }
+
+    // Priority 2: Check localStorage (user's own previous session)
+    if (!sessionLoaded) {
+        const localSessionId = utils.getSessionFromLocalStorage();
+        if (localSessionId) {
+            console.log('Found session in localStorage:', localSessionId);
+            sessionLoaded = await utils.loadSession(localSessionId);
+        }
+    }
+
+    // If no session loaded, just stay on step 1
+    if (!sessionLoaded) {
+        console.log('No session to restore, starting fresh');
+    }
 });
