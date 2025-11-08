@@ -63,14 +63,39 @@ property_cache = init_cache(
 session_storage = get_session_storage()
 
 # Rate limiting configuration
+# SECURITY: Комбинированный ключ для защиты от обхода через прокси
+import hashlib
+
+def get_rate_limit_key():
+    """
+    Генерирует комбинированный ключ для rate limiting
+
+    Использует: IP + User-Agent + Session (если есть)
+    Это затрудняет обход через прокси или смену IP
+    """
+    # IP адрес
+    ip = get_remote_address()
+
+    # User-Agent
+    user_agent = request.headers.get('User-Agent', '')[:200]  # Ограничиваем длину
+
+    # Session ID (если есть)
+    session_id = session.get('id', '')
+
+    # Комбинируем и хэшируем для privacy
+    combined = f"{ip}:{user_agent}:{session_id}"
+    key_hash = hashlib.sha256(combined.encode()).hexdigest()[:16]
+
+    return key_hash
+
 # Используем Redis для распределенного rate limiting (если доступен)
 limiter = Limiter(
     app=app,
-    key_func=get_remote_address,
+    key_func=get_rate_limit_key,  # Используем улучшенный ключ
     storage_uri=f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}/{os.getenv('REDIS_DB', 0)}" if os.getenv('REDIS_ENABLED', 'false').lower() == 'true' else 'memory://',
     default_limits=["200 per day", "50 per hour"],
     storage_options={"socket_connect_timeout": 30},
-    strategy="fixed-window"
+    strategy="moving-window"  # Более строгая стратегия
 )
 
 logger.info(f"Rate limiting initialized: {limiter.storage_uri[:20]}...")
@@ -884,6 +909,47 @@ def exclude_comparable():
 
     except Exception as e:
         logger.error(f"Ошибка исключения: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/include-comparable', methods=['POST'])
+def include_comparable():
+    """
+    API: Возврат аналога в анализ (Экран 2)
+
+    Body:
+        {
+            "session_id": "uuid",
+            "index": 3
+        }
+
+    Returns:
+        {
+            "status": "success"
+        }
+    """
+    try:
+        payload = request.json
+        session_id = payload.get('session_id')
+        index = payload.get('index')
+
+        if not session_id or not session_storage.exists(session_id):
+            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+
+        session_data = session_storage.get(session_id)
+        comparables = session_data['comparables']
+
+        if 0 <= index < len(comparables):
+            comparables[index]['excluded'] = False
+            session_storage.set(session_id, session_data)
+
+        return jsonify({'status': 'success'})
+
+    except Exception as e:
+        logger.error(f"Ошибка возврата: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
