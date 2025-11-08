@@ -95,7 +95,8 @@ class PlaywrightParser(BaseCianParser):
         delay: float = 2.0,
         block_resources: bool = True,
         cache=None,
-        region: str = 'spb'
+        region: str = 'spb',
+        browser_pool=None
     ):
         """
         Args:
@@ -104,6 +105,7 @@ class PlaywrightParser(BaseCianParser):
             block_resources: Блокировать картинки/шрифты для ускорения
             cache: PropertyCache instance (опционально)
             region: Регион поиска ('spb' или 'msk')
+            browser_pool: BrowserPool instance (опционально, рекомендуется для production)
         """
         super().__init__(delay, cache=cache)
         self.headless = headless
@@ -111,6 +113,8 @@ class PlaywrightParser(BaseCianParser):
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
+        self.browser_pool = browser_pool
+        self.using_pool = browser_pool is not None
 
         # Маппинг регионов на коды Cian
         self.region_codes = {
@@ -120,7 +124,7 @@ class PlaywrightParser(BaseCianParser):
         self.region = region
         self.region_code = self.region_codes.get(region, '2')  # Default: SPB
 
-        logger.info(f"Регион: {region} (код: {self.region_code})")
+        logger.info(f"Регион: {region} (код: {self.region_code}), using_pool: {self.using_pool}")
 
     def __enter__(self):
         """Context manager вход"""
@@ -132,12 +136,20 @@ class PlaywrightParser(BaseCianParser):
         self.close()
 
     def start(self):
-        """Запуск браузера (один раз за сессию)"""
+        """Запуск браузера (один раз за сессию) или получение из пула"""
         if self.browser:
             logger.warning("Браузер уже запущен")
             return
 
         try:
+            # Если используем browser pool, получаем браузер из пула
+            if self.using_pool:
+                logger.info("Acquiring browser from pool...")
+                self.browser, self.context = self.browser_pool.acquire(timeout=30.0)
+                logger.info("✓ Браузер получен из пула")
+                return
+
+            # Иначе создаем собственный браузер (legacy режим)
             logger.info("🚀 Запуск Playwright браузера...")
             self.playwright = sync_playwright().start()
 
@@ -183,7 +195,21 @@ class PlaywrightParser(BaseCianParser):
             raise
 
     def close(self):
-        """Закрытие браузера с гарантированной очисткой ресурсов"""
+        """Закрытие браузера или возврат в пул"""
+        # Если используем browser pool, возвращаем браузер в пул
+        if self.using_pool and self.browser:
+            try:
+                logger.info("Returning browser to pool...")
+                self.browser_pool.release(self.browser)
+                self.browser = None
+                self.context = None
+                logger.info("✓ Browser returned to pool")
+                return
+            except Exception as e:
+                logger.error(f"Error returning browser to pool: {e}")
+                # Продолжаем с обычным закрытием
+
+        # Legacy режим: закрываем браузер полностью
         errors = []
 
         # Закрываем context
