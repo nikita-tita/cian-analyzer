@@ -1,0 +1,54 @@
+[flake8]
+# Flake8 configuration for code style checking
+
+max-line-length = 127
+max-complexity = 10
+
+# Exclude patterns
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    env,
+    .venv,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    htmlcov,
+    .tox,
+    node_modules
+
+# Ignore specific errors
+ignore =
+    E203,  # Whitespace before ':'
+    E501,  # Line too long (handled by Black)
+    W503,  # Line break before binary operator (conflicts with Black)
+    W504,  # Line break after binary operator
+    E402,  # Module level import not at top of file (sometimes needed)
+
+# Select specific error codes to check
+select =
+    E,   # PEP8 errors
+    W,   # PEP8 warnings
+    F,   # PyFlakes errors
+    C,   # McCabe complexity
+    N,   # PEP8 naming conventions
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401,F403,  # Allow unused imports in __init__.py
+    tests/*.py:F401,F811,   # Allow redefinition in tests
+    conftest.py:F401,F811
+
+# Complexity settings
+max-complexity = 10
+
+# Show source code for each error
+show-source = True
+
+# Show statistics at the end
+statistics = True
+
+# Count number of occurrences of each error/warning
+count = True
