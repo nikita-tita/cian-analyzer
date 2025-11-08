@@ -236,12 +236,12 @@ body {
     background: var(--gray-light);
 }
 
-.floating-btn-primary {
+.floating-btn-dark {
     background: var(--black);
     color: var(--white);
 }
 
-.floating-btn-primary:hover {
+.floating-btn-dark:hover {
     background: var(--gray-dark);
 }
 
@@ -679,4 +679,197 @@ body {
 
 canvas {
     max-height: 400px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Pixel Loader - Пиксельная бегущая строка
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+.pixel-loader-content {
+    max-width: 500px;
+    width: 85%;
+}
+
+.pixel-loader-screen {
+    background: #fff;
+    border: 1px solid #000;
+    border-radius: 4px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+
+/* Пиксельная бегущая строка */
+.pixel-marquee {
+    overflow: hidden;
+    background: #000;
+    border: 1px solid #333;
+    padding: 15px 0;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.pixel-marquee-track {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 20s linear infinite;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 11px;
+    color: #fff;
+    letter-spacing: 1px;
+    padding: 0 100%;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* Пиксельный прогресс бар */
+.pixel-progress-bar {
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.pixel-progress-fill {
+    height: 100%;
+    background: #000;
+    width: 0%;
+    animation: progressFill 3s ease-in-out infinite;
+}
+
+@keyframes progressFill {
+    0% { width: 0%; }
+    50% { width: 100%; }
+    100% { width: 0%; }
+}
+
+/* Пиксельная иконка */
+.pixel-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 50%;
+    animation: pixelPulse 1.5s ease-in-out infinite;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.pixel-icon.agent::after {
+    content: '⚙️';
+    font-size: 28px;
+}
+
+.pixel-icon.house::after {
+    content: '🏠';
+    font-size: 28px;
+}
+
+.pixel-icon.document::after {
+    content: '📊';
+    font-size: 28px;
+}
+
+@keyframes pixelPulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.1);
+        filter: brightness(1.2);
+    }
+}
+
+/* Все типы лоадеров одинаковые (черно-белые) */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Фиксированная бегущая строка с советами
+   ══════════════════════════════════════════════════════════════ */
+
+.advice-ticker {
+    position: fixed;
+    bottom: 80px;
+    left: 0;
+    right: 0;
+    background: #000;
+    border-top: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    overflow: hidden;
+    z-index: 999;
+    height: 35px;
+    display: flex;
+    align-items: center;
+}
+
+.advice-ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 180s linear infinite;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+    padding: 0 100%;
+}
+
+/* Responsive для pixel loader */
+@media (max-width: 768px) {
+    .pixel-marquee-track {
+        font-size: 14px;
+    }
+
+    .pixel-loader-screen {
+        padding: 20px;
+    }
+
+    .pixel-icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .advice-ticker {
+        bottom: 120px;
+        height: 35px;
+    }
+
+    .advice-ticker-track {
+        font-size: 10px;
+    }
 }
