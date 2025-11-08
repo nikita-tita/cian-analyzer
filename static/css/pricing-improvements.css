@@ -55,21 +55,28 @@
 .pricing-card-featured {
     position: relative;
     border: 2px solid var(--color-accent);
-    transform: scale(1.02);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-card-featured .pricing-header {
+    padding-top: 48px;
 }
 
 .pricing-badge {
     position: absolute;
-    top: -12px;
-    right: 24px;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
     background: var(--color-accent);
     color: var(--color-bg);
-    padding: 4px 16px;
+    padding: 6px 20px;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap;
+    z-index: 10;
+    border-radius: 4px;
 }
 
 /* Explanation section */
@@ -143,10 +150,50 @@
     font-weight: 600;
 }
 
+/* Tablet adjustments */
+@media (max-width: 1024px) {
+    .explanation-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .option-description {
+        font-size: 12px;
+    }
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
     .pricing-card-featured {
-        transform: scale(1);
+        border-width: 1px;
+    }
+
+    .pricing-card-featured .pricing-header {
+        padding-top: 40px;
+    }
+
+    .pricing-badge {
+        top: 12px;
+        font-size: 10px;
+        padding: 4px 16px;
+    }
+
+    .price-range-label {
+        font-size: 11px;
+    }
+
+    .option-badge {
+        font-size: 10px;
+        padding: 3px 10px;
+    }
+
+    .option-title {
+        font-size: 14px;
+    }
+
+    .option-description {
+        font-size: 12px;
+        margin-top: 8px;
     }
 
     .explanation-grid {
@@ -154,10 +201,50 @@
     }
 
     .explanation-card {
-        padding: 24px;
+        padding: 20px;
+    }
+
+    .explanation-card h4 {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+
+    .explanation-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .explanation-content strong {
+        font-size: 14px;
+    }
+
+    .explanation-content p {
+        font-size: 13px;
     }
 
     .pricing-explanation {
         margin-top: 32px;
+    }
+
+    .pricing-note {
+        font-size: 14px;
+        margin-top: 24px;
+    }
+}
+
+/* Small mobile adjustments */
+@media (max-width: 480px) {
+    .pricing-badge {
+        font-size: 9px;
+        padding: 3px 12px;
+    }
+
+    .explanation-card {
+        padding: 16px;
+    }
+
+    .explanation-item {
+        gap: 12px;
     }
 }
