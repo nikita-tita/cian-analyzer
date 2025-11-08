@@ -217,7 +217,7 @@ const utils = {
                     screen1.displayParseResult(state.targetProperty, []);
                 }
                 if (state.comparables.length > 0) {
-                    screen2.displayComparables(state.comparables);
+                    screen2.renderComparables(); // Исправлено: было displayComparables
                 }
                 if (state.analysis) {
                     screen3.displayAnalysis(state.analysis);
@@ -1274,6 +1274,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;
+    window.screen3 = screen3; // Нужно для auto-run анализа
 
     // Breadcrumbs: Make progress bar clickable
     document.querySelectorAll('.progress-step').forEach((stepEl) => {
