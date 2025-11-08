@@ -1,0 +1,163 @@
+/* ============================================
+   PRICING SECTION IMPROVEMENTS
+   Better clarity and explanations
+   ============================================ */
+
+/* Price range label */
+.price-range-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-light);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+/* Option badges */
+.option-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.option-badge-alt {
+    background: var(--color-text-light);
+}
+
+.option-title {
+    display: block;
+    font-weight: 600;
+    font-size: 15px;
+    margin-top: 4px;
+    color: var(--color-text);
+}
+
+.option-description {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-text-light);
+    margin-top: 12px;
+}
+
+.option-description strong {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+/* Featured pricing card */
+.pricing-card-featured {
+    position: relative;
+    border: 2px solid var(--color-accent);
+    transform: scale(1.02);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-badge {
+    position: absolute;
+    top: -12px;
+    right: 24px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    padding: 4px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Explanation section */
+.pricing-explanation {
+    margin-top: 48px;
+}
+
+.explanation-card {
+    background: var(--color-bg-gray);
+    padding: 32px;
+    border-radius: 8px;
+}
+
+.explanation-card h4 {
+    font-size: 20px;
+    margin-bottom: 24px;
+    text-align: center;
+    color: var(--color-text);
+}
+
+.explanation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.explanation-item {
+    display: flex;
+    gap: 16px;
+    align-items: start;
+}
+
+.explanation-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.explanation-content strong {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-text);
+    font-size: 15px;
+}
+
+.explanation-content p {
+    color: var(--color-text-light);
+    line-height: 1.6;
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Pricing note */
+.pricing-note {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 15px;
+    color: var(--color-text);
+    line-height: 1.6;
+}
+
+.pricing-note strong {
+    font-weight: 600;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .pricing-card-featured {
+        transform: scale(1);
+    }
+
+    .explanation-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .explanation-card {
+        padding: 24px;
+    }
+
+    .pricing-explanation {
+        margin-top: 32px;
+    }
+}
