@@ -38,6 +38,7 @@ ENV/
 !vercel.json
 !railway.json
 !package*.json
+!static/manifest.json
 *.csv
 *.xlsx
 results/
