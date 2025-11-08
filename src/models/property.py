@@ -276,6 +276,19 @@ class AnalysisResult(BaseModel):
     comparison_chart_data: Dict[str, Any]
     box_plot_data: Dict[str, Any]
 
+    # НОВЫЕ МЕТРИКИ
+    # Диапазон справедливой цены (min, fair, recommended, max)
+    price_range: Dict[str, Any] = {}
+
+    # Индекс привлекательности объекта (0-100)
+    attractiveness_index: Dict[str, Any] = {}
+
+    # Прогноз времени продажи
+    time_forecast: Dict[str, Any] = {}
+
+    # Анализ чувствительности к цене
+    price_sensitivity: List[Dict[str, Any]] = []
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()

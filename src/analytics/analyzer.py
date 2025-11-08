@@ -33,6 +33,11 @@ from .fair_price_calculator import calculate_fair_price_with_medians
 from .median_calculator import calculate_medians_from_comparables, get_readable_comparison_summary
 from .parameter_classifier import explain_parameter_classification
 
+# Новые модули аналитики
+from .price_range import calculate_price_range, calculate_price_sensitivity
+from .attractiveness_index import calculate_attractiveness_index
+from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
+
 
 class RealEstateAnalyzer:
     """
@@ -155,6 +160,36 @@ class RealEstateAnalyzer:
         comparison_chart = self.generate_comparison_chart_data()
         box_plot = self.generate_box_plot_data()
 
+        # НОВЫЕ РАСЧЕТЫ
+        # 1. Диапазон справедливой цены
+        price_range = calculate_price_range(
+            fair_price=fair_price.get('fair_price_total', 0),
+            confidence_interval=fair_price.get('confidence_interval_95'),
+            overpricing_percent=fair_price.get('overpricing_percent', 0),
+            market_stats=market_stats
+        )
+
+        # 2. Индекс привлекательности
+        attractiveness = calculate_attractiveness_index(
+            target=request.target_property,
+            fair_price_analysis=fair_price,
+            market_stats=market_stats
+        )
+
+        # 3. Прогноз времени продажи
+        time_forecast = forecast_time_to_sell(
+            current_price=request.target_property.price or 0,
+            fair_price=fair_price.get('fair_price_total', 0),
+            attractiveness_index=attractiveness.get('total_index', 50),
+            market_stats=market_stats
+        )
+
+        # 4. Анализ чувствительности к цене
+        price_sensitivity = forecast_at_different_prices(
+            fair_price=fair_price.get('fair_price_total', 0),
+            attractiveness_index=attractiveness.get('total_index', 50)
+        )
+
         # Метрики
         end_time = datetime.now()
         self.metrics['calculation_time_ms'] = int((end_time - start_time).total_seconds() * 1000)
@@ -162,6 +197,11 @@ class RealEstateAnalyzer:
         # Завершение трекинга
         if self.enable_tracking and self.property_log:
             self.property_log.metrics = self.metrics
+            # Сохраняем новые метрики
+            self.property_log.price_range = price_range
+            self.property_log.attractiveness_index = attractiveness
+            self.property_log.time_forecast = time_forecast
+            self.property_log.price_sensitivity = price_sensitivity
             self._log_event(EventType.ANALYSIS_COMPLETED,
                 f"Анализ завершён за {self.metrics['calculation_time_ms']} мс")
             self.tracker.complete_property(self.property_id, "completed")
@@ -175,7 +215,12 @@ class RealEstateAnalyzer:
             price_scenarios=scenarios,
             strengths_weaknesses=strengths_weaknesses,
             comparison_chart_data=comparison_chart,
-            box_plot_data=box_plot
+            box_plot_data=box_plot,
+            # Новые метрики
+            price_range=price_range,
+            attractiveness_index=attractiveness,
+            time_forecast=time_forecast,
+            price_sensitivity=price_sensitivity
         )
 
     def _filter_outliers(self, comparables: List[ComparableProperty]) -> List[ComparableProperty]:
