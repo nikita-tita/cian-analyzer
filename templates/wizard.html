@@ -47,7 +47,7 @@
         <div id="screen-1" class="wizard-screen active">
             <div class="screen-header">
                 <h2>Шаг 1: Загрузка объекта</h2>
-                <p class="text-muted">Введите ссылку на объявление для анализа</p>
+                <p class="text-muted">Введите ссылку на объявление или заполните данные вручную</p>
             </div>
 
             <div class="card shadow-sm">
@@ -67,6 +67,171 @@
                     <button id="parse-btn" class="btn btn-primary btn-lg w-100">
                         Спарсить объект
                     </button>
+
+                    <div class="divider my-3">
+                        <span>или</span>
+                    </div>
+
+                    <button id="manual-input-btn" class="btn btn-outline-primary btn-lg w-100">
+                        Ввести данные вручную
+                    </button>
+                </div>
+            </div>
+
+            <!-- Форма ручного ввода -->
+            <div id="manual-input-form" class="mt-4" style="display: none;">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Введите данные объекта</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="manual-property-form">
+                            <div class="row">
+                                <!-- Адрес (обязательно) -->
+                                <div class="col-md-12 mb-3">
+                                    <label for="manual-address" class="form-label fw-bold">
+                                        Адрес <span class="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        id="manual-address"
+                                        placeholder="Санкт-Петербург, улица Ленина, 10"
+                                        required
+                                    >
+                                    <div class="form-text">Полный адрес для поиска похожих объектов</div>
+                                </div>
+
+                                <!-- Цена -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-price" class="form-label fw-bold">
+                                        Цена (₽) <span class="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="manual-price"
+                                        placeholder="15000000"
+                                        required
+                                    >
+                                </div>
+
+                                <!-- Площадь -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-area" class="form-label fw-bold">
+                                        Общая площадь (м²) <span class="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="manual-area"
+                                        placeholder="75"
+                                        step="0.1"
+                                        required
+                                    >
+                                </div>
+
+                                <!-- Комнаты -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-rooms" class="form-label fw-bold">
+                                        Количество комнат <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-select" id="manual-rooms" required>
+                                        <option value="">Выберите...</option>
+                                        <option value="Студия">Студия</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5+">5+</option>
+                                    </select>
+                                </div>
+
+                                <!-- Этаж -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-floor" class="form-label fw-bold">
+                                        Этаж
+                                    </label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        id="manual-floor"
+                                        placeholder="5/10"
+                                    >
+                                    <div class="form-text">Формат: этаж/всего (например: 5/10)</div>
+                                </div>
+
+                                <!-- Жилая площадь -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-living-area" class="form-label">
+                                        Жилая площадь (м²)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="manual-living-area"
+                                        placeholder="55"
+                                        step="0.1"
+                                    >
+                                </div>
+
+                                <!-- Площадь кухни -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-kitchen-area" class="form-label">
+                                        Площадь кухни (м²)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="manual-kitchen-area"
+                                        placeholder="12"
+                                        step="0.1"
+                                    >
+                                </div>
+
+                                <!-- Ремонт -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-repair" class="form-label">
+                                        Уровень отделки
+                                    </label>
+                                    <select class="form-select" id="manual-repair">
+                                        <option value="">Не указано</option>
+                                        <option value="черновая">Черновая</option>
+                                        <option value="стандартная" selected>Стандартная</option>
+                                        <option value="улучшенная">Улучшенная</option>
+                                        <option value="премиум">Премиум</option>
+                                        <option value="люкс">Люкс</option>
+                                    </select>
+                                </div>
+
+                                <!-- Вид из окна -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-view" class="form-label">
+                                        Вид из окна
+                                    </label>
+                                    <select class="form-select" id="manual-view">
+                                        <option value="">Не указано</option>
+                                        <option value="дом">Во двор</option>
+                                        <option value="улица" selected>На улицу</option>
+                                        <option value="парк">На парк</option>
+                                        <option value="вода">На воду</option>
+                                        <option value="город">На город</option>
+                                        <option value="закат">На закат</option>
+                                        <option value="премиум">Премиум вид</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-3 mt-3">
+                                <button type="button" id="cancel-manual-btn" class="btn btn-outline-secondary">
+                                    Отмена
+                                </button>
+                                <button type="submit" class="btn btn-primary flex-grow-1">
+                                    Продолжить с этими данными
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -96,6 +261,13 @@
                             </form>
                         </div>
                     </div>
+                </div>
+
+                <!-- Кнопка "Далее" -->
+                <div id="next-step-btn-container" class="mt-4" style="display: none;">
+                    <button id="next-to-comparables-btn" class="btn btn-success btn-lg w-100">
+                        Далее: Подбор аналогов
+                    </button>
                 </div>
             </div>
         </div>
