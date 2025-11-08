@@ -324,7 +324,7 @@ def normalize_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
     # 2. Умные дефолты для высоты потолков
     if not normalized.get('ceiling_height'):
         build_year = normalized.get('build_year')
-        house_type = normalized.get('house_type', '').lower()
+        house_type = (normalized.get('house_type') or '').lower()
 
         # Современные монолиты
         if build_year and build_year >= 2010:
