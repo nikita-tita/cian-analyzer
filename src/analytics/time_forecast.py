@@ -119,6 +119,10 @@ def forecast_at_different_prices(
         Список прогнозов для каждой цены
     """
 
+    # Защита от деления на ноль
+    if not fair_price or fair_price <= 0:
+        return []
+
     if price_points is None:
         # Автоматические точки: от -10% до +20% от справедливой цены
         price_points = [

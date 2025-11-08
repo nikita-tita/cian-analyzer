@@ -28,11 +28,13 @@
     display: inline-block;
     white-space: nowrap;
     animation: marquee 180s linear infinite;
+    -webkit-animation: marquee 180s linear infinite;
     font-family: 'Press Start 2P', 'Courier New', monospace;
     font-size: 10px;
     color: #fff;
     letter-spacing: 1px;
     padding: 0 100%;
+    will-change: transform;
 }
 
 @keyframes marquee {
@@ -40,6 +42,17 @@
         transform: translateX(0%);
     }
     100% {
+        transform: translateX(-50%);
+    }
+}
+
+@-webkit-keyframes marquee {
+    0% {
+        -webkit-transform: translateX(0%);
+        transform: translateX(0%);
+    }
+    100% {
+        -webkit-transform: translateX(-50%);
         transform: translateX(-50%);
     }
 }
@@ -52,5 +65,8 @@
 
     .advice-ticker-track {
         font-size: 9px;
+        /* Чуть быстрее на мобильных для лучшей видимости */
+        animation: marquee 150s linear infinite;
+        -webkit-animation: marquee 150s linear infinite;
     }
 }
