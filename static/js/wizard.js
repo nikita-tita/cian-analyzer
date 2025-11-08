@@ -50,6 +50,41 @@ const utils = {
         return new Intl.NumberFormat('ru-RU', {
             maximumFractionDigits: decimals
         }).format(num);
+    },
+
+    /**
+     * SECURITY: Escape HTML to prevent XSS
+     * Используется для текста, который не должен содержать HTML
+     */
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    /**
+     * SECURITY: Sanitize HTML using DOMPurify
+     * Используется когда нужно вставить HTML, но безопасно
+     */
+    sanitizeHtml(html) {
+        if (typeof DOMPurify === 'undefined') {
+            console.warn('DOMPurify not loaded, falling back to escapeHtml');
+            return this.escapeHtml(html);
+        }
+        return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'span', 'p', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'small'],
+            ALLOWED_ATTR: ['href', 'target', 'class', 'style'],
+            ALLOW_DATA_ATTR: false
+        });
+    },
+
+    /**
+     * SECURITY: Safely set innerHTML with DOMPurify
+     */
+    setInnerHTML(element, html) {
+        if (!element) return;
+        element.innerHTML = this.sanitizeHtml(html);
     }
 };
 
