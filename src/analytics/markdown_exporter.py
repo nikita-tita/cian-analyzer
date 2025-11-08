@@ -193,6 +193,124 @@ class MarkdownExporter:
 
             md.append("")
 
+        # 7.1. Диапазон цен (НОВОЕ)
+        if hasattr(log, 'price_range') and log.price_range:
+            md.append("### 📊 Диапазон справедливой цены")
+            md.append("")
+
+            pr = log.price_range
+            md.append(f"- **Минимальная цена:** {self.format_number(pr.get('min_price', 0))} ({pr.get('min_price_description', '')})")
+            md.append(f"- **Справедливая цена:** {self.format_number(pr.get('fair_price', 0))}")
+            md.append(f"- **Рекомендуемая цена листинга:** {self.format_number(pr.get('recommended_listing', 0))} ({pr.get('recommended_listing_description', '')})")
+            md.append(f"- **Максимальная цена:** {self.format_number(pr.get('max_price', 0))} ({pr.get('max_price_description', '')})")
+            md.append("")
+
+            # Интерпретация
+            if 'interpretation' in pr:
+                interp = pr['interpretation']
+                md.append("**Рекомендации:**")
+                md.append(f"- {interp.get('pricing_strategy', '')}")
+                md.append(f"- Ожидаемый срок: {interp.get('expected_timeline', '')}")
+                md.append(f"- {interp.get('negotiation_advice', '')}")
+                md.append("")
+
+        # 7.2. Индекс привлекательности (НОВОЕ)
+        if hasattr(log, 'attractiveness_index') and log.attractiveness_index:
+            md.append("### 🌟 Индекс привлекательности объекта")
+            md.append("")
+
+            attr = log.attractiveness_index
+            total = attr.get('total_index', 0)
+            category = attr.get('category', '')
+            emoji = attr.get('category_emoji', '')
+
+            md.append(f"**Общая оценка:** {emoji} {total:.1f}/100 ({category})")
+            md.append("")
+            md.append(attr.get('category_description', ''))
+            md.append("")
+
+            # Компоненты
+            if 'components' in attr:
+                md.append("**Компоненты оценки:**")
+                md.append("")
+                md.append("| Компонент | Оценка | Вес | Вклад |")
+                md.append("|-----------|--------|-----|-------|")
+
+                for comp_name, comp_data in attr['components'].items():
+                    score = comp_data.get('score', 0)
+                    weight = comp_data.get('weight', 0)
+                    weighted = comp_data.get('weighted_score', 0)
+                    md.append(f"| {comp_name.capitalize()} | {score:.1f}/100 | {weight}% | {weighted:.1f} |")
+
+                md.append("")
+
+            # Сводка рекомендаций
+            if 'summary' in attr:
+                md.append("**Сводка:**")
+                md.append("```")
+                md.append(attr['summary'])
+                md.append("```")
+                md.append("")
+
+        # 7.3. Прогноз времени продажи (НОВОЕ)
+        if hasattr(log, 'time_forecast') and log.time_forecast:
+            md.append("### ⏱️ Прогноз времени продажи")
+            md.append("")
+
+            tf = log.time_forecast
+            expected = tf.get('expected_time_months', 0)
+            time_range = tf.get('time_range_description', '')
+
+            md.append(f"**Ожидаемое время:** {expected:.1f} месяцев ({time_range})")
+            md.append("")
+
+            # Вероятности продажи
+            if 'probability_milestones' in tf:
+                pm = tf['probability_milestones']
+                md.append("**Вероятность продажи:**")
+                md.append(f"- За 1 месяц: {pm.get('1_month', 0):.0%}")
+                md.append(f"- За 3 месяца: {pm.get('3_months', 0):.0%}")
+                md.append(f"- За 6 месяцев: {pm.get('6_months', 0):.0%}")
+                md.append(f"- За 12 месяцев: {pm.get('12_months', 0):.0%}")
+                md.append("")
+
+            # Интерпретация
+            if 'interpretation' in tf:
+                interp = tf['interpretation']
+                md.append("**Интерпретация:**")
+                md.append(f"- {interp.get('overall', '')}")
+                md.append(f"- {interp.get('price_factor', '')}")
+                md.append(f"- {interp.get('attractiveness_factor', '')}")
+                md.append("")
+
+        # 7.4. Анализ чувствительности (НОВОЕ)
+        if hasattr(log, 'price_sensitivity') and log.price_sensitivity:
+            md.append("### 📉 Анализ чувствительности к цене")
+            md.append("")
+            md.append("Как изменение цены влияет на вероятность и время продажи:")
+            md.append("")
+
+            md.append("| Цена (млн₽) | Отклонение | Время продажи | Вероятность (6 мес) |")
+            md.append("|-------------|------------|---------------|---------------------|")
+
+            for ps in log.price_sensitivity[:10]:  # Топ-10 точек
+                price_m = ps.get('price', 0) / 1_000_000
+                discount = ps.get('discount_percent', 0)
+                time_m = ps.get('expected_time_months', 0)
+                prob_6 = ps.get('probability_6_months', 0)
+
+                # Выделяем справедливую цену
+                if abs(discount) < 1:
+                    price_str = f"**{price_m:.2f}**"
+                    time_str = f"**{time_m:.1f} мес**"
+                else:
+                    price_str = f"{price_m:.2f}"
+                    time_str = f"{time_m:.1f} мес"
+
+                md.append(f"| {price_str} | {discount:+.1f}% | {time_str} | {prob_6:.0%} |")
+
+            md.append("")
+
         # 8. Сценарии продажи
         if log.scenarios:
             md.append("## 📈 Сценарии продажи")
