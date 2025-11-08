@@ -76,6 +76,42 @@ ENDSSH
 
 echo ""
 
+# Проверка Redis конфигурации
+echo "🔍 Проверка Redis конфигурации..."
+ssh -i "$SSH_KEY" "$DEPLOY_USER@$SERVER" << 'ENDSSH'
+# Проверяем что Redis настроен в systemd service
+if ! grep -q "REDIS_URL" /etc/systemd/system/housler.service; then
+    echo "   ⚠️  Redis не настроен, добавляю переменные окружения..."
+
+    # Бэкап текущего service файла
+    cp /etc/systemd/system/housler.service /etc/systemd/system/housler.service.backup
+
+    # Добавляем Redis переменные после строки с PATH
+    sed -i '/Environment="PATH=/a\
+Environment="REDIS_ENABLED=true"\
+Environment="REDIS_HOST=localhost"\
+Environment="REDIS_PORT=6379"\
+Environment="REDIS_DB=0"\
+Environment="REDIS_URL=redis://localhost:6379/0"' /etc/systemd/system/housler.service
+
+    systemctl daemon-reload
+    echo "   ✅ Redis конфигурация добавлена"
+else
+    echo "   ✅ Redis уже настроен"
+fi
+
+# Проверяем что Redis работает
+if systemctl is-active --quiet redis-server; then
+    echo "   ✅ Redis работает"
+else
+    echo "   ⚠️  Redis не запущен, запускаю..."
+    systemctl start redis-server
+    systemctl enable redis-server
+fi
+ENDSSH
+
+echo ""
+
 # Перезапуск сервиса
 echo "🔄 Перезапуск Housler service..."
 ssh -i "$SSH_KEY" "$DEPLOY_USER@$SERVER" << 'ENDSSH'

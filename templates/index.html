@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/static/css/landing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -214,6 +214,13 @@
         </div>
     </section>
 
+    <!-- Advice Ticker -->
+    <div class="advice-ticker" id="advice-ticker">
+        <div class="advice-ticker-track">
+            ЕГРН: права, обременения, запреты на сделки ⚡ История собственников за 10 лет и основания перехода ⚡ Согласие супруга/и при браке или подтверждение раздельности ⚡ Доли и дети: опека, нотариус, выделение долей заранее ⚡ Маткапитал: целевое использование и обязательства на детей ⚡ Ипотека: согласие банка, эскроу/аккредитив, закладная ⚡ Проверка продавца: ФНС, ФССП, банкротство, исполнительные ⚡ Доверенность: реестр, объем полномочий, без перепоручения ⚡ Перепланировка: акты БТИ, узаконивание до сделки ⚡ Ограничения по земле/дому: ПЗЗ, охранные и санитарные зоны ⚡ Судебные споры: проверки по адресу и собственнику ⚡ Долги: коммуналка, капремонт, порядок погашения в договоре ⚡ Третьи лица: зарегистрированные жильцы, арендаторы, право прохода/проезда ⚡ Наследство: все наследники, обязательные доли, сроки принятия ⚡ Налоги: срок владения, НДФЛ, вычет, подтвержденные расходы ⚡ Расчеты: без крупных наличных, только эскроу/аккредитив ⚡ Расписки: дата, сумма, ФИО, паспорт, назначение платежа ⚡ Предварительный договор: предмет, цена, сроки, штрафы ⚡ Электронная регистрация: кто подает, контроль пакета, уведомления ⚡ Земельные границы: межевание, кадастровые ошибки, пересечения соседей ⚡ ЕГРН: права, обременения, запреты на сделки ⚡ История собственников за 10 лет и основания перехода ⚡ Согласие супруга/и при браке или подтверждение раздельности ⚡ Доли и дети: опека, нотариус, выделение долей заранее ⚡ Маткапитал: целевое использование и обязательства на детей ⚡ Ипотека: согласие банка, эскроу/аккредитив, закладная ⚡ Проверка продавца: ФНС, ФССП, банкротство, исполнительные ⚡ Доверенность: реестр, объем полномочий, без перепоручения ⚡ Перепланировка: акты БТИ, узаконивание до сделки ⚡ Ограничения по земле/дому: ПЗЗ, охранные и санитарные зоны ⚡ Судебные споры: проверки по адресу и собственнику ⚡ Долги: коммуналка, капремонт, порядок погашения в договоре ⚡ Третьи лица: зарегистрированные жильцы, арендаторы, право прохода/проезда ⚡ Наследство: все наследники, обязательные доли, сроки принятия ⚡ Налоги: срок владения, НДФЛ, вычет, подтвержденные расходы ⚡ Расчеты: без крупных наличных, только эскроу/аккредитив ⚡ Расписки: дата, сумма, ФИО, паспорт, назначение платежа ⚡ Предварительный договор: предмет, цена, сроки, штрафы ⚡ Электронная регистрация: кто подает, контроль пакета, уведомления ⚡ Земельные границы: межевание, кадастровые ошибки, пересечения соседей
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -235,6 +242,30 @@
                 }
             });
         });
+
+        // Hide ticker on scroll to contact/footer sections
+        const ticker = document.getElementById('advice-ticker');
+        const contactSection = document.getElementById('contact');
+        const footer = document.querySelector('.footer');
+
+        function handleTickerVisibility() {
+            if (!ticker || !contactSection || !footer) return;
+
+            const scrollPosition = window.scrollY + window.innerHeight;
+            const contactTop = contactSection.offsetTop;
+            const footerTop = footer.offsetTop;
+
+            // Hide ticker when reaching contact section (second to last block)
+            if (scrollPosition >= contactTop + 200) {
+                ticker.classList.add('hidden');
+            } else {
+                ticker.classList.remove('hidden');
+            }
+        }
+
+        window.addEventListener('scroll', handleTickerVisibility);
+        window.addEventListener('resize', handleTickerVisibility);
+        handleTickerVisibility(); // Check on page load
     </script>
 </body>
 </html>

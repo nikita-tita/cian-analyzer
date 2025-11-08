@@ -1,0 +1,316 @@
+/* ══════════════════════════════════════════════════════════════
+   Pixel Loader - Пиксельная бегущая строка
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.pixel-loader-content {
+    max-width: 800px;
+    width: 90%;
+}
+
+.pixel-loader-screen {
+    background: #1a1a1a;
+    border: 4px solid #00ff00;
+    border-radius: 0;
+    padding: 40px;
+    box-shadow:
+        0 0 20px #00ff00,
+        inset 0 0 20px rgba(0, 255, 0, 0.1);
+    position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Пиксельный шрифт для бегущей строки
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-marquee {
+    overflow: hidden;
+    background: #000;
+    border: 2px solid #00ff00;
+    padding: 20px 0;
+    position: relative;
+    margin-bottom: 30px;
+    box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.pixel-marquee-track {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 20s linear infinite;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 18px;
+    color: #00ff00;
+    text-shadow:
+        0 0 5px #00ff00,
+        0 0 10px #00ff00,
+        0 0 15px #00ff00;
+    letter-spacing: 2px;
+    padding: 0 100%;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Пиксельный прогресс бар
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-progress-bar {
+    height: 30px;
+    background: #000;
+    border: 2px solid #00ff00;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.pixel-progress-fill {
+    height: 100%;
+    background: repeating-linear-gradient(
+        90deg,
+        #00ff00 0px,
+        #00ff00 10px,
+        #00dd00 10px,
+        #00dd00 20px
+    );
+    width: 0%;
+    animation: progressFill 3s ease-in-out infinite;
+    box-shadow: 0 0 10px #00ff00;
+}
+
+@keyframes progressFill {
+    0% { width: 0%; }
+    50% { width: 100%; }
+    100% { width: 0%; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Пиксельная иконка (агент/дом/документы)
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+    background: #00ff00;
+    box-shadow:
+        0 0 0 4px #000,
+        0 0 0 8px #00ff00,
+        0 0 20px #00ff00;
+    animation: pixelPulse 1s ease-in-out infinite;
+    position: relative;
+}
+
+/* Пиксельный агент */
+.pixel-icon.agent::before {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background: #000;
+    top: 10px;
+    left: 20px;
+    border-radius: 50%;
+}
+
+.pixel-icon.agent::after {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 30px;
+    background: #000;
+    bottom: 5px;
+    left: 10px;
+}
+
+/* Пиксельный дом */
+.pixel-icon.house::before {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-left: 40px solid transparent;
+    border-right: 40px solid transparent;
+    border-bottom: 30px solid #000;
+    top: 0;
+    left: 0;
+}
+
+.pixel-icon.house::after {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 40px;
+    background: #000;
+    bottom: 5px;
+    left: 10px;
+}
+
+/* Пиксельный документ */
+.pixel-icon.document::before {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 70px;
+    background: #000;
+    top: 5px;
+    left: 10px;
+}
+
+.pixel-icon.document::after {
+    content: '📄';
+    position: absolute;
+    font-size: 40px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+@keyframes pixelPulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.1);
+        filter: brightness(1.2);
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Анимации появления
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Responsive
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .pixel-marquee-track {
+        font-size: 14px;
+    }
+
+    .pixel-loader-screen {
+        padding: 20px;
+    }
+
+    .pixel-icon {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Вариации цветов для разных этапов
+   ══════════════════════════════════════════════════════════════ */
+
+/* Парсинг - зеленый */
+.pixel-loader.parsing {
+    /* Default green */
+}
+
+/* Поиск аналогов - синий */
+.pixel-loader.searching .pixel-loader-screen {
+    border-color: #00aaff;
+    box-shadow:
+        0 0 20px #00aaff,
+        inset 0 0 20px rgba(0, 170, 255, 0.1);
+}
+
+.pixel-loader.searching .pixel-marquee,
+.pixel-loader.searching .pixel-progress-bar {
+    border-color: #00aaff;
+}
+
+.pixel-loader.searching .pixel-marquee-track {
+    color: #00aaff;
+    text-shadow:
+        0 0 5px #00aaff,
+        0 0 10px #00aaff,
+        0 0 15px #00aaff;
+}
+
+.pixel-loader.searching .pixel-progress-fill {
+    background: repeating-linear-gradient(
+        90deg,
+        #00aaff 0px,
+        #00aaff 10px,
+        #0088dd 10px,
+        #0088dd 20px
+    );
+}
+
+.pixel-loader.searching .pixel-icon {
+    background: #00aaff;
+    box-shadow:
+        0 0 0 4px #000,
+        0 0 0 8px #00aaff,
+        0 0 20px #00aaff;
+}
+
+/* Анализ - фиолетовый */
+.pixel-loader.analyzing .pixel-loader-screen {
+    border-color: #ff00ff;
+    box-shadow:
+        0 0 20px #ff00ff,
+        inset 0 0 20px rgba(255, 0, 255, 0.1);
+}
+
+.pixel-loader.analyzing .pixel-marquee,
+.pixel-loader.analyzing .pixel-progress-bar {
+    border-color: #ff00ff;
+}
+
+.pixel-loader.analyzing .pixel-marquee-track {
+    color: #ff00ff;
+    text-shadow:
+        0 0 5px #ff00ff,
+        0 0 10px #ff00ff,
+        0 0 15px #ff00ff;
+}
+
+.pixel-loader.analyzing .pixel-progress-fill {
+    background: repeating-linear-gradient(
+        90deg,
+        #ff00ff 0px,
+        #ff00ff 10px,
+        #dd00dd 10px,
+        #dd00dd 20px
+    );
+}
+
+.pixel-loader.analyzing .pixel-icon {
+    background: #ff00ff;
+    box-shadow:
+        0 0 0 4px #000,
+        0 0 0 8px #ff00ff,
+        0 0 20px #ff00ff;
+}
