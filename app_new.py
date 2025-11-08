@@ -874,6 +874,10 @@ def find_similar():
         session_data['comparables'] = similar
         session_storage.set(session_id, session_data)
 
+        # Debug logging - trace object count
+        logger.info(f"🔍 DEBUG: Saved {len(similar)} comparables to session {session_id}")
+        logger.info(f"🔍 DEBUG: Returning {len(similar)} comparables in API response")
+
         return jsonify({
             'status': 'success',
             'comparables': similar,
