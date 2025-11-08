@@ -13,10 +13,21 @@ import logging
 import threading
 import time
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
+
+
+def serialize_for_json(obj):
+    """Convert datetime and other non-JSON-serializable objects to strings"""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [serialize_for_json(item) for item in obj]
+    return obj
 
 class SessionStorage:
     """Unified session storage interface with TTL and LRU support"""
@@ -122,11 +133,13 @@ class SessionStorage:
         """
         try:
             if self.redis_client:
+                # Serialize datetime objects before storing
+                serialized_data = serialize_for_json(data)
                 # Store in Redis with TTL
                 self.redis_client.setex(
                     f"session:{session_id}",
                     ttl,
-                    json.dumps(data, ensure_ascii=False)
+                    json.dumps(serialized_data, ensure_ascii=False)
                 )
                 return True
             else:
@@ -138,7 +151,7 @@ class SessionStorage:
                     # Calculate expiration time
                     expires_at = datetime.now() + timedelta(seconds=ttl)
 
-                    # Store data with expiration
+                    # Store data with expiration (no need to serialize for memory)
                     self.memory_storage[session_id] = (data, expires_at)
 
                     # Move to end (most recently used)
