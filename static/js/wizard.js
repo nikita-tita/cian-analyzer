@@ -530,6 +530,19 @@ const screen1 = {
         if (missingFields && missingFields.length > 0) {
             document.getElementById('missing-fields').style.display = 'block';
             this.renderMissingFields(missingFields);
+
+            // Автоматически скроллим к дополнительным полям с небольшой задержкой
+            setTimeout(() => {
+                const missingFieldsSection = document.getElementById('missing-fields');
+                if (missingFieldsSection) {
+                    missingFieldsSection.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    // Показываем тост с подсказкой
+                    utils.showToast('Пожалуйста, заполните дополнительные поля для точного анализа', 'info');
+                }
+            }, 500);
         }
     },
 
@@ -678,6 +691,12 @@ const screen2 = {
                 console.log('🔍 DEBUG: State comparables set to:', state.comparables.length);
 
                 this.renderComparables();
+
+                // Обновляем кнопки навигации (для разблокировки "К анализу")
+                if (window.floatingButtons) {
+                    floatingButtons.updateButtons();
+                }
+
                 utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
             } else {
                 const errorData = getErrorMessage(result.message || 'no_comparables');
@@ -717,6 +736,12 @@ const screen2 = {
             if (result.status === 'success') {
                 state.comparables.push(result.comparable);
                 this.renderComparables();
+
+                // Обновляем кнопки навигации (для разблокировки "К анализу")
+                if (window.floatingButtons) {
+                    floatingButtons.updateButtons();
+                }
+
                 document.getElementById('add-comparable-input').value = '';
                 utils.showToast('Объект добавлен', 'success');
             } else {
@@ -816,6 +841,12 @@ const screen2 = {
 
             state.comparables[index].excluded = true;
             this.renderComparables();
+
+            // Обновляем кнопки навигации (может заблокировать "К анализу")
+            if (window.floatingButtons) {
+                floatingButtons.updateButtons();
+            }
+
             utils.showToast('Объект исключен из анализа', 'info');
         } catch (error) {
             console.error('Exclude error:', error);
@@ -837,6 +868,12 @@ const screen2 = {
 
             state.comparables[index].excluded = false;
             this.renderComparables();
+
+            // Обновляем кнопки навигации (может разблокировать "К анализу")
+            if (window.floatingButtons) {
+                floatingButtons.updateButtons();
+            }
+
             utils.showToast('Объект возвращен в анализ', 'success');
         } catch (error) {
             console.error('Include error:', error);
@@ -1091,6 +1128,12 @@ const floatingButtons = {
             if (state.currentStep === 1) {
                 screen1.updateTargetProperty();
             } else if (state.currentStep === 2) {
+                // Проверяем наличие аналогов перед переходом к анализу
+                const activeComparables = state.comparables.filter(c => !c.excluded);
+                if (activeComparables.length === 0) {
+                    utils.showToast('Сначала добавьте объекты для сравнения', 'warning');
+                    return;
+                }
                 navigation.goToStep(3);
             } else if (state.currentStep === 3) {
                 // На последнем экране кнопка может скачивать отчет
@@ -1134,6 +1177,25 @@ const floatingButtons = {
             nextBtn.style.display = 'flex';
         }
 
+        // На втором шаге блокируем кнопку если нет аналогов
+        if (state.currentStep === 2) {
+            const activeComparables = state.comparables.filter(c => !c.excluded);
+            if (activeComparables.length === 0) {
+                nextBtn.classList.add('disabled');
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.classList.remove('disabled');
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        } else {
+            // На других шагах убираем блокировку
+            nextBtn.classList.remove('disabled');
+            nextBtn.style.opacity = '1';
+            nextBtn.style.cursor = 'pointer';
+        }
+
         // Session Management: Show "Share" button only if session exists
         if (shareBtn) {
             if (state.sessionId) {
@@ -1172,14 +1234,20 @@ const pixelLoader = {
             'Обработка запроса'
         ],
 
-        // Поиск аналогов
+        // Поиск аналогов - веселые вовлекающие сообщения с прогрессом
         searching: [
-            'Поиск аналогов',
-            'Анализ рынка',
-            'Подбор объектов',
-            'Сравнение параметров',
-            'Оценка района',
-            'Фильтрация данных'
+            // Начало поиска (0-5 объектов)
+            'Звоню агентам... опять не берут трубку, видимо заняты другими важными объектами',
+            'Применяю технику клонирования и бегаю по всем квартирам на районе',
+            'Записался на консультацию к ИИ, который поможет обзвонить все объявления',
+            // Середина (5-10 объектов)
+            'Уже на середине! Наклеил баннер что ищем похожую квартиру',
+            'Еще немного... база данных уже наполовину собрана',
+            'Продолжаю поиск, совсем скоро найдем все лучшие варианты',
+            // Почти готово (10-15+ объектов)
+            'Уже почти готово! База почти вся собралась',
+            'Осталось совсем чуть-чуть, заканчиваю сбор данных',
+            'Финальные штрихи... сейчас покажу все что нашел'
         ],
 
         // Анализ
