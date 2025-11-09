@@ -266,8 +266,8 @@ class AsyncPlaywrightParser(BaseCianParser):
 
                 # Дополняем данные из HTML
                 self._extract_basic_info(soup, data)
-                self._extract_characteristics(soup, data)
-                self._extract_images(soup, data)
+                data['characteristics'] = self._extract_characteristics(soup)
+                data['images'] = self._extract_images(soup)
 
                 # Сохраняем в кэш
                 if self.cache:
