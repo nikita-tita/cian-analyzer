@@ -210,7 +210,7 @@ class RealEstateAnalyzer:
             recommendations_list = recommendation_engine.generate()
             recommendations = [r.to_dict() for r in recommendations_list]
         except Exception as e:
-            logger.error(f"Ошибка генерации рекомендаций: {e}")
+            logger.error(f"Ошибка генерации рекомендаций: {e}", exc_info=True)
             recommendations = []
 
         # Завершение трекинга
