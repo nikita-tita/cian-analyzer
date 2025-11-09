@@ -50,6 +50,10 @@ logs/
 !tests/test_*.py
 !tests/*_test.py
 
+# Ignore test reports and previews
+test_report_preview.*
+*_preview.md
+
 # OS
 .DS_Store
 Thumbs.db
