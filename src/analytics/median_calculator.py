@@ -6,6 +6,7 @@
 """
 
 import statistics
+from collections import Counter
 from typing import List, Dict, Any, Optional
 from ..models.property import ComparableProperty, TargetProperty
 from .parameter_classifier import get_variable_parameters
@@ -122,8 +123,24 @@ def calculate_medians_from_comparables(
 
     # Рассчитываем моду (наиболее частое значение) для категориальных
     for param_name, values in categorical_params.items():
-        if values:
+        if not values:
+            continue
+
+        try:
             medians[param_name] = statistics.mode(values)
+        except statistics.StatisticsError:
+            # Несколько значений с одинаковой частотой — выбираем первое встреченное
+            counter = Counter(values)
+            max_count = max(counter.values())
+            top_candidates = {value for value, count in counter.items() if count == max_count}
+
+            for value in values:
+                if value in top_candidates:
+                    medians[param_name] = value
+                    break
+            else:
+                # Fallback на первое значение, если список неожиданно пуст
+                medians[param_name] = values[0]
 
     # Специальные медианы
     if build_years and len(build_years) >= 2:
