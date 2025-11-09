@@ -282,6 +282,9 @@ class AnalysisResult(BaseModel):
     # Анализ чувствительности к цене
     price_sensitivity: List[Dict[str, Any]] = []
 
+    # Рекомендации
+    recommendations: List[Dict[str, Any]] = []
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()

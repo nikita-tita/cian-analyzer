@@ -37,6 +37,7 @@ from .parameter_classifier import explain_parameter_classification
 from .price_range import calculate_price_range, calculate_price_sensitivity
 from .attractiveness_index import calculate_attractiveness_index
 from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
+from .recommendations import RecommendationEngine
 
 
 class RealEstateAnalyzer:
@@ -194,6 +195,22 @@ class RealEstateAnalyzer:
         end_time = datetime.now()
         self.metrics['calculation_time_ms'] = int((end_time - start_time).total_seconds() * 1000)
 
+        # Генерация рекомендаций
+        try:
+            recommendation_engine = RecommendationEngine({
+                'target_property': request.target_property.dict(),
+                'fair_price_analysis': fair_price,
+                'price_scenarios': [s.dict() for s in scenarios],
+                'strengths_weaknesses': strengths_weaknesses,
+                'attractiveness_index': attractiveness,
+                'time_forecast': time_forecast
+            })
+            recommendations_list = recommendation_engine.generate()
+            recommendations = [r.to_dict() for r in recommendations_list]
+        except Exception as e:
+            logger.error(f"Ошибка генерации рекомендаций: {e}")
+            recommendations = []
+
         # Завершение трекинга
         if self.enable_tracking and self.property_log:
             self.property_log.metrics = self.metrics
@@ -220,7 +237,9 @@ class RealEstateAnalyzer:
             price_range=price_range,
             attractiveness_index=attractiveness,
             time_forecast=time_forecast,
-            price_sensitivity=price_sensitivity
+            price_sensitivity=price_sensitivity,
+            # Рекомендации
+            recommendations=recommendations
         )
 
     def _filter_outliers(self, comparables: List[ComparableProperty]) -> List[ComparableProperty]:

@@ -938,6 +938,11 @@ const screen3 = {
 
         // График
         this.renderChart(analysis.comparison_chart_data);
+
+        // Рекомендации
+        if (analysis.recommendations && analysis.recommendations.length > 0) {
+            this.renderRecommendations(analysis.recommendations);
+        }
     },
 
     renderSummary(analysis) {
@@ -1114,6 +1119,91 @@ const screen3 = {
                 }
             }
         });
+    },
+
+    renderRecommendations(recommendations) {
+        const container = document.getElementById('recommendations-list');
+
+        // Группируем рекомендации по приоритету
+        const priorities = {
+            1: { label: 'КРИТИЧНО', emoji: '🔴', class: 'danger', recs: [] },
+            2: { label: 'ВАЖНО', emoji: '🟠', class: 'warning', recs: [] },
+            3: { label: 'СРЕДНЕ', emoji: '🟡', class: 'info', recs: [] },
+            4: { label: 'ИНФО', emoji: '🔵', class: 'secondary', recs: [] }
+        };
+
+        recommendations.forEach(rec => {
+            const priority = rec.priority || 4;
+            if (priorities[priority]) {
+                priorities[priority].recs.push(rec);
+            }
+        });
+
+        // Формируем HTML
+        let html = '';
+        for (let priority = 1; priority <= 4; priority++) {
+            const priorityData = priorities[priority];
+            const recs = priorityData.recs;
+
+            if (recs.length > 0) {
+                html += `
+                    <div class="recommendation-priority-group mb-4">
+                        <h6 class="mb-3">
+                            ${priorityData.emoji} <span class="badge bg-${priorityData.class}">${priorityData.label}</span>
+                        </h6>
+                `;
+
+                recs.forEach(rec => {
+                    const icon = rec.icon || '💡';
+                    const title = rec.title || '';
+                    const message = rec.message || '';
+                    const action = rec.action || '';
+                    const expected = rec.expected_result || '';
+                    const roi = rec.roi;
+                    const financial = rec.financial_impact || {};
+
+                    html += `
+                        <div class="card mb-3 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title">${icon} ${title}</h6>
+                                <p class="card-text"><strong>Проблема:</strong> ${message}</p>
+                                <p class="card-text"><strong>Действие:</strong> ${action}</p>
+                                <p class="card-text text-success"><strong>Ожидаемый результат:</strong> ${expected}</p>
+                    `;
+
+                    // ROI если есть
+                    if (roi != null && roi > 0) {
+                        html += `<p class="card-text"><strong>ROI:</strong> <span class="badge bg-success">${roi.toFixed(1)}x</span></p>`;
+                    }
+
+                    // Финансовый эффект если есть
+                    if (Object.keys(financial).length > 0) {
+                        html += '<div class="alert alert-light mt-2"><strong>Финансовый эффект:</strong><ul class="mb-0 mt-2">';
+                        for (const [key, value] of Object.entries(financial)) {
+                            if (typeof value === 'number' && Math.abs(value) > 1000) {
+                                html += `<li>${key}: ${utils.formatPrice(value)}</li>`;
+                            } else {
+                                html += `<li>${key}: ${value}</li>`;
+                            }
+                        }
+                        html += '</ul></div>';
+                    }
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+            }
+        }
+
+        if (html === '') {
+            html = '<p class="text-muted">Нет рекомендаций для данного объекта</p>';
+        }
+
+        container.innerHTML = html;
     }
 };
 
@@ -1136,8 +1226,8 @@ const floatingButtons = {
                 }
                 navigation.goToStep(3);
             } else if (state.currentStep === 3) {
-                // На последнем экране кнопка может скачивать отчет
-                utils.showToast('Функция скачивания в разработке', 'info');
+                // На последнем экране кнопка скачивает отчет
+                this.downloadReport();
             }
         });
 
@@ -1213,6 +1303,60 @@ const floatingButtons = {
             nextText.textContent = 'К анализу';
         } else if (state.currentStep === 3) {
             nextText.textContent = 'Скачать отчет';
+        }
+    },
+
+    async downloadReport() {
+        if (!state.sessionId) {
+            utils.showToast('Сессия не найдена', 'error');
+            return;
+        }
+
+        if (!state.analysis) {
+            utils.showToast('Сначала выполните анализ', 'warning');
+            return;
+        }
+
+        try {
+            // Показываем лоадер
+            pixelLoader.show('analyzing');
+
+            const response = await fetch(`/api/export-report/${state.sessionId}`, {
+                method: 'GET',
+                headers: utils.getCsrfHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки отчета');
+            }
+
+            // Получаем имя файла из заголовков
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'housler_report.md';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            // Скачиваем файл
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            utils.showToast('Отчет успешно скачан!', 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            utils.showToast('Ошибка при скачивании отчета', 'error');
+        } finally {
+            pixelLoader.hide();
         }
     }
 };
