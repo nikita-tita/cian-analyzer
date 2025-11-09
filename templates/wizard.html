@@ -397,12 +397,30 @@
                     <div class="card-header cursor-pointer" data-bs-toggle="collapse" data-bs-target="#charts-content">
                         <h5 class="mb-0">
                             Графики и визуализация
-                            
+
                         </h5>
                     </div>
                     <div id="charts-content" class="collapse">
                         <div class="card-body">
                             <canvas id="comparison-chart" class="mb-4"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Рекомендации -->
+                <div class="card shadow-sm mb-4 collapsible-card">
+                    <div class="card-header cursor-pointer" data-bs-toggle="collapse" data-bs-target="#recommendations-content">
+                        <h5 class="mb-0">
+                            💡 Персональные рекомендации
+
+                        </h5>
+                    </div>
+                    <div id="recommendations-content" class="collapse show">
+                        <div class="card-body">
+                            <p class="text-muted mb-3">На основе анализа объекта выявлены следующие рекомендации:</p>
+                            <div id="recommendations-list">
+                                <!-- Будет заполнено через JS -->
+                            </div>
                         </div>
                     </div>
                 </div>

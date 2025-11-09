@@ -333,6 +333,70 @@ class MarkdownExporter:
 
             md.append("")
 
+        # 7.5. Рекомендации (НОВОЕ)
+        if hasattr(log, 'recommendations') and log.recommendations:
+            md.append("## 💡 Персональные рекомендации")
+            md.append("")
+            md.append("На основе анализа объекта выявлены следующие рекомендации по улучшению результатов продажи:")
+            md.append("")
+
+            # Группируем рекомендации по приоритету
+            priorities = {
+                1: {'label': 'КРИТИЧНО', 'emoji': '🔴', 'recs': []},
+                2: {'label': 'ВАЖНО', 'emoji': '🟠', 'recs': []},
+                3: {'label': 'СРЕДНЕ', 'emoji': '🟡', 'recs': []},
+                4: {'label': 'ИНФО', 'emoji': '🔵', 'recs': []}
+            }
+
+            for rec in log.recommendations:
+                priority = rec.get('priority', 4)
+                if priority in priorities:
+                    priorities[priority]['recs'].append(rec)
+
+            # Выводим рекомендации по приоритетам
+            for priority_num in sorted(priorities.keys()):
+                priority_data = priorities[priority_num]
+                recs_list = priority_data['recs']
+
+                if recs_list:
+                    md.append(f"### {priority_data['emoji']} {priority_data['label']}")
+                    md.append("")
+
+                    for rec in recs_list:
+                        title = rec.get('title', '')
+                        message = rec.get('message', '')
+                        action = rec.get('action', '')
+                        expected = rec.get('expected_result', '')
+                        roi = rec.get('roi')
+                        financial = rec.get('financial_impact', {})
+
+                        md.append(f"#### {rec.get('icon', '•')} {title}")
+                        md.append("")
+                        md.append(f"**Проблема:** {message}")
+                        md.append("")
+                        md.append(f"**Действие:** {action}")
+                        md.append("")
+                        md.append(f"**Ожидаемый результат:** {expected}")
+                        md.append("")
+
+                        # ROI если есть
+                        if roi is not None:
+                            md.append(f"**ROI:** {roi:.1f}x (окупаемость)")
+                            md.append("")
+
+                        # Финансовый эффект если есть
+                        if financial:
+                            md.append("**Финансовый эффект:**")
+                            for key, value in financial.items():
+                                if isinstance(value, (int, float)) and abs(value) > 1000:
+                                    md.append(f"- {key}: {self.format_number(value)}")
+                                else:
+                                    md.append(f"- {key}: {value}")
+                            md.append("")
+
+            md.append("---")
+            md.append("")
+
         # 8. Сценарии продажи
         if log.scenarios:
             md.append("## 📈 Сценарии продажи")

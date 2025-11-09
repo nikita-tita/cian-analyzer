@@ -1383,6 +1383,10 @@ def export_report(session_id):
         if 'metrics' in analysis:
             property_log.metrics = analysis['metrics']
 
+        # Рекомендации
+        if 'recommendations' in analysis:
+            property_log.recommendations = analysis['recommendations']
+
         # Генерируем Markdown отчет
         exporter = MarkdownExporter()
         markdown_content = exporter.export_single_property(property_log)
