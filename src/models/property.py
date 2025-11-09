@@ -204,21 +204,14 @@ class TargetProperty(PropertyBase):
         super().__init__(**mapped_data)
 
 
-class ComparableProperty(PropertyBase):
+class ComparableProperty(TargetProperty):
     """Аналог для сравнения"""
-    price_per_sqm: Optional[float] = None
     has_design: bool = False
     distance_km: Optional[float] = None  # Расстояние от целевого объекта
     similarity_score: Optional[float] = Field(None, ge=0, le=1)  # Оценка схожести
     excluded: bool = False  # Исключен из анализа
 
-    @validator('price_per_sqm', always=True)
-    def calculate_price_per_sqm(cls, v, values):
-        if v is None and values.get('price') and values.get('total_area'):
-            return values['price'] / values['total_area']
-        return v
-
-    class Config:
+    class Config(TargetProperty.Config):
         validate_assignment = True
 
 
