@@ -80,6 +80,8 @@ class RecommendationEngine:
         self.target = analysis_result.get('target_property', {})
         self.fair_price_analysis = analysis_result.get('fair_price_analysis', {})
         self.scenarios = analysis_result.get('price_scenarios', [])
+        self.comparables = analysis_result.get('comparables', [])
+        self.market_stats = analysis_result.get('market_statistics', {})
 
     def generate(self) -> List[Recommendation]:
         """
@@ -101,6 +103,9 @@ class RecommendationEngine:
 
         # 4. Информационные рекомендации по стратегии
         recommendations.extend(self._check_strategy())
+
+        # 5. Контекстный анализ корректировок
+        recommendations.extend(self._analyze_adjustments_context())
 
         # Сортируем по приоритету
         return sorted(recommendations, key=lambda r: (r.priority, -r.roi if r.roi else 0))
@@ -438,6 +443,85 @@ class RecommendationEngine:
             Упущенная выгода в рублях
         """
         return price * self.OPPORTUNITY_RATE * (months / 12)
+
+    def _analyze_adjustments_context(self) -> List[Recommendation]:
+        """
+        Контекстный анализ корректировок
+
+        Анализирует корректировки и дает умные рекомендации с учетом контекста.
+        Например, меньшая площадь в престижном районе может быть плюсом.
+        """
+        recs = []
+        adjustments = self.fair_price_analysis.get('adjustments', {})
+
+        # Анализ корректировки площади
+        if 'total_area' in adjustments:
+            area_adj = adjustments['total_area']
+            area_impact = (area_adj.get('value', 1) - 1) * 100
+            target_area = area_adj.get('target_value', 0)
+            median_area = area_adj.get('median_value', 0)
+
+            current_price = self.target.get('price', 0)
+            price_per_sqm = self.target.get('price_per_sqm', 0)
+
+            # Если площадь меньше медианы и получили штраф
+            if target_area < median_area and area_impact < 0:
+                # Но цена за м² высокая (>200k) или общая цена >20млн = престижный район
+                is_premium = price_per_sqm > 200000 or current_price > 20000000
+
+                if is_premium:
+                    recs.append(Recommendation(
+                        priority=self.INFO,
+                        icon='💎',
+                        title='Меньшая площадь в престижном районе — это плюс',
+                        message=f'Система дала штраф {area_impact:.1f}% за площадь {target_area:.0f}м² vs {median_area:.0f}м² (медиана). '
+                                f'Но в вашем случае это неверно! В престижных районах (цена {price_per_sqm:,.0f} ₽/м²) '
+                                f'меньшая площадь = выше доступность для покупателей и выше ликвидность.',
+                        action='Не снижать цену из-за площади. Ваш размер — оптимален для этого сегмента.',
+                        expected_result='Реальная цена может быть на 3-5% выше расчетной',
+                        category='pricing',
+                        financial_impact={
+                            'системный_штраф': f'{area_impact:.1f}%',
+                            'реальный_эффект': '+3-5% (ликвидность)',
+                            'объяснение': 'Компактность = преимущество в премиум-сегменте'
+                        }
+                    ))
+                else:
+                    # Обычный сегмент - штраф оправдан
+                    recs.append(Recommendation(
+                        priority=self.INFO,
+                        icon='📏',
+                        title='Меньшая площадь влияет на цену',
+                        message=f'Ваша площадь {target_area:.0f}м² меньше медианы {median_area:.0f}м². '
+                                f'В вашем сегменте (цена {price_per_sqm:,.0f} ₽/м²) это снижает привлекательность.',
+                        action='Учитывать при ценообразовании',
+                        expected_result='Корректировка {area_impact:.1f}% оправдана',
+                        category='pricing'
+                    ))
+
+            # Если площадь больше медианы и получили бонус
+            elif target_area > median_area and area_impact > 0:
+                # Проверяем, не слишком ли большая квартира для рынка
+                comparables_areas = [c.get('total_area', 0) for c in self.comparables if c.get('total_area')]
+                if comparables_areas:
+                    max_comparable = max(comparables_areas)
+                    if target_area > max_comparable * 1.2:
+                        recs.append(Recommendation(
+                            priority=self.MEDIUM,
+                            icon='⚠️',
+                            title='Очень большая площадь может затруднить продажу',
+                            message=f'Ваша площадь {target_area:.0f}м² значительно больше всех аналогов (макс {max_comparable:.0f}м²). '
+                                    f'Система дала бонус +{area_impact:.1f}%, но это может быть ошибкой.',
+                            action='Быть готовым к более длительной продаже или снижению цены',
+                            expected_result='Узкая аудитория покупателей',
+                            category='pricing',
+                            financial_impact={
+                                'системный_бонус': f'+{area_impact:.1f}%',
+                                'реальный_риск': 'Затянутая продажа на 2-4 месяца'
+                            }
+                        ))
+
+        return recs
 
     def get_summary(self) -> Dict:
         """
