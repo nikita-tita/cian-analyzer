@@ -861,7 +861,7 @@ def find_similar():
                     headless=True,
                     cache=property_cache,
                     region=region,
-                    max_concurrent=5
+                    max_concurrent=2  # Reduced to avoid CIAN rate limiting
                 )
 
                 # Обновляем данные аналогов детальной информацией
