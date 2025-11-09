@@ -52,7 +52,9 @@ logs/
 
 # Ignore test reports and previews
 test_report_preview.*
+test_real_data_report.*
 *_preview.md
+/test_*.md
 
 # OS
 .DS_Store
