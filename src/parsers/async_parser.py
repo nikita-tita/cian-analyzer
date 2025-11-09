@@ -375,5 +375,15 @@ def parse_multiple_urls_parallel(
         ) as parser:
             return await parser.parse_multiple_async(urls)
 
-    # Запускаем async код в новом event loop
-    return asyncio.run(_run())
+    # Запускаем async код, обходя проблему с running event loop
+    try:
+        # Проверяем есть ли активный event loop
+        asyncio.get_running_loop()
+        # Есть активный loop - запускаем в отдельном потоке
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, _run())
+            return future.result()
+    except RuntimeError:
+        # Нет активного loop - можем использовать asyncio.run() напрямую
+        return asyncio.run(_run())
