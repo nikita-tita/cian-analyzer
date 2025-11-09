@@ -1007,7 +1007,51 @@ const screen3 = {
                     Медиана — это среднее значение параметра по всем аналогам на рынке.
                     Половина объектов лучше медианы, половина хуже. Мы сравниваем ваш объект с медианой,
                     чтобы понять, насколько он отличается от типичного предложения.
+                    <br><br>
+                    <a href="#" class="text-decoration-none" data-bs-toggle="collapse" data-bs-target="#comparables-table">
+                        <strong>📊 Показать все аналоги, которые участвуют в расчете →</strong>
+                    </a>
                 </div>
+
+                <!-- Таблица аналогов (скрытая по умолчанию) -->
+                <div id="comparables-table" class="collapse mb-3">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <strong>Объекты для сравнения (${(analysis.comparables || []).length} шт)</strong>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Цена</th>
+                                            <th>Площадь</th>
+                                            <th>Комнат</th>
+                                            <th>Ванных</th>
+                                            <th>Этаж</th>
+                                            <th>Цена/м²</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${(analysis.comparables || []).map((comp, i) => `
+                                            <tr>
+                                                <td>${i + 1}</td>
+                                                <td>${utils.formatPrice(comp.price || 0)}</td>
+                                                <td>${comp.total_area || '-'} м²</td>
+                                                <td>${comp.rooms || '-'}</td>
+                                                <td>${comp.bathrooms || '-'}</td>
+                                                <td>${comp.floor || '-'}/${comp.total_floors || '-'}</td>
+                                                <td>${utils.formatPrice(comp.price_per_sqm || 0)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <h6>Сравнение с рынком:</h6>
                 <p class="text-muted small mb-3">Показываем, как ваши параметры отличаются от медианы рынка и как это влияет на цену</p>
                 <div class="table-responsive">
