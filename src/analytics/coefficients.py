@@ -73,6 +73,32 @@ BATHROOMS_COEFFICIENTS = {
     3: 1.08,
 }
 
+
+def get_bathrooms_coefficient(bathroom_count: float) -> float:
+    """Интерполировать коэффициент по количеству ванных комнат."""
+    if bathroom_count is None:
+        return BATHROOMS_COEFFICIENTS[1]
+
+    count = float(bathroom_count)
+    thresholds = sorted(BATHROOMS_COEFFICIENTS)
+
+    if count <= thresholds[0]:
+        return BATHROOMS_COEFFICIENTS[thresholds[0]]
+    if count >= thresholds[-1]:
+        return BATHROOMS_COEFFICIENTS[thresholds[-1]]
+
+    lower = max(t for t in thresholds if t <= count)
+    upper = min(t for t in thresholds if t >= count)
+
+    if lower == upper:
+        return BATHROOMS_COEFFICIENTS[lower]
+
+    lower_coef = BATHROOMS_COEFFICIENTS[lower]
+    upper_coef = BATHROOMS_COEFFICIENTS[upper]
+    weight = (count - lower) / (upper - lower)
+    return lower_coef + (upper_coef - lower_coef) * weight
+
+
 WINDOW_TYPE_COEFFICIENTS = {
     'деревянные': 0.85,
     'алюм': 0.90,
