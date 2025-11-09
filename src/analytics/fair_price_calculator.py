@@ -24,6 +24,7 @@ from .coefficients import (
     ELEVATOR_COUNT_COEFFICIENTS,
     PHOTO_TYPE_COEFFICIENTS,
     OBJECT_STATUS_COEFFICIENTS,
+    get_bathrooms_coefficient,
     get_ceiling_height_coefficient,
     get_area_coefficient,
     get_living_area_coefficient,
@@ -116,6 +117,32 @@ def calculate_fair_price_with_medians(
         }
         multiplier = 1.4
 
+    # ШАГ 4.1: Анализ ликвидности (не влияет на multiplier)
+    liquidity_analysis = None
+    if target.price:
+        liquidity_coef = get_price_liquidity_coefficient(target.price)
+        liquidity_analysis = {
+            'coefficient': liquidity_coef,
+            'price': target.price,
+            'applies_to_multiplier': False
+        }
+
+        if liquidity_coef < 1.0:
+            expected_discount_percent = round((1 - liquidity_coef) * 100, 2)
+            liquidity_analysis['expected_discount_percent'] = expected_discount_percent
+
+            adjustments['liquidity'] = {
+                'value': liquidity_coef,
+                'description': (
+                    f'Ликвидность: цена {target.price:,.0f} ₽ '
+                    f"→ ожидаемый торг ~{expected_discount_percent:.1f}%"
+                ),
+                'target_value': target.price,
+                'median_value': None,
+                'type': 'liquidity_indicator',
+                'impacts_multiplier': False
+            }
+
     # ШАГ 5: Финальный расчет
     fair_price_per_sqm = base_price_per_sqm * multiplier
     fair_price_total = fair_price_per_sqm * (target.total_area or 0)
@@ -143,6 +170,7 @@ def calculate_fair_price_with_medians(
         'is_overpriced': is_overpriced,
         'is_underpriced': is_underpriced,
         'is_fair': is_fair,
+        'liquidity_analysis': liquidity_analysis,
         'overpricing_amount': price_diff_amount,
         'overpricing_percent': price_diff_percent,
         'method': method
@@ -203,16 +231,19 @@ def _apply_apartment_features_adjustments(target, medians, comparison, multiplie
     # Ванные комнаты
     if 'bathrooms' in comparison and not comparison['bathrooms']['equals_median']:
         target_bathrooms = target.bathrooms
-        median_bathrooms = int(medians['bathrooms'])
+        median_bathrooms = medians['bathrooms']
 
-        # Упрощенная логика: +5% за каждую дополнительную ванную
-        diff = target_bathrooms - median_bathrooms
-        coef = 1 + (diff * 0.05)
-        coef = max(0.90, min(coef, 1.15))  # Ограничение от -10% до +15%
+        target_coef = get_bathrooms_coefficient(target_bathrooms)
+        median_coef = get_bathrooms_coefficient(median_bathrooms)
+
+        coef = target_coef / median_coef if median_coef else 1.0
 
         adjustments['bathrooms'] = {
             'value': coef,
-            'description': f'Ванные комнаты: {target_bathrooms} vs {median_bathrooms} (медиана)',
+            'description': (
+                f'Ванные комнаты: {target_bathrooms} '
+                f"vs {median_bathrooms:.1f} (медиана)"
+            ),
             'target_value': target_bathrooms,
             'median_value': median_bathrooms,
             'type': 'variable'
@@ -305,20 +336,24 @@ def _apply_position_adjustments(target, medians, comparison, multiplier, adjustm
     # Этаж
     if 'floor' in comparison and not comparison['floor']['equals_median']:
         target_floor = target.floor
-        median_floor = int(medians['floor'])
+        median_floor = medians['floor']
 
-        # Используем total_floors целевого объекта
-        if target.total_floors:
-            target_coef = get_floor_coefficient(target_floor, target.total_floors)
+        median_total_floors = medians.get('total_floors')
+        target_total_floors = target.total_floors or median_total_floors
 
-            # Для медианы берем те же total_floors (предполагаем, что дома похожие)
-            median_coef = get_floor_coefficient(median_floor, target.total_floors)
+        if target_total_floors:
+            target_coef = get_floor_coefficient(target_floor, target_total_floors)
+            median_reference_floors = median_total_floors or target_total_floors
+            median_coef = get_floor_coefficient(median_floor, median_reference_floors)
 
-            coef = target_coef / median_coef
+            coef = target_coef / median_coef if median_coef else 1.0
 
             adjustments['floor'] = {
                 'value': coef,
-                'description': f'Этаж: {target_floor}/{target.total_floors} vs {median_floor}/{target.total_floors} (медиана)',
+                'description': (
+                    f'Этаж: {target_floor}/{target_total_floors} '
+                    f"vs {median_floor}/{median_reference_floors} (медиана)"
+                ),
                 'target_value': target_floor,
                 'median_value': median_floor,
                 'type': 'variable'
@@ -434,19 +469,6 @@ def _apply_risk_adjustments(target, medians, comparison, multiplier, adjustments
         }
         multiplier *= coef
 
-    # Ликвидность (очень высокая цена)
-    if target.price:
-        coef = get_price_liquidity_coefficient(target.price)
-        if coef < 1.0:
-            adjustments['liquidity'] = {
-                'value': coef,
-                'description': f'Ликвидность: цена {target.price:,.0f} ₽ (высокая - низкая ликвидность)',
-                'target_value': target.price,
-                'median_value': None,
-                'type': 'variable'
-            }
-            multiplier *= coef
-
     return multiplier, adjustments
 
 
@@ -470,12 +492,115 @@ def _fallback_calculation(target, base_price_per_sqm, method):
         }
         multiplier *= coef
 
+    if target.ceiling_height:
+        coef = get_ceiling_height_coefficient(target.ceiling_height)
+        adjustments['ceiling_height'] = {
+            'value': coef,
+            'description': f'Высота потолков: {target.ceiling_height}м',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.bathrooms is not None:
+        coef = get_bathrooms_coefficient(target.bathrooms)
+        adjustments['bathrooms'] = {
+            'value': coef,
+            'description': f'Ванные комнаты: {target.bathrooms}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.window_type and target.window_type in WINDOW_TYPE_COEFFICIENTS:
+        coef = WINDOW_TYPE_COEFFICIENTS[target.window_type]
+        adjustments['window_type'] = {
+            'value': coef,
+            'description': f'Окна: {target.window_type}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.elevator_count and target.elevator_count in ELEVATOR_COUNT_COEFFICIENTS:
+        coef = ELEVATOR_COUNT_COEFFICIENTS[target.elevator_count]
+        adjustments['elevator_count'] = {
+            'value': coef,
+            'description': f'Лифты: {target.elevator_count}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.view_type and target.view_type in VIEW_TYPE_COEFFICIENTS:
+        coef = VIEW_TYPE_COEFFICIENTS[target.view_type]
+        adjustments['view_type'] = {
+            'value': coef,
+            'description': f'Вид из окна: {target.view_type}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.floor and target.total_floors:
+        coef = get_floor_coefficient(target.floor, target.total_floors)
+        adjustments['floor'] = {
+            'value': coef,
+            'description': f'Этаж: {target.floor}/{target.total_floors}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.photo_type and target.photo_type in PHOTO_TYPE_COEFFICIENTS:
+        coef = PHOTO_TYPE_COEFFICIENTS[target.photo_type]
+        adjustments['photo_type'] = {
+            'value': coef,
+            'description': f'Тип фото: {target.photo_type}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.object_status and target.object_status in OBJECT_STATUS_COEFFICIENTS:
+        coef = OBJECT_STATUS_COEFFICIENTS[target.object_status]
+        adjustments['object_status'] = {
+            'value': coef,
+            'description': f'Статус объекта: {target.object_status}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
+    if target.build_year:
+        coef = get_building_age_coefficient(target.build_year)
+        adjustments['build_year'] = {
+            'value': coef,
+            'description': f'Год постройки: {target.build_year}',
+            'type': 'simple'
+        }
+        multiplier *= coef
+
     fair_price_per_sqm = base_price_per_sqm * multiplier
     fair_price_total = fair_price_per_sqm * (target.total_area or 0)
 
     current_price = target.price or 0
     price_diff_amount = current_price - fair_price_total
     price_diff_percent = (price_diff_amount / fair_price_total * 100) if fair_price_total > 0 else 0
+
+    liquidity_analysis = None
+    if target.price:
+        liquidity_coef = get_price_liquidity_coefficient(target.price)
+        liquidity_analysis = {
+            'coefficient': liquidity_coef,
+            'price': target.price,
+            'applies_to_multiplier': False
+        }
+
+        if liquidity_coef < 1.0:
+            expected_discount_percent = round((1 - liquidity_coef) * 100, 2)
+            liquidity_analysis['expected_discount_percent'] = expected_discount_percent
+            adjustments['liquidity'] = {
+                'value': liquidity_coef,
+                'description': (
+                    f'Ликвидность: цена {target.price:,.0f} ₽ '
+                    f"→ ожидаемый торг ~{expected_discount_percent:.1f}%"
+                ),
+                'type': 'liquidity_indicator',
+                'impacts_multiplier': False
+            }
 
     return {
         'base_price_per_sqm': base_price_per_sqm,
@@ -486,6 +611,7 @@ def _fallback_calculation(target, base_price_per_sqm, method):
         'current_price': current_price,
         'price_diff_amount': price_diff_amount,
         'price_diff_percent': price_diff_percent,
+        'liquidity_analysis': liquidity_analysis,
         'is_overpriced': price_diff_percent > 5,
         'is_underpriced': price_diff_percent < -5,
         'is_fair': -5 <= price_diff_percent <= 5,
