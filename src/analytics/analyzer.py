@@ -203,7 +203,9 @@ class RealEstateAnalyzer:
                 'price_scenarios': [s.dict() for s in scenarios],
                 'strengths_weaknesses': strengths_weaknesses,
                 'attractiveness_index': attractiveness,
-                'time_forecast': time_forecast
+                'time_forecast': time_forecast,
+                'comparables': [c.dict() for c in self.filtered_comparables],
+                'market_statistics': market_stats
             })
             recommendations_list = recommendation_engine.generate()
             recommendations = [r.to_dict() for r in recommendations_list]
