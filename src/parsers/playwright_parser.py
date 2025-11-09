@@ -708,6 +708,17 @@ class PlaywrightParser(BaseCianParser):
         # Ограничиваем количество
         limited_results = results[:limit]
 
+        # Маппинг полей для Pydantic моделей
+        # Парсер карточек возвращает 'area_value' и 'price_raw', но модели ожидают 'total_area' и 'price'
+        for result in limited_results:
+            if 'area_value' in result and result['area_value']:
+                result['total_area'] = result['area_value']
+            if 'price_raw' in result and result['price_raw']:
+                result['price'] = result['price_raw']
+            # Конвертируем rooms в int если это строка с цифрой
+            if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
+                result['rooms'] = int(result['rooms'])
+
         logger.info(f"✓ Найдено {len(limited_results)} похожих объявлений")
 
         return limited_results
