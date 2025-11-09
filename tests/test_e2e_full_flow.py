@@ -21,10 +21,11 @@ def api_session():
     assert response.status_code == 200
     csrf_token = response.json().get("csrf_token")
 
-    # Добавляем CSRF токен в заголовки по умолчанию
+    # Добавляем CSRF токен и Referer в заголовки по умолчанию
     session.headers.update({
         "Content-Type": "application/json",
-        "X-CSRF-Token": csrf_token
+        "X-CSRF-Token": csrf_token,
+        "Referer": f"{BASE_URL}/calculator"
     })
 
     return session
