@@ -263,11 +263,16 @@ class AsyncPlaywrightParser(BaseCianParser):
                     if offers:
                         data['price_raw'] = offers.get('price')
                         data['currency'] = offers.get('priceCurrency')
+                        if data['price_raw']:
+                            data['price'] = data['price_raw']
 
                 # Дополняем данные из HTML
                 self._extract_basic_info(soup, data)
                 data['characteristics'] = self._extract_characteristics(soup)
                 data['images'] = self._extract_images(soup)
+
+                # Переносим ключевые поля из characteristics в корень
+                self._promote_key_fields(data)
 
                 # Сохраняем в кэш
                 if self.cache:
