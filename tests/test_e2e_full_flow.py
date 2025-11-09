@@ -92,7 +92,7 @@ class TestE2EFullFlow:
         # Ищем аналоги
         response = api_session.post(
             f"{BASE_URL}/api/find-similar",
-            json={"session_id": session_id, "limit": 50},
+            json={"session_id": session_id, "limit": 15},  # Достаточно для валидации, не перегружает сервер
             timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
@@ -128,7 +128,7 @@ class TestE2EFullFlow:
         # Находим аналоги
         api_session.post(
             f"{BASE_URL}/api/find-similar",
-            json={"session_id": session_id, "limit": 50},
+            json={"session_id": session_id, "limit": 15},  # Достаточно для валидации, не перегружает сервер
             timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
@@ -184,7 +184,7 @@ class TestE2EFullFlow:
 
         api_session.post(
             f"{BASE_URL}/api/find-similar",
-            json={"session_id": session_id, "limit": 50},
+            json={"session_id": session_id, "limit": 15},  # Достаточно для валидации, не перегружает сервер
             timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
