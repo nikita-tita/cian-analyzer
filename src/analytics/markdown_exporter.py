@@ -123,10 +123,16 @@ class MarkdownExporter:
         comparables_count = len(log.comparables_data) if log.comparables_data else 0
         median_price_sqm = 0
 
-        if log.market_stats and 'all' in log.market_stats:
-            all_stats = log.market_stats['all']
-            median_price_sqm = all_stats.get('median', 0)
-            mean_price_sqm = all_stats.get('mean', 0)
+        if log.market_stats:
+            # Поддержка двух форматов: вложенный 'all' или прямые поля
+            if 'all' in log.market_stats:
+                all_stats = log.market_stats['all']
+                median_price_sqm = all_stats.get('median', 0)
+                mean_price_sqm = all_stats.get('mean', 0)
+            else:
+                # Fallback для прямых полей
+                median_price_sqm = log.market_stats.get('median_price_per_sqm', 0)
+                mean_price_sqm = log.market_stats.get('mean_price_per_sqm', 0)
 
         your_price_sqm = current_price / log.property_info.get('total_area', 50) if log.property_info and current_price > 0 else 0
 
