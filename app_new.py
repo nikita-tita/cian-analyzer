@@ -1115,9 +1115,12 @@ def analyze():
             }), 400
 
         # Анализ
+        logger.info(f"🔧 DEBUG: Создаю analyzer...")
         analyzer = RealEstateAnalyzer()
         try:
+            logger.info(f"🔧 DEBUG: Запускаю analyzer.analyze()...")
             result = analyzer.analyze(request_model)
+            logger.info(f"🔧 DEBUG: ✓ Анализ завершён, тип результата: {type(result)}")
         except ValueError as ve:
             # Специфичные ошибки валидации (например, мало аналогов)
             logger.warning(f"Ошибка валидации анализа: {ve}")
@@ -1137,7 +1140,9 @@ def analyze():
 
         # Конвертируем в JSON
         try:
+            logger.info(f"🔧 DEBUG: Конвертирую result в dict...")
             result_dict = result.dict()
+            logger.info(f"🔧 DEBUG: ✓ Конвертация успешна, размер: {len(str(result_dict))} символов")
         except Exception as dict_error:
             logger.error(f"Ошибка конвертации результата в dict: {dict_error}", exc_info=True)
             return jsonify({
@@ -1147,6 +1152,7 @@ def analyze():
             }), 500
 
         # Валидация результата перед отправкой
+        logger.info(f"🔧 DEBUG: Валидирую required_fields...")
         required_fields = ['market_statistics', 'fair_price_analysis', 'price_scenarios',
                           'strengths_weaknesses', 'target_property']
         missing_fields = [field for field in required_fields if not result_dict.get(field)]
@@ -1162,17 +1168,22 @@ def analyze():
 
         # Метрики
         try:
+            logger.info(f"🔧 DEBUG: Получаю метрики...")
             metrics = analyzer.get_metrics()
             result_dict['metrics'] = metrics
+            logger.info(f"🔧 DEBUG: ✓ Метрики получены")
         except Exception as metrics_error:
             logger.warning(f"Ошибка получения метрик: {metrics_error}")
             result_dict['metrics'] = {}
 
         # Сохраняем в сессию
+        logger.info(f"🔧 DEBUG: Сохраняю результат в сессию {session_id}...")
         session_data['analysis'] = result_dict
         session_data['step'] = 3
         session_storage.set(session_id, session_data)
+        logger.info(f"🔧 DEBUG: ✓ Результат сохранён в сессию")
 
+        logger.info(f"🔧 DEBUG: Формирую JSON ответ...")
         return jsonify({
             'status': 'success',
             'analysis': result_dict
