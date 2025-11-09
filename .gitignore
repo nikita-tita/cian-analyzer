@@ -50,6 +50,12 @@ logs/
 !tests/test_*.py
 !tests/*_test.py
 
+# Test and coverage
+.coverage
+htmlcov/
+*.log
+test_output.log
+
 # OS
 .DS_Store
 Thumbs.db
