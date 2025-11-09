@@ -1371,21 +1371,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // Session Management: Try to restore session
-    let sessionLoaded = false;
+    // Session Management: Check for reset parameter from landing page
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldReset = urlParams.get('reset') === '1';
 
-    // Priority 1: Check URL parameter (from server or shared link)
-    if (window.SERVER_SESSION_ID) {
-        console.log('Found session in URL from server:', window.SERVER_SESSION_ID);
-        sessionLoaded = await utils.loadSession(window.SERVER_SESSION_ID);
+    if (shouldReset) {
+        console.log('Reset parameter detected - clearing session and starting fresh');
+        utils.clearSessionFromLocalStorage();
+
+        // Clean up URL by removing reset parameter
+        urlParams.delete('reset');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newUrl);
     }
 
-    // Priority 2: Check localStorage (user's own previous session)
-    if (!sessionLoaded) {
-        const localSessionId = utils.getSessionFromLocalStorage();
-        if (localSessionId) {
-            console.log('Found session in localStorage:', localSessionId);
-            sessionLoaded = await utils.loadSession(localSessionId);
+    // Session Management: Try to restore session (skip if reset=1)
+    let sessionLoaded = false;
+
+    if (!shouldReset) {
+        // Priority 1: Check URL parameter (from server or shared link)
+        if (window.SERVER_SESSION_ID) {
+            console.log('Found session in URL from server:', window.SERVER_SESSION_ID);
+            sessionLoaded = await utils.loadSession(window.SERVER_SESSION_ID);
+        }
+
+        // Priority 2: Check localStorage (user's own previous session)
+        if (!sessionLoaded) {
+            const localSessionId = utils.getSessionFromLocalStorage();
+            if (localSessionId) {
+                console.log('Found session in localStorage:', localSessionId);
+                sessionLoaded = await utils.loadSession(localSessionId);
+            }
         }
     }
 
