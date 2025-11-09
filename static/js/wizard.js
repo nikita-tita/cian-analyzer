@@ -1002,22 +1002,49 @@ const screen3 = {
                 ${overpricing > 0 ? '(цена выше справедливой)' : '(цена ниже справедливой)'}
             </div>
             <div class="mt-3">
-                <h6>Примененные корректировки:</h6>
+                <div class="alert alert-info mb-3">
+                    <strong>💡 Что такое "медиана"?</strong><br>
+                    Медиана — это среднее значение параметра по всем аналогам на рынке.
+                    Половина объектов лучше медианы, половина хуже. Мы сравниваем ваш объект с медианой,
+                    чтобы понять, насколько он отличается от типичного предложения.
+                </div>
+                <h6>Сравнение с рынком:</h6>
+                <p class="text-muted small mb-3">Показываем, как ваши параметры отличаются от медианы рынка и как это влияет на цену</p>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
-                                <th>Коэффициент</th>
-                                <th>Описание</th>
+                                <th>Параметр</th>
+                                <th>У вас</th>
+                                <th>Медиана рынка</th>
+                                <th>Влияние на цену</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${Object.entries(fairPrice.adjustments || {}).map(([key, adj]) => `
+                            ${Object.entries(fairPrice.adjustments || {}).map(([key, adj]) => {
+                                const impact = (adj.value - 1) * 100;
+                                const impactClass = impact > 0 ? 'text-success' : impact < 0 ? 'text-danger' : 'text-muted';
+                                const impactIcon = impact > 0 ? '↑' : impact < 0 ? '↓' : '=';
+
+                                // Парсим описание: "Параметр: значение1 vs значение2 (медиана)"
+                                const descParts = (adj.description || '').split(':');
+                                const paramName = descParts[0] || key;
+                                const valuePart = descParts[1] || '';
+                                const values = valuePart.split(' vs ');
+                                const yourValue = (values[0] || '').trim();
+                                const medianValue = (values[1] || '').replace('(медиана)', '').trim();
+
+                                return `
                                 <tr>
-                                    <td><strong>${utils.formatNumber((adj.value - 1) * 100, 2)}%</strong></td>
-                                    <td>${adj.description || ''}</td>
+                                    <td><strong>${paramName}</strong></td>
+                                    <td>${yourValue || '-'}</td>
+                                    <td>${medianValue || '-'}</td>
+                                    <td class="${impactClass}">
+                                        <strong>${impactIcon} ${utils.formatNumber(Math.abs(impact), 2)}%</strong>
+                                    </td>
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
