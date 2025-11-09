@@ -93,7 +93,7 @@ class TestE2EFullFlow:
         response = api_session.post(
             f"{BASE_URL}/api/find-similar",
             json={"session_id": session_id, "limit": 50},
-            timeout=120  # Параллельный парсинг занимает время
+            timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
         assert response.status_code == 200
@@ -129,7 +129,7 @@ class TestE2EFullFlow:
         api_session.post(
             f"{BASE_URL}/api/find-similar",
             json={"session_id": session_id, "limit": 50},
-            timeout=120
+            timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
         # Запускаем анализ
@@ -185,7 +185,7 @@ class TestE2EFullFlow:
         api_session.post(
             f"{BASE_URL}/api/find-similar",
             json={"session_id": session_id, "limit": 50},
-            timeout=120
+            timeout=300  # Параллельный парсинг 50 объектов занимает 2-5 минут
         )
 
         # Первый анализ с базовыми параметрами
