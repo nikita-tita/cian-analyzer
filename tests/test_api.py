@@ -478,5 +478,84 @@ class TestAPIEndpointsFlow:
         assert 'market_price' in data['analysis']
 
 
+class TestExportReportEndpoint:
+    """Tests for /api/export-report/<session_id> endpoint"""
+
+    def test_export_report_success(self, client, disable_rate_limiting, mock_session_with_analysis):
+        """Test successful report export"""
+        session_id = mock_session_with_analysis['session_id']
+
+        response = client.get(f'/api/export-report/{session_id}')
+
+        assert response.status_code == 200
+        assert response.content_type == 'text/markdown; charset=utf-8'
+        assert 'Content-Disposition' in response.headers
+        assert 'attachment' in response.headers['Content-Disposition']
+        assert 'housler_report_' in response.headers['Content-Disposition']
+        assert '.md' in response.headers['Content-Disposition']
+
+        # Проверяем содержимое отчета
+        content = response.get_data(as_text=True)
+        assert len(content) > 0
+        assert '# 🏢 Отчёт по объекту недвижимости' in content
+        assert '## 🔬 Методология анализа' in content
+        assert '## 📋 Информация об объекте' in content
+        assert '## 🎯 Комплексный подход к продаже недвижимости' in content
+
+    def test_export_report_session_not_found(self, client):
+        """Test export fails when session doesn't exist"""
+        response = client.get('/api/export-report/nonexistent-session-id')
+
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data['status'] == 'error'
+        assert 'не найдена' in data['message'].lower()
+
+    def test_export_report_no_analysis(self, client, disable_rate_limiting, mock_session_without_analysis):
+        """Test export fails when analysis hasn't been run"""
+        session_id = mock_session_without_analysis['session_id']
+
+        response = client.get(f'/api/export-report/{session_id}')
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['status'] == 'error'
+        assert 'анализ не выполнен' in data['message'].lower()
+
+    def test_export_report_content_structure(self, client, disable_rate_limiting, mock_session_with_analysis):
+        """Test exported report contains all expected sections"""
+        session_id = mock_session_with_analysis['session_id']
+
+        response = client.get(f'/api/export-report/{session_id}')
+        content = response.get_data(as_text=True)
+
+        # Проверяем основные секции отчета
+        expected_sections = [
+            '## 🔬 Методология анализа',
+            '## 📋 Информация об объекте',
+            '## 🏘️ Найденные аналоги',
+            '## 📊 Рыночная статистика',
+            '## 💰 Расчёт справедливой цены',
+            '## 🎯 Комплексный подход к продаже недвижимости',
+        ]
+
+        for section in expected_sections:
+            assert section in content, f"Section '{section}' not found in report"
+
+    def test_export_report_markdown_format(self, client, disable_rate_limiting, mock_session_with_analysis):
+        """Test report is valid markdown"""
+        session_id = mock_session_with_analysis['session_id']
+
+        response = client.get(f'/api/export-report/{session_id}')
+        content = response.get_data(as_text=True)
+
+        # Проверяем markdown элементы
+        assert content.count('##') >= 5  # Должно быть несколько заголовков
+        assert '**' in content  # Жирный текст
+        assert '- **' in content  # Списки с жирным текстом
+        assert '₽' in content  # Валюта
+        assert content.count('---') >= 1  # Разделители
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

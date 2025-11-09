@@ -263,6 +263,72 @@ class TestE2EFullFlow:
         print(f"✅ Шаринг сессии работает")
         print(f"   URL: {BASE_URL}/calculator?session={session_id}")
 
+    def test_08_export_report(self, api_session):
+        """Тест 8: Экспорт детального отчета"""
+        # Парсим объект и находим аналоги
+        parse_response = api_session.post(
+            f"{BASE_URL}/api/parse",
+            json={"url": TEST_PROPERTY_URL},
+            timeout=60
+        )
+        session_id = parse_response.json()["session_id"]
+
+        # Находим аналоги
+        api_session.post(
+            f"{BASE_URL}/api/find-similar",
+            json={"session_id": session_id, "limit": 15},
+            timeout=300
+        )
+
+        # Запускаем анализ
+        api_session.post(
+            f"{BASE_URL}/api/analyze",
+            json={"session_id": session_id},
+            timeout=30
+        )
+
+        # Экспортируем отчет
+        response = api_session.get(
+            f"{BASE_URL}/api/export-report/{session_id}",
+            timeout=30
+        )
+
+        assert response.status_code == 200, f"Ошибка экспорта: {response.status_code}"
+        assert response.headers['Content-Type'] == 'text/markdown; charset=utf-8'
+        assert 'Content-Disposition' in response.headers
+        assert 'attachment' in response.headers['Content-Disposition']
+
+        # Проверяем содержимое отчета
+        content = response.text
+        assert len(content) > 1000, "Отчет слишком короткий"
+
+        # Проверяем ключевые секции
+        required_sections = [
+            '# 🏢 Отчёт по объекту недвижимости',
+            '## 🔬 Методология анализа',
+            '## 📋 Информация об объекте',
+            '## 🏘️ Найденные аналоги',
+            '## 📊 Рыночная статистика',
+            '## 💰 Расчёт справедливой цены',
+            '## 🎯 Комплексный подход к продаже недвижимости'
+        ]
+
+        missing_sections = []
+        for section in required_sections:
+            if section not in content:
+                missing_sections.append(section)
+
+        assert not missing_sections, f"Отсутствуют секции: {missing_sections}"
+
+        # Проверяем что в отчете есть данные
+        assert 'Медианный подход' in content, "Нет описания методологии"
+        assert 'Цена:' in content or 'цена' in content.lower(), "Нет данных о цене"
+        assert 'м²' in content, "Нет данных о площади"
+        assert '₽' in content, "Нет финансовых данных"
+
+        print(f"✅ Отчет экспортирован успешно ({len(content)} байт)")
+        print(f"   Содержит {len(required_sections)} обязательных секций")
+
 
 class TestAPICriticalEndpoints:
     """Тесты критических API эндпоинтов"""
