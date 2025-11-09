@@ -183,6 +183,21 @@ class RecommendationEngine:
                     'risk_level': 'Низкий'
                 }
             ))
+        else:
+            # Справедливая цена (-5% до +5%)
+            recs.append(Recommendation(
+                priority=self.INFO,
+                icon='✅',
+                title='Цена соответствует рынку',
+                message=f'Цена находится в пределах справедливой (отклонение {overpricing:+.1f}%). Это хорошая стартовая позиция.',
+                action='Держать текущую цену, но быть готовым к торгу 5-7%',
+                expected_result='Продажа за 3-6 месяцев с высокой вероятностью',
+                category='pricing',
+                financial_impact={
+                    'торг_диапазон': f'{current_price * 0.93:,.0f} - {current_price:,.0f} ₽',
+                    'expected_time': '3-6 месяцев'
+                }
+            ))
 
         return recs
 
@@ -324,6 +339,23 @@ class RecommendationEngine:
                 financial_impact={
                     'investment': 30_000,
                     'serious_inquiries_boost': '60%'
+                }
+            ))
+
+        # Общая рекомендация по презентации (всегда)
+        if len(recs) == 0:
+            recs.append(Recommendation(
+                priority=self.INFO,
+                icon='✨',
+                title='Качество презентации',
+                message='Качественная презентация объекта — ключ к быстрой продаже. Даже при справедливой цене плохие фото могут затянуть продажу на месяцы.',
+                action='Обновить фотографии при естественном освещении, добавить детальное описание с акцентом на преимущества',
+                expected_result='Увеличение количества просмотров и звонков на 30-40%',
+                category='presentation',
+                financial_impact={
+                    'cost': 'минимальная',
+                    'impact': 'высокий',
+                    'time_to_implement': '1-2 дня'
                 }
             ))
 
