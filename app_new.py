@@ -843,7 +843,13 @@ def find_similar():
                 residential_complex = None
 
         # Если найдено много аналогов с URL, парсим их параллельно
-        urls_to_parse = [c.get('url') for c in similar if c.get('url') and not c.get('price_raw')]
+        # Парсим детально объекты без полных данных (price, total_area, price_per_sqm)
+        urls_to_parse = [
+            c.get('url') for c in similar
+            if c.get('url') and not (c.get('price') and c.get('total_area'))
+        ]
+
+        logger.info(f"🔍 DEBUG: {len(similar)} comparables found, {len(urls_to_parse)} need detailed parsing")
 
         if urls_to_parse:
             try:
