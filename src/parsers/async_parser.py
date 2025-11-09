@@ -182,7 +182,7 @@ class AsyncPlaywrightParser(BaseCianParser):
         try:
             logger.debug(f"Fetching: {url[:60]}...")
 
-            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            await page.goto(url, wait_until='domcontentloaded', timeout=60000)
 
             # Ждем появления контента
             try:
