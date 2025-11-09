@@ -1270,6 +1270,145 @@ def cache_clear():
         }), 500
 
 
+@app.route('/api/export-report/<session_id>', methods=['GET'])
+def export_report(session_id):
+    """
+    API: Экспорт детального отчета в Markdown (Экран 3)
+
+    Returns:
+        Markdown файл для скачивания с полным отчетом:
+        - Методология анализа
+        - Информация об объекте
+        - Найденные аналоги
+        - Рыночная статистика
+        - Применённые корректировки
+        - Справедливая цена
+        - Диапазон цен
+        - Индекс привлекательности
+        - Прогноз времени продажи
+        - Анализ чувствительности
+        - Сценарии продажи
+        - Комплексный подход к продаже (рекомендации)
+    """
+    try:
+        if not session_storage.exists(session_id):
+            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+
+        session_data = session_storage.get(session_id)
+
+        # Проверяем, что анализ выполнен
+        if 'analysis' not in session_data or not session_data['analysis']:
+            return jsonify({
+                'status': 'error',
+                'message': 'Анализ не выполнен. Сначала запустите анализ на шаге 3.'
+            }), 400
+
+        logger.info(f"Экспорт отчета для сессии {session_id}")
+
+        # Импортируем необходимые модули
+        from src.analytics.property_tracker import PropertyLog, EventType
+        from src.analytics.markdown_exporter import MarkdownExporter
+        from datetime import datetime
+
+        # Создаем PropertyLog из данных сессии
+        property_log = PropertyLog(
+            property_id=session_id,
+            url=session_data.get('target_property', {}).get('url'),
+            started_at=datetime.now().isoformat(),
+            completed_at=datetime.now().isoformat(),
+            status='completed'
+        )
+
+        # Заполняем информацию об объекте
+        target = session_data.get('target_property', {})
+        property_log.property_info = {
+            'price': target.get('price'),
+            'total_area': target.get('total_area'),
+            'rooms': target.get('rooms'),
+            'floor': target.get('floor'),
+            'total_floors': target.get('total_floors'),
+            'address': target.get('address')
+        }
+
+        # Добавляем аналоги
+        comparables = session_data.get('comparables', [])
+        property_log.comparables_data = [
+            {
+                'price': c.get('price'),
+                'total_area': c.get('total_area'),
+                'price_per_sqm': c.get('price_per_sqm'),
+                'address': c.get('address'),
+                'url': c.get('url')
+            }
+            for c in comparables
+            if not c.get('excluded', False)  # Только не исключенные
+        ]
+
+        # Заполняем результаты анализа
+        analysis = session_data['analysis']
+
+        # Рыночная статистика
+        if 'market_statistics' in analysis:
+            property_log.market_stats = analysis['market_statistics']
+
+        # Справедливая цена
+        if 'fair_price_analysis' in analysis:
+            property_log.fair_price_result = analysis['fair_price_analysis']
+
+        # Диапазон цен
+        if 'price_range' in analysis:
+            property_log.price_range = analysis['price_range']
+
+        # Индекс привлекательности
+        if 'attractiveness_index' in analysis:
+            property_log.attractiveness_index = analysis['attractiveness_index']
+
+        # Прогноз времени
+        if 'time_forecast' in analysis:
+            property_log.time_forecast = analysis['time_forecast']
+
+        # Чувствительность к цене
+        if 'price_sensitivity' in analysis:
+            property_log.price_sensitivity = analysis['price_sensitivity']
+
+        # Сценарии
+        if 'price_scenarios' in analysis:
+            property_log.scenarios = analysis['price_scenarios']
+
+        # Корректировки
+        if 'adjustments_applied' in analysis:
+            property_log.adjustments = analysis['adjustments_applied']
+
+        # Метрики
+        if 'metrics' in analysis:
+            property_log.metrics = analysis['metrics']
+
+        # Генерируем Markdown отчет
+        exporter = MarkdownExporter()
+        markdown_content = exporter.export_single_property(property_log)
+
+        # Возвращаем файл для скачивания
+        from flask import Response
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"housler_report_{session_id[:8]}_{timestamp}.md"
+
+        return Response(
+            markdown_content,
+            mimetype='text/markdown',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/markdown; charset=utf-8'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка экспорта отчета: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Ошибка генерации отчета: {str(e)}'
+        }), 500
+
+
 def _identify_missing_fields(parsed_data: Dict) -> List[Dict]:
     """
     Определяет недостающие поля для анализа

@@ -562,6 +562,59 @@ const screen3 = {
     init() {
         document.getElementById('run-analysis-btn').addEventListener('click', this.runAnalysis.bind(this));
         document.getElementById('back-to-comparables-btn').addEventListener('click', () => navigation.goToStep(2));
+
+        // Кнопка скачивания отчета
+        document.getElementById('download-report-btn').addEventListener('click', async () => {
+            try {
+                const sessionId = sessionStorage.getItem('session_id');
+                if (!sessionId) {
+                    utils.showToast('Ошибка: сессия не найдена', 'error');
+                    return;
+                }
+
+                utils.showToast('Генерация отчета...', 'info');
+
+                // Скачиваем отчет
+                const response = await fetch(`/api/export-report/${sessionId}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Ошибка генерации отчета');
+                }
+
+                // Получаем blob и скачиваем файл
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Получаем имя файла из заголовка Content-Disposition
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `housler_report_${sessionId.substring(0, 8)}.md`;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                utils.showToast('✅ Отчет успешно скачан!', 'success');
+            } catch (error) {
+                console.error('Ошибка скачивания отчета:', error);
+                utils.showToast(`Ошибка: ${error.message}`, 'error');
+            }
+        });
     },
 
     async runAnalysis() {
