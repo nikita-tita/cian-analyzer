@@ -29,21 +29,25 @@ jobs:
         pip install bandit[toml]
 
     - name: Run Bandit
+      continue-on-error: true
       run: |
         bandit -r src/ app_new.py \
           -f json \
           -o bandit-report.json \
           --severity-level medium \
-          --confidence-level medium || true
+          --confidence-level medium
 
     - name: Display Bandit results
+      continue-on-error: true
       run: |
         bandit -r src/ app_new.py \
           -f txt \
           --severity-level medium \
-          --confidence-level medium || true
+          --confidence-level medium
 
     - name: Upload Bandit report
+      if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v3
       with:
         name: bandit-security-report
@@ -69,18 +73,22 @@ jobs:
         pip install safety
 
     - name: Run Safety check
+      continue-on-error: true
       run: |
         pip install -r requirements.txt
         safety check \
           --json \
           --output safety-report.json \
-          --continue-on-error || true
+          --continue-on-error
 
     - name: Display Safety results
+      continue-on-error: true
       run: |
-        safety check --full-report || true
+        safety check --full-report
 
     - name: Upload Safety report
+      if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v3
       with:
         name: safety-dependency-report
@@ -99,17 +107,21 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run Semgrep
+      continue-on-error: true
       run: |
         semgrep scan \
           --config=auto \
           --json \
-          --output=semgrep-report.json || true
+          --output=semgrep-report.json
 
     - name: Display Semgrep results
+      continue-on-error: true
       run: |
-        semgrep scan --config=auto || true
+        semgrep scan --config=auto
 
     - name: Upload Semgrep report
+      if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v3
       with:
         name: semgrep-security-report
