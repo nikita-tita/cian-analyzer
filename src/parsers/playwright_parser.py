@@ -275,8 +275,8 @@ class PlaywrightParser(BaseCianParser):
                     'h1, [data-mark="OfferTitle"], script[type="application/ld+json"]',
                     timeout=10000
                 )
-            except:
-                logger.warning("Селекторы не найдены, но продолжаем")
+            except Exception as e:
+                logger.warning(f"Селекторы не найдены, но продолжаем: {e}")
 
             # Дополнительное ожидание для динамического контента
             time.sleep(1)

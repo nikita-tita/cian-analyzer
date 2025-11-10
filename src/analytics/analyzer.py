@@ -197,7 +197,6 @@ class RealEstateAnalyzer:
 
         # Генерация рекомендаций
         try:
-            from .recommendations import RecommendationEngine
             rec_engine = RecommendationEngine({
                 'target_property': request.target_property.model_dump(),
                 'fair_price_analysis': fair_price,

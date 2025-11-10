@@ -190,8 +190,8 @@ class AsyncPlaywrightParser(BaseCianParser):
                     'h1, [data-mark="OfferTitle"], script[type="application/ld+json"]',
                     timeout=10000
                 )
-            except:
-                logger.debug("Selectors not found, continuing anyway")
+            except Exception as e:
+                logger.debug(f"Selectors not found, continuing anyway: {e}")
 
             # Минимальная задержка
             await asyncio.sleep(0.5)

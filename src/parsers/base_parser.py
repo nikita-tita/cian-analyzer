@@ -409,10 +409,8 @@ class BaseCianParser(ABC):
             'Жилая площадь': ('living_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
             # Площадь кухни
             'Площадь кухни': ('kitchen_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
-            # Этаж
+            # Этаж (извлекает floor из формата "5 из 10")
             'Этаж': ('floor', lambda x: int(x.split()[0]) if x and 'из' in x else (int(x) if x.isdigit() else None)),
-            # Всего этажей
-            'Этаж': ('floor_total', lambda x: int(x.split()[-1]) if x and 'из' in x else None),
             # Год постройки
             'Год постройки': ('build_year', lambda x: int(re.sub(r'[^\d]', '', x)) if x else None),
         }
@@ -424,6 +422,15 @@ class BaseCianParser(ABC):
                     data[data_key] = transform_func(value) if transform_func else value
                 except Exception:
                     pass
+
+        # Извлекаем общее количество этажей из характеристики "Этаж"
+        if 'Этаж' in characteristics and not data.get('floor_total'):
+            try:
+                floor_value = characteristics['Этаж']
+                if floor_value and 'из' in floor_value:
+                    data['floor_total'] = int(floor_value.split()[-1])
+            except Exception:
+                pass
 
         # Извлекаем количество комнат из заголовка
         if not data.get('rooms') and data.get('title'):

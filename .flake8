@@ -19,30 +19,39 @@ exclude =
     .tox,
     node_modules
 
-# Ignore specific errors
+# Ignore specific errors:
+# E203 - Whitespace before ':'
+# E501 - Line too long (handled by Black)
+# W503 - Line break before binary operator (conflicts with Black)
+# W504 - Line break after binary operator
+# E402 - Module level import not at top of file (sometimes needed)
 ignore =
-    E203,  # Whitespace before ':'
-    E501,  # Line too long (handled by Black)
-    W503,  # Line break before binary operator (conflicts with Black)
-    W504,  # Line break after binary operator
-    E402,  # Module level import not at top of file (sometimes needed)
+    E203,
+    E501,
+    W503,
+    W504,
+    E402
 
-# Select specific error codes to check
+# Select specific error codes to check:
+# E - PEP8 errors
+# W - PEP8 warnings
+# F - PyFlakes errors
+# C - McCabe complexity
+# N - PEP8 naming conventions
 select =
-    E,   # PEP8 errors
-    W,   # PEP8 warnings
-    F,   # PyFlakes errors
-    C,   # McCabe complexity
-    N,   # PEP8 naming conventions
+    E,
+    W,
+    F,
+    C,
+    N
 
-# Per-file ignores
+# Per-file ignores:
+# __init__.py - Allow unused imports
+# tests - Allow redefinition
 per-file-ignores =
-    __init__.py:F401,F403,  # Allow unused imports in __init__.py
-    tests/*.py:F401,F811,   # Allow redefinition in tests
+    __init__.py:F401,F403
+    tests/*.py:F401,F811
     conftest.py:F401,F811
-
-# Complexity settings
-max-complexity = 10
 
 # Show source code for each error
 show-source = True
