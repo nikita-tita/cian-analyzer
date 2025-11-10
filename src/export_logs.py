@@ -51,7 +51,7 @@ def export_logs(output_file: str = None, summary_only: bool = False):
     # Статистика
     summary = tracker.get_summary()
     print(f"\n✅ Логи экспортированы в: {output_path.absolute()}")
-    print(f"\n📊 Статистика:")
+    print("\n📊 Статистика:")
     print(f"  Всего объектов: {summary['total']}")
     print(f"  Успешно: {summary['completed']}")
     print(f"  Ошибки: {summary['failed']}")

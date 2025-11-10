@@ -8,7 +8,6 @@ import requests
 import io
 from PIL import Image
 import numpy as np
-import cv2
 from typing import Optional
 import logging
 
@@ -220,7 +219,7 @@ def demo():
         import os
         os.makedirs('test_images', exist_ok=True)
         result.save('test_images/iopaint_cleaned.jpg')
-        print(f"\n✅ Результат сохранен: test_images/iopaint_cleaned.jpg")
+        print("\n✅ Результат сохранен: test_images/iopaint_cleaned.jpg")
         print(f"   Размер: {result.size[0]}x{result.size[1]} px")
     else:
         print("\n❌ Ошибка обработки")

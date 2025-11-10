@@ -170,7 +170,7 @@ class TxtExporter:
                 lines.append("Или добавьте ?no-watermark=1 в конец URL")
                 example_img = data['images'][0]
                 no_wm_img = example_img.replace('/images/', '/images-no-watermark/')
-                lines.append(f"Пример:")
+                lines.append("Пример:")
                 lines.append(f"  С водяным знаком:  {example_img}")
                 lines.append(f"  Без водяного знака: {no_wm_img}")
                 lines.append("")

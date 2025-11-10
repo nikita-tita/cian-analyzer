@@ -102,7 +102,7 @@ class SimpleParser:
                 '_warning': 'Данные получены упрощенным парсером. Для точных данных используйте локальную версию.'
             }
 
-            logger.info(f"SimpleParser: Successfully parsed basic data")
+            logger.info("SimpleParser: Successfully parsed basic data")
             return result
 
         except Exception as e:

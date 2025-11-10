@@ -662,7 +662,7 @@ class RealEstateAnalyzer:
             expected_living_area = target.rooms * 12  # минимум 12 м² на комнату
             if target.living_area < expected_living_area:
                 coef = 0.95  # штраф 5%
-                adjustments['bedrooms_mismatch'] = {'value': coef, 'description': f'Несоответствие кол-ва комнат жилой площади'}
+                adjustments['bedrooms_mismatch'] = {'value': coef, 'description': 'Несоответствие кол-ва комнат жилой площади'}
                 multiplier *= coef
 
         # 16. Возраст дома
