@@ -53,6 +53,7 @@ ELEVATOR_COUNT_COEFFICIENTS = {
     'панорамный': 1.07,
 }
 
+
 # Высота потолков: динамический расчет
 # 2.5м = 0.95, 2.7м = 1.00, 3.0м = 1.02, 3.2м+ = 1.05
 def get_ceiling_height_coefficient(height: float) -> float:
@@ -65,6 +66,7 @@ def get_ceiling_height_coefficient(height: float) -> float:
         return 1.00 + (height - 2.7) * 0.067  # линейно от 1.00 до 1.02
     else:
         return min(1.05, 1.02 + (height - 3.0) * 0.015)  # до 1.05 макс
+
 
 BATHROOMS_COEFFICIENTS = {
     0: 0.70,

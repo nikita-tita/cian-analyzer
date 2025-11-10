@@ -5,6 +5,7 @@
 import json
 import time
 import logging
+import re
 from typing import Optional, Dict, List
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
@@ -151,7 +152,6 @@ class BaseCianParser(ABC):
         # ЖК (Жилой комплекс)
         if not data.get('residential_complex'):
             # Пробуем разные варианты извлечения ЖК
-            import re
 
             # Метод 1: Из ссылок на ЖК (самый надежный!)
             # Ищем ссылки типа: https://zhk-название.cian.ru/ или /zhiloy-kompleks-название/
@@ -224,7 +224,6 @@ class BaseCianParser(ABC):
                         # Ищем название станции внутри
                         text = item.get_text(strip=True)
                         # Убираем время в пути (например "5 мин." или "10 мин. пешком")
-                        import re
                         # Удаляем паттерны вроде "5 мин", "10 мин. пешком"
                         text = re.sub(r'\d+\s*мин\.?\s*(пешком)?', '', text).strip()
                         if text and text not in metro_list:
@@ -392,7 +391,6 @@ class BaseCianParser(ABC):
         Args:
             data: Словарь с данными объявления (модифицируется in-place)
         """
-        import re
 
         characteristics = data.get('characteristics', {})
         if not characteristics:
@@ -449,7 +447,6 @@ class BaseCianParser(ABC):
             soup: BeautifulSoup объект страницы
             data: Словарь с данными (модифицируется in-place)
         """
-        import re
 
         # Получаем полный текст страницы для анализа
         page_text = soup.get_text(separator=' ', strip=True).lower()
@@ -488,10 +485,10 @@ class BaseCianParser(ABC):
         # Определяем по названию района / адресу
         premium_locations = [
             'петровск',  # Петровский остров
-            'крестовск', # Крестовский остров
-            'васильевск', # Васильевский остров (центральная часть)
-            'каменноостров', # Каменноостровский
-            'приморск', # Приморский район (элитные части)
+            'крестовск',  # Крестовский остров
+            'васильевск',  # Васильевский остров (центральная часть)
+            'каменноостров',  # Каменноостровский
+            'приморск',  # Приморский район (элитные части)
             'центральный район',
             'адмиралтейск',
         ]
@@ -616,7 +613,7 @@ class BaseCianParser(ABC):
                         except ValueError:
                             pass
 
-        logger.debug(f"Извлечены премиум-характеристики:")
+        logger.debug("Извлечены премиум-характеристики:")
         logger.debug(f"  Дизайнерская отделка: {data.get('дизайнерская отделка')}")
         logger.debug(f"  Панорамные виды: {data.get('панорамные виды')}")
         logger.debug(f"  Премиум локация: {data.get('премиум локация')}")

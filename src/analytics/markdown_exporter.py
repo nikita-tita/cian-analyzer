@@ -31,7 +31,7 @@ class MarkdownExporter:
         md = []
 
         # Заголовок
-        md.append(f"# 🏢 Отчёт по объекту недвижимости")
+        md.append("# 🏢 Отчёт по объекту недвижимости")
         md.append("")
         md.append(f"**ID:** {log.property_id}")
 
@@ -201,7 +201,7 @@ class MarkdownExporter:
             md.append(f"- **Справедливая цена за м²:** {self.format_number(result.get('fair_price_per_sqm', 0))}")
             md.append("")
 
-            md.append(f"### Результат")
+            md.append("### Результат")
             md.append(f"- **Справедливая цена:** {self.format_number(result.get('fair_price_total', 0))}")
             md.append(f"- **Текущая цена:** {self.format_number(result.get('current_price', 0))}")
 

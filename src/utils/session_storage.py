@@ -29,6 +29,7 @@ def serialize_for_json(obj):
         return [serialize_for_json(item) for item in obj]
     return obj
 
+
 class SessionStorage:
     """Unified session storage interface with TTL and LRU support"""
 
@@ -253,6 +254,7 @@ class SessionStorage:
 
 # Global session storage instance
 _storage = None
+
 
 def get_session_storage() -> SessionStorage:
     """Get global session storage instance"""

@@ -10,7 +10,7 @@ from PIL import Image
 import requests
 import io
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +287,7 @@ def demo():
         import os
         os.makedirs('test_images', exist_ok=True)
         result.save('test_images/cleaned.jpg')
-        print(f"\n✅ Результат сохранен: test_images/cleaned.jpg")
+        print("\n✅ Результат сохранен: test_images/cleaned.jpg")
         print(f"   Размер: {result.size[0]}x{result.size[1]} px")
     else:
         print("\n❌ Ошибка обработки")
