@@ -196,9 +196,20 @@ class RealEstateAnalyzer:
         self.metrics['calculation_time_ms'] = int((end_time - start_time).total_seconds() * 1000)
 
         # Генерация рекомендаций
-        # ВРЕМЕННО ОТКЛЮЧЕНО: новые контекстные рекомендации вызывают зависание
-        # TODO: Исправить RecommendationEngine._analyze_adjustments_context()
-        recommendations = []
+        try:
+            from .recommendations import RecommendationEngine
+            rec_engine = RecommendationEngine({
+                'target_property': request.target_property.model_dump(),
+                'fair_price_analysis': fair_price,
+                'price_scenarios': scenarios,
+                'comparables': [c.model_dump() for c in self.filtered_comparables],
+                'market_statistics': market_stats
+            })
+            recommendations_objects = rec_engine.generate()
+            recommendations = [rec.to_dict() for rec in recommendations_objects]
+        except Exception as e:
+            logger.warning(f"Не удалось сгенерировать рекомендации: {e}")
+            recommendations = []
 
         # Завершение трекинга
         if self.enable_tracking and self.property_log:

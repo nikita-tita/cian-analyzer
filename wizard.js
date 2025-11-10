@@ -1112,22 +1112,62 @@ const screen3 = {
 
         container.style.display = 'block';
 
-        list.innerHTML = recommendations.map((rec, index) => `
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h6 class="card-title">
-                        <span class="badge bg-primary me-2">${index + 1}</span>
-                        ${rec.title || rec.type || 'Рекомендация'}
-                    </h6>
-                    <p class="card-text">${rec.description || rec.text || rec}</p>
-                    ${rec.priority ? `
-                        <span class="badge ${rec.priority === 'high' ? 'bg-danger' : rec.priority === 'medium' ? 'bg-warning' : 'bg-info'}">
-                            Приоритет: ${rec.priority === 'high' ? 'Высокий' : rec.priority === 'medium' ? 'Средний' : 'Низкий'}
-                        </span>
-                    ` : ''}
+        list.innerHTML = recommendations.map((rec, index) => {
+            // Определяем класс бейджа по приоритету (1=CRITICAL, 2=HIGH, 3=MEDIUM, 4=INFO)
+            let priorityBadgeClass = 'bg-info';
+            if (rec.priority === 1) priorityBadgeClass = 'bg-danger';
+            else if (rec.priority === 2) priorityBadgeClass = 'bg-warning text-dark';
+            else if (rec.priority === 3) priorityBadgeClass = 'bg-primary';
+
+            // Определяем класс карточки по приоритету
+            let cardClass = '';
+            if (rec.priority === 1) cardClass = 'border-danger';
+            else if (rec.priority === 2) cardClass = 'border-warning';
+
+            return `
+                <div class="card mb-3 ${cardClass}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">
+                                ${rec.icon || '💡'} ${rec.title || 'Рекомендация'}
+                            </h6>
+                            <span class="badge ${priorityBadgeClass}">
+                                ${rec.priority_label || 'ИНФО'}
+                            </span>
+                        </div>
+                        <p class="card-text mb-2">${rec.message || rec.description || ''}</p>
+                        ${rec.action ? `
+                            <div class="alert alert-light mb-2 py-2">
+                                <strong>Действие:</strong> ${rec.action}
+                            </div>
+                        ` : ''}
+                        ${rec.expected_result ? `
+                            <div class="text-success mb-2">
+                                <strong>Ожидаемый результат:</strong> ${rec.expected_result}
+                            </div>
+                        ` : ''}
+                        ${rec.roi ? `
+                            <div class="text-primary">
+                                <strong>ROI:</strong> ${utils.formatNumber(rec.roi, 1)}%
+                            </div>
+                        ` : ''}
+                        ${rec.financial_impact && Object.keys(rec.financial_impact).length > 0 ? `
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <strong>Финансовый эффект:</strong>
+                                    ${Object.entries(rec.financial_impact).map(([key, value]) => {
+                                        if (typeof value === 'number' && value > 1000) {
+                                            return `${key}: ${utils.formatPrice(value)}`;
+                                        }
+                                        return `${key}: ${value}`;
+                                    }).join(', ')}
+                                </small>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 };
 
