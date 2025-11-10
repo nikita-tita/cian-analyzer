@@ -1284,22 +1284,10 @@ def cache_clear():
 @app.route('/api/export-report/<session_id>', methods=['GET'])
 def export_report(session_id):
     """
-    API: Экспорт детального отчета в Markdown (Экран 3)
+    API: Экспорт детального отчета в PDF (Экран 3)
 
     Returns:
-        Markdown файл для скачивания с полным отчетом:
-        - Методология анализа
-        - Информация об объекте
-        - Найденные аналоги
-        - Рыночная статистика
-        - Применённые корректировки
-        - Справедливая цена
-        - Диапазон цен
-        - Индекс привлекательности
-        - Прогноз времени продажи
-        - Анализ чувствительности
-        - Сценарии продажи
-        - Комплексный подход к продаже (рекомендации)
+        PDF файл для скачивания с полным визуальным отчетом
     """
     try:
         if not session_storage.exists(session_id):
@@ -1314,105 +1302,35 @@ def export_report(session_id):
                 'message': 'Анализ не выполнен. Сначала запустите анализ на шаге 3.'
             }), 400
 
-        logger.info(f"Экспорт отчета для сессии {session_id}")
+        logger.info(f"Экспорт PDF отчета для сессии {session_id}")
 
-        # Импортируем необходимые модули
-        from src.analytics.property_tracker import PropertyLog, EventType
-        from src.analytics.markdown_exporter import MarkdownExporter
+        # Генерируем PDF используя Playwright
         from datetime import datetime
+        import asyncio
 
-        # Создаем PropertyLog из данных сессии
-        property_log = PropertyLog(
-            property_id=session_id,
-            url=session_data.get('target_property', {}).get('url'),
-            started_at=datetime.now().isoformat(),
-            completed_at=datetime.now().isoformat(),
-            status='completed'
-        )
+        if not PLAYWRIGHT_AVAILABLE:
+            # Fallback to markdown if playwright not available
+            logger.warning("Playwright не доступен, возвращаем markdown")
+            return _export_markdown_fallback(session_id, session_data)
 
-        # Заполняем информацию об объекте
-        target = session_data.get('target_property', {})
-        property_log.property_info = {
-            'price': target.get('price'),
-            'total_area': target.get('total_area'),
-            'rooms': target.get('rooms'),
-            'floor': target.get('floor'),
-            'total_floors': target.get('total_floors'),
-            'address': target.get('address')
-        }
+        # Создаем URL для страницы с отчетом
+        base_url = request.url_root.rstrip('/')
+        report_url = f"{base_url}/calculator?session={session_id}#step-3"
 
-        # Добавляем аналоги
-        comparables = session_data.get('comparables', [])
-        property_log.comparables_data = [
-            {
-                'price': c.get('price'),
-                'total_area': c.get('total_area'),
-                'price_per_sqm': c.get('price_per_sqm'),
-                'address': c.get('address'),
-                'url': c.get('url')
-            }
-            for c in comparables
-            if not c.get('excluded', False)  # Только не исключенные
-        ]
+        # Генерируем PDF
+        pdf_bytes = asyncio.run(_generate_pdf_from_page(report_url))
 
-        # Заполняем результаты анализа
-        analysis = session_data['analysis']
-
-        # Рыночная статистика
-        if 'market_statistics' in analysis:
-            property_log.market_stats = analysis['market_statistics']
-
-        # Справедливая цена
-        if 'fair_price_analysis' in analysis:
-            property_log.fair_price_result = analysis['fair_price_analysis']
-
-        # Диапазон цен
-        if 'price_range' in analysis:
-            property_log.price_range = analysis['price_range']
-
-        # Индекс привлекательности
-        if 'attractiveness_index' in analysis:
-            property_log.attractiveness_index = analysis['attractiveness_index']
-
-        # Прогноз времени
-        if 'time_forecast' in analysis:
-            property_log.time_forecast = analysis['time_forecast']
-
-        # Чувствительность к цене
-        if 'price_sensitivity' in analysis:
-            property_log.price_sensitivity = analysis['price_sensitivity']
-
-        # Сценарии
-        if 'price_scenarios' in analysis:
-            property_log.scenarios = analysis['price_scenarios']
-
-        # Корректировки
-        if 'adjustments_applied' in analysis:
-            property_log.adjustments = analysis['adjustments_applied']
-
-        # Метрики
-        if 'metrics' in analysis:
-            property_log.metrics = analysis['metrics']
-
-        # Рекомендации
-        if 'recommendations' in analysis:
-            property_log.recommendations = analysis['recommendations']
-
-        # Генерируем Markdown отчет
-        exporter = MarkdownExporter()
-        markdown_content = exporter.export_single_property(property_log)
-
-        # Возвращаем файл для скачивания
+        # Возвращаем PDF файл
         from flask import Response
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"housler_report_{session_id[:8]}_{timestamp}.md"
+        filename = f"housler_report_{session_id[:8]}_{timestamp}.pdf"
 
         return Response(
-            markdown_content,
-            mimetype='text/markdown',
+            pdf_bytes,
+            mimetype='application/pdf',
             headers={
                 'Content-Disposition': f'attachment; filename="{filename}"',
-                'Content-Type': 'text/markdown; charset=utf-8'
+                'Content-Type': 'application/pdf'
             }
         )
 
@@ -1422,6 +1340,137 @@ def export_report(session_id):
             'status': 'error',
             'message': f'Ошибка генерации отчета: {str(e)}'
         }), 500
+
+
+async def _generate_pdf_from_page(url: str) -> bytes:
+    """
+    Генерирует PDF из HTML страницы используя Playwright
+    """
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+
+        # Загружаем страницу
+        await page.goto(url, wait_until='networkidle', timeout=30000)
+
+        # Ждем загрузки результатов анализа
+        await page.wait_for_selector('#analysis-results', timeout=10000)
+
+        # Скрываем элементы, которые не нужны в PDF
+        await page.add_style_tag(content="""
+            .header, .progress-container, .floating-buttons,
+            .advice-ticker, #pixel-loader, .toast-container,
+            #share-btn, .nav-link {
+                display: none !important;
+            }
+            body {
+                padding-bottom: 0 !important;
+            }
+            .container {
+                max-width: 100% !important;
+            }
+        """)
+
+        # Генерируем PDF
+        pdf_bytes = await page.pdf(
+            format='A4',
+            margin={
+                'top': '20mm',
+                'right': '15mm',
+                'bottom': '20mm',
+                'left': '15mm'
+            },
+            print_background=True,
+            prefer_css_page_size=False
+        )
+
+        await browser.close()
+        return pdf_bytes
+
+
+def _export_markdown_fallback(session_id: str, session_data: dict):
+    """
+    Fallback функция для экспорта в markdown если playwright не доступен
+    """
+    from src.analytics.property_tracker import PropertyLog
+    from src.analytics.markdown_exporter import MarkdownExporter
+    from datetime import datetime
+    from flask import Response
+
+    # Создаем PropertyLog из данных сессии
+    property_log = PropertyLog(
+        property_id=session_id,
+        url=session_data.get('target_property', {}).get('url'),
+        started_at=datetime.now().isoformat(),
+        completed_at=datetime.now().isoformat(),
+        status='completed'
+    )
+
+    # Заполняем информацию об объекте
+    target = session_data.get('target_property', {})
+    property_log.property_info = {
+        'price': target.get('price'),
+        'total_area': target.get('total_area'),
+        'rooms': target.get('rooms'),
+        'floor': target.get('floor'),
+        'total_floors': target.get('total_floors'),
+        'address': target.get('address')
+    }
+
+    # Добавляем аналоги
+    comparables = session_data.get('comparables', [])
+    property_log.comparables_data = [
+        {
+            'price': c.get('price'),
+            'total_area': c.get('total_area'),
+            'price_per_sqm': c.get('price_per_sqm'),
+            'address': c.get('address'),
+            'url': c.get('url')
+        }
+        for c in comparables
+        if not c.get('excluded', False)
+    ]
+
+    # Заполняем результаты анализа
+    analysis = session_data['analysis']
+    if 'market_statistics' in analysis:
+        property_log.market_stats = analysis['market_statistics']
+    if 'fair_price_analysis' in analysis:
+        property_log.fair_price_result = analysis['fair_price_analysis']
+    if 'price_range' in analysis:
+        property_log.price_range = analysis['price_range']
+    if 'attractiveness_index' in analysis:
+        property_log.attractiveness_index = analysis['attractiveness_index']
+    if 'time_forecast' in analysis:
+        property_log.time_forecast = analysis['time_forecast']
+    if 'price_sensitivity' in analysis:
+        property_log.price_sensitivity = analysis['price_sensitivity']
+    if 'price_scenarios' in analysis:
+        property_log.scenarios = analysis['price_scenarios']
+    if 'adjustments_applied' in analysis:
+        property_log.adjustments = analysis['adjustments_applied']
+    if 'metrics' in analysis:
+        property_log.metrics = analysis['metrics']
+    if 'recommendations' in analysis:
+        property_log.recommendations = analysis['recommendations']
+
+    # Генерируем Markdown отчет
+    exporter = MarkdownExporter()
+    markdown_content = exporter.export_single_property(property_log)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"housler_report_{session_id[:8]}_{timestamp}.md"
+
+    return Response(
+        markdown_content,
+        mimetype='text/markdown',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Type': 'text/markdown; charset=utf-8'
+        }
+    )
 
 
 def _identify_missing_fields(parsed_data: Dict) -> List[Dict]:
