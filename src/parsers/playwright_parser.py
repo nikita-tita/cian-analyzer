@@ -539,10 +539,9 @@ class PlaywrightParser(BaseCianParser):
                     catalog_links = soup.find_all('a', href=True)
                     for link in catalog_links:
                         href = link.get('href')
-                        text = link.get_text(strip=True).lower()
 
                         if ('/kupit-kvartiru-zhiloy-kompleks-' in href or
-                            ('/cat.php' in href and 'newobject' in href)):
+                                ('/cat.php' in href and 'newobject' in href)):
                             residential_complex_url = href if href.startswith('http') else f"https://www.cian.ru{href}"
                             logger.info(f"   Найдена ссылка на каталог: {residential_complex_url[:80]}")
                             break
@@ -625,7 +624,7 @@ class PlaywrightParser(BaseCianParser):
             # Полное совпадение (приоритет)
             if rc_lower in result_title or rc_lower in result_address:
                 filtered_results.append(result)
-                logger.debug(f"     ✓ Добавлена (полное совпадение)")
+                logger.debug("     ✓ Добавлена (полное совпадение)")
                 continue
 
             # Частичное совпадение - проверяем основные слова

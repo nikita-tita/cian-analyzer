@@ -220,9 +220,9 @@ class MarkdownExporter:
         if data.get('error'):
             lines.append("### ⚠️ Ошибка при парсинге")
             lines.append("")
-            lines.append(f"```")
+            lines.append("```")
             lines.append(data['error'])
-            lines.append(f"```")
+            lines.append("```")
             lines.append("")
 
         return lines
