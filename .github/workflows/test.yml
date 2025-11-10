@@ -32,6 +32,7 @@ jobs:
         python -m playwright install chromium
 
     - name: Run Unit Tests
+      continue-on-error: true
       run: |
         python -m pytest tests/ \
           --ignore=tests/test_e2e_full_flow.py \
@@ -40,10 +41,11 @@ jobs:
           --cov-report=term-missing \
           --cov-report=html:htmlcov \
           --html=test_reports/unit_tests.html \
-          --self-contained-html || true
+          --self-contained-html
 
     - name: Upload test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v3
       with:
         name: test-results
@@ -52,8 +54,9 @@ jobs:
           htmlcov/
 
     - name: Check coverage threshold
+      continue-on-error: true
       run: |
         python -m pytest tests/ \
           --ignore=tests/test_e2e_full_flow.py \
           --cov=src \
-          --cov-fail-under=60 || true
+          --cov-fail-under=60
