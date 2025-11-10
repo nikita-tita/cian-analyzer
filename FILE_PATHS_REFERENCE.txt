@@ -1,0 +1,254 @@
+=============================================================
+CIAN ANALYZER - ABSOLUTE FILE PATHS FOR KEY COMPONENTS
+=============================================================
+
+## STEP 1 LOGIC (Property Parsing)
+Frontend Implementation:
+  /home/user/cian-analyzer/static/js/wizard.js (lines 94-383, screen1 object)
+  
+Backend Implementation:
+  /home/user/cian-analyzer/app_new.py (lines 564-637, /api/parse endpoint)
+  /home/user/cian-analyzer/app_new.py (lines 640-745, /api/create-manual endpoint)
+  /home/user/cian-analyzer/app_new.py (lines 748-793, /api/update-target endpoint)
+
+Missing Fields Logic:
+  /home/user/cian-analyzer/app_new.py (lines 1427-1486, _identify_missing_fields function)
+
+HTML Template:
+  /home/user/cian-analyzer/templates/wizard.html (lines 58-279, screen-1 div)
+
+=============================================================
+## STEP 2 LOGIC (Find Comparables)
+Frontend Implementation:
+  /home/user/cian-analyzer/static/js/wizard.js (lines 386-558, screen2 object)
+  - findSimilar() function: lines 394-422
+  - addComparable() function: lines 424-460
+  - renderComparables() function: lines 462-531
+  - excludeComparable() function: lines 533-557
+
+Backend Implementation:
+  /home/user/cian-analyzer/app_new.py (lines 796-900, /api/find-similar endpoint)
+  /home/user/cian-analyzer/app_new.py (lines 903-966, /api/add-comparable endpoint)
+  /home/user/cian-analyzer/app_new.py (lines 969-1007, /api/exclude-comparable endpoint)
+  /home/user/cian-analyzer/app_new.py (lines 1010-1048, /api/include-comparable endpoint)
+
+Parallel Parsing:
+  /home/user/cian-analyzer/src/parsers/async_parser.py (parse_multiple_urls_parallel function)
+  Called from: /home/user/cian-analyzer/app_new.py (lines 854-874)
+
+HTML Template:
+  /home/user/cian-analyzer/templates/wizard.html (lines 281-315, screen-2 div)
+
+=============================================================
+## STEP 3 LOGIC (Run Analysis)
+Frontend Implementation:
+  /home/user/cian-analyzer/static/js/wizard.js (lines 561-845, screen3 object)
+  - runAnalysis() function: lines 620-649
+  - displayAnalysis() function: lines 651-668
+  - renderSummary() function: lines 670-697
+  - renderFairPrice() function: lines 699-748
+  - renderScenarios() function: lines 750-780
+  - renderStrengthsWeaknesses() function: lines 782-813
+  - renderChart() function: lines 815-844
+
+Backend Implementation - MAIN ANALYSIS ENDPOINT:
+  /home/user/cian-analyzer/app_new.py (lines 1051-1198, /api/analyze endpoint)
+
+Analysis Engine:
+  /home/user/cian-analyzer/src/analytics/analyzer.py (lines 87-232, analyze() method)
+  /home/user/cian-analyzer/src/analytics/analyzer.py (lines 234-285, _filter_outliers() method)
+  /home/user/cian-analyzer/src/analytics/analyzer.py (lines 287-297, confidence intervals)
+
+Report Export:
+  /home/user/cian-analyzer/app_new.py (lines 1284-1424, /api/export-report endpoint)
+
+HTML Template:
+  /home/user/cian-analyzer/templates/wizard.html (lines 318+, screen-3 div)
+
+=============================================================
+## CORE MODULES
+
+### Main Flask Application
+  /home/user/cian-analyzer/app_new.py (1,520 lines)
+  
+### Wizard Frontend (Modern Version)
+  /home/user/cian-analyzer/static/js/wizard.js (1,583 lines)
+
+### Legacy Wizard
+  /home/user/cian-analyzer/wizard.js (906 lines)
+
+### Analytics Engine
+  /home/user/cian-analyzer/src/analytics/analyzer.py (1,090 lines)
+
+### Data Models (Pydantic)
+  /home/user/cian-analyzer/src/models/property.py (474 lines)
+
+### Parser Implementations
+  /home/user/cian-analyzer/src/parsers/playwright_parser.py
+  /home/user/cian-analyzer/src/parsers/simple_parser.py
+  /home/user/cian-analyzer/src/parsers/async_parser.py (Parallel parsing)
+  /home/user/cian-analyzer/src/parsers/browser_pool.py (Resource management)
+
+### Caching Layer
+  /home/user/cian-analyzer/src/cache/redis_cache.py
+
+### Session Storage
+  /home/user/cian-analyzer/src/utils/session_storage.py (263 lines)
+
+### Error Messages
+  /home/user/cian-analyzer/static/js/error-messages.js (259 lines)
+
+### Analytics Submodules
+  /home/user/cian-analyzer/src/analytics/fair_price_calculator.py
+  /home/user/cian-analyzer/src/analytics/median_calculator.py
+  /home/user/cian-analyzer/src/analytics/price_range.py
+  /home/user/cian-analyzer/src/analytics/attractiveness_index.py
+  /home/user/cian-analyzer/src/analytics/time_forecast.py
+  /home/user/cian-analyzer/src/analytics/recommendations.py
+  /home/user/cian-analyzer/src/analytics/coefficients.py
+  /home/user/cian-analyzer/src/analytics/parameter_classifier.py
+
+=============================================================
+## ENTRY POINTS
+
+### Production Entry
+  /home/user/cian-analyzer/app_new.py (Flask app)
+  
+### Vercel Entry Point
+  /home/user/cian-analyzer/index.py (Wrapper for Vercel)
+
+### Legacy Entry Points
+  /home/user/cian-analyzer/wizard.js
+  /home/user/cian-analyzer/pixel_loader.js
+  /home/user/cian-analyzer/add_dns_auto.js
+
+=============================================================
+## TEMPLATES
+
+### Main Wizard Template
+  /home/user/cian-analyzer/templates/wizard.html (Main 3-screen wizard)
+  - Step 1: lines 58-279
+  - Step 2: lines 281-315
+  - Step 3: lines 318+
+
+### Landing Page
+  /home/user/cian-analyzer/templates/index.html
+
+### Static Assets
+  /home/user/cian-analyzer/static/css/wizard.css
+  /home/user/cian-analyzer/static/css/design-system.css
+  /home/user/cian-analyzer/static/css/advice-ticker.css
+  /home/user/cian-analyzer/static/js/advice-ticker.js
+
+=============================================================
+## SECURITY & LOGGING
+
+### Security Implementation
+  URL Validation: /home/user/cian-analyzer/app_new.py (lines 149-206)
+  Input Sanitization: /home/user/cian-analyzer/app_new.py (lines 208-231)
+  Security Headers: /home/user/cian-analyzer/app_new.py (lines 341-382)
+  CSRF Protection: /home/user/cian-analyzer/app_new.py (lines 56-62)
+  Rate Limiting: /home/user/cian-analyzer/app_new.py (lines 122-131)
+  Timeout Protection: /home/user/cian-analyzer/app_new.py (lines 286-334)
+
+### Logging Configuration
+  Main Logger: /home/user/cian-analyzer/app_new.py (lines 9-17)
+  
+### Logging Locations
+  Flask App: /home/user/cian-analyzer/app_new.py
+  Analytics: /home/user/cian-analyzer/src/analytics/*.py
+  Parser: /home/user/cian-analyzer/src/parsers/*.py
+  Cache: /home/user/cian-analyzer/src/cache/redis_cache.py
+  Session: /home/user/cian-analyzer/src/utils/session_storage.py
+
+=============================================================
+## TESTING INFRASTRUCTURE
+
+### Test Framework
+  Location: /home/user/cian-analyzer/tests/
+
+### Test Files
+  /home/user/cian-analyzer/tests/test_api.py (API endpoints)
+  /home/user/cian-analyzer/tests/test_e2e_full_flow.py (End-to-end)
+  /home/user/cian-analyzer/tests/test_session_storage.py (Session mgmt)
+  /home/user/cian-analyzer/tests/test_security.py (Security)
+  /home/user/cian-analyzer/tests/test_browser_pool.py (Browser pool)
+  /home/user/cian-analyzer/tests/test_new_analytics.py (Analytics)
+  /home/user/cian-analyzer/tests/test_field_mapping.py (Field mapping)
+  /home/user/cian-analyzer/tests/test_fair_price_calculator.py (Fair price)
+  /home/user/cian-analyzer/tests/conftest.py (Fixtures)
+
+=============================================================
+## CONFIGURATION FILES
+
+### Dependencies
+  /home/user/cian-analyzer/requirements.txt
+  /home/user/cian-analyzer/pyproject.toml
+
+### Environment
+  /home/user/cian-analyzer/.env.example
+
+### Code Quality
+  /home/user/cian-analyzer/.pre-commit-config.yaml
+  /home/user/cian-analyzer/.flake8
+  /home/user/cian-analyzer/.bandit
+
+### Docker
+  /home/user/cian-analyzer/.dockerignore
+
+=============================================================
+## API ENDPOINTS MAPPING
+
+### Health & Monitoring (app_new.py)
+  GET /health → lines 391-506
+  GET /metrics → lines 524-553
+  GET /api/csrf-token → lines 509-521
+
+### Step 1: Property Input (app_new.py)
+  POST /api/parse → lines 564-637
+  POST /api/create-manual → lines 640-745
+  POST /api/update-target → lines 748-793
+
+### Step 2: Comparables (app_new.py)
+  POST /api/find-similar → lines 796-900
+  POST /api/add-comparable → lines 903-966
+  POST /api/exclude-comparable → lines 969-1007
+  POST /api/include-comparable → lines 1010-1048
+
+### Step 3: Analysis & Export (app_new.py)
+  POST /api/analyze → lines 1051-1198
+  GET /api/export-report/<id> → lines 1284-1424
+
+### Cache Management (app_new.py)
+  GET /api/cache/stats → lines 1221-1248
+  POST /api/cache/clear → lines 1251-1281
+
+### Session Management (app_new.py)
+  GET /api/session/<id> → lines 1201-1218
+
+=============================================================
+## QUICK LOOKUP TABLE
+
+For Step 2 issues:
+  Check: /home/user/cian-analyzer/app_new.py:796-900
+  Debug: Look for 🔍 and 🚀 markers
+  Parallel parsing: lines 854-874
+
+For Step 3 issues:
+  Check: /home/user/cian-analyzer/app_new.py:1051-1198
+  Debug: Look for 🔧 markers
+  Analysis details: /home/user/cian-analyzer/src/analytics/analyzer.py:87-232
+
+For error messages:
+  Check: /home/user/cian-analyzer/static/js/error-messages.js
+  Functions: getErrorMessage(), showErrorToast()
+
+For session storage:
+  Check: /home/user/cian-analyzer/src/utils/session_storage.py
+  Session TTL: 3600 seconds (1 hour) default
+
+For logging:
+  Config: /home/user/cian-analyzer/app_new.py:9-17
+  Level: INFO (set in logging.basicConfig)
+
+=============================================================

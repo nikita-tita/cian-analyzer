@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring - Housler</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .monitoring-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            font-size: 1.2rem;
+            padding: 8px 16px;
+        }
+        .status-healthy {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .status-degraded {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .status-unhealthy {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        .metric-card {
+            text-align: center;
+            padding: 20px;
+        }
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .error-item {
+            border-left: 3px solid #dc3545;
+            padding-left: 10px;
+            margin-bottom: 10px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .auto-refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div class="monitoring-container">
+        <!-- Header -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="mb-0"><i class="bi bi-activity me-2"></i>System Monitoring</h1>
+                        <small class="text-muted">Last updated: <span id="last-update">-</span></small>
+                    </div>
+                    <div>
+                        <span id="status-badge" class="badge status-healthy">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body metric-card">
+                        <i class="bi bi-heart-pulse text-success" style="font-size: 2rem;"></i>
+                        <div class="metric-value text-success" id="health-status">-</div>
+                        <div class="metric-label">Health Status</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body metric-card">
+                        <i class="bi bi-bug text-danger" style="font-size: 2rem;"></i>
+                        <div class="metric-value text-danger" id="error-count">-</div>
+                        <div class="metric-label">Errors (1h)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body metric-card">
+                        <i class="bi bi-check-circle text-primary" style="font-size: 2rem;"></i>
+                        <div class="metric-value text-primary" id="test-passed">-</div>
+                        <div class="metric-label">Tests Passed</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body metric-card">
+                        <i class="bi bi-x-circle text-warning" style="font-size: 2rem;"></i>
+                        <div class="metric-value text-warning" id="test-failed">-</div>
+                        <div class="metric-label">Tests Failed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Health Check Details -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Health Check Details</h5>
+            </div>
+            <div class="card-body" id="health-details">
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Analysis -->
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Log Analysis (Last Hour)</h5>
+            </div>
+            <div class="card-body" id="log-analysis">
+                <div class="loading">
+                    <div class="spinner-border text-danger" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Test Results</h5>
+            </div>
+            <div class="card-body" id="test-results">
+                <div class="loading">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-body">
+                <h5><i class="bi bi-tools me-2"></i>Actions</h5>
+                <button class="btn btn-primary me-2" onclick="runFullDiagnostic()">
+                    <i class="bi bi-search me-1"></i>Run Full Diagnostic
+                </button>
+                <button class="btn btn-success me-2" onclick="runTests()">
+                    <i class="bi bi-play-circle me-1"></i>Run Tests
+                </button>
+                <a href="/" class="btn btn-secondary">
+                    <i class="bi bi-house me-1"></i>Back to App
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-refresh indicator -->
+    <div class="auto-refresh-indicator">
+        <span class="badge bg-info">
+            <i class="bi bi-arrow-clockwise"></i> Auto-refresh: <span id="refresh-countdown">30</span>s
+        </span>
+    </div>
+
+    <!-- Floating Refresh Button -->
+    <button class="btn btn-primary btn-lg refresh-btn" onclick="loadMonitoringData()">
+        <i class="bi bi-arrow-clockwise"></i>
+    </button>
+
+    <script>
+        let refreshInterval;
+        let countdownInterval;
+        let countdownSeconds = 30;
+
+        async function loadMonitoringData() {
+            try {
+                const response = await fetch('/api/monitoring/status');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    updateDashboard(data);
+                }
+
+                // Load detailed data
+                loadHealthDetails();
+                loadLogAnalysis();
+                loadTestResults();
+
+                document.getElementById('last-update').textContent = new Date().toLocaleString('ru-RU');
+            } catch (error) {
+                console.error('Failed to load monitoring data:', error);
+            }
+        }
+
+        function updateDashboard(data) {
+            // Update status badge
+            const statusBadge = document.getElementById('status-badge');
+            const status = data.health.status;
+            statusBadge.textContent = status.toUpperCase();
+            statusBadge.className = `badge status-${status}`;
+
+            // Update quick stats
+            document.getElementById('health-status').textContent = status;
+            document.getElementById('error-count').textContent = data.logs.error_count;
+            document.getElementById('test-passed').textContent = data.tests.passed;
+            document.getElementById('test-failed').textContent = data.tests.failed;
+        }
+
+        async function loadHealthDetails() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+
+                let html = '<div class="row">';
+
+                for (const [checkName, checkData] of Object.entries(data.checks || {})) {
+                    const icon = checkData.healthy ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+                    html += `
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-${icon} me-2" style="font-size: 1.5rem;"></i>
+                                <div>
+                                    <strong>${checkName}</strong><br>
+                                    <small class="text-muted">${checkData.message || 'OK'}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+
+                if (data.errors && data.errors.length > 0) {
+                    html += '<hr><h6 class="text-danger">Errors:</h6>';
+                    data.errors.forEach(error => {
+                        html += `<div class="error-item">${error}</div>`;
+                    });
+                }
+
+                document.getElementById('health-details').innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load health details:', error);
+            }
+        }
+
+        async function loadLogAnalysis() {
+            try {
+                const response = await fetch('/api/monitoring/logs?hours=1');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const analysis = data.analysis;
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <strong>Errors:</strong> ${analysis.error_count}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Warnings:</strong> ${analysis.warning_count}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Critical Issues:</strong> ${analysis.critical_issues?.length || 0}
+                            </div>
+                        </div>
+                    `;
+
+                    if (analysis.critical_issues && analysis.critical_issues.length > 0) {
+                        html += '<h6 class="text-danger">Critical Issues:</h6>';
+                        analysis.critical_issues.forEach(issue => {
+                            html += `
+                                <div class="alert alert-danger">
+                                    <strong>${issue.type}</strong> (${issue.count} occurrences)<br>
+                                    ${issue.message}<br>
+                                    <small><em>Recommendation: ${issue.recommendation}</em></small>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    if (analysis.error_types && Object.keys(analysis.error_types).length > 0) {
+                        html += '<h6 class="mt-3">Error Types:</h6><ul>';
+                        for (const [type, count] of Object.entries(analysis.error_types)) {
+                            html += `<li>${type}: <strong>${count}</strong></li>`;
+                        }
+                        html += '</ul>';
+                    }
+
+                    document.getElementById('log-analysis').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Failed to load log analysis:', error);
+            }
+        }
+
+        async function loadTestResults() {
+            try {
+                const response = await fetch('/api/monitoring/test-results');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const results = data.results;
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <strong>Status:</strong>
+                                <span class="badge bg-${results.status === 'passed' ? 'success' : 'danger'}">
+                                    ${results.status}
+                                </span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Total:</strong> ${results.tests_run || 0}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Passed:</strong> <span class="text-success">${results.tests_passed || 0}</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Failed:</strong> <span class="text-danger">${results.tests_failed || 0}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    if (results.failures && results.failures.length > 0) {
+                        html += '<h6 class="text-danger">Failed Tests:</h6>';
+                        results.failures.forEach(failure => {
+                            html += `
+                                <div class="error-item">
+                                    <strong>${failure.test}</strong><br>
+                                    <small class="text-muted">${failure.message}</small>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    document.getElementById('test-results').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Failed to load test results:', error);
+            }
+        }
+
+        async function runFullDiagnostic() {
+            if (!confirm('Run full diagnostic? This may take a few minutes.')) return;
+
+            try {
+                const response = await fetch('/api/monitoring/diagnostic', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert('Diagnostic completed! Check the logs for details.');
+                    loadMonitoringData();
+                } else {
+                    alert('Diagnostic failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Failed to run diagnostic: ' + error);
+            }
+        }
+
+        async function runTests() {
+            if (!confirm('Run all tests? This may take several minutes.')) return;
+
+            try {
+                const response = await fetch('/api/monitoring/test-run', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert('Tests completed!');
+                    loadMonitoringData();
+                } else {
+                    alert('Tests failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Failed to run tests: ' + error);
+            }
+        }
+
+        function startAutoRefresh() {
+            // Refresh every 30 seconds
+            refreshInterval = setInterval(() => {
+                loadMonitoringData();
+                countdownSeconds = 30;
+            }, 30000);
+
+            // Countdown
+            countdownInterval = setInterval(() => {
+                countdownSeconds--;
+                document.getElementById('refresh-countdown').textContent = countdownSeconds;
+                if (countdownSeconds <= 0) {
+                    countdownSeconds = 30;
+                }
+            }, 1000);
+        }
+
+        // Initial load
+        loadMonitoringData();
+        startAutoRefresh();
+    </script>
+</body>
+</html>

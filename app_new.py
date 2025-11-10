@@ -41,6 +41,9 @@ from src.models.property import (
 from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
 
+# Monitoring and diagnostics
+from src.monitoring import health_service, test_runner, log_analyzer, error_detector, monitoring_scheduler
+
 app = Flask(__name__)
 
 # SECURITY: Secret key from environment (CRITICAL FIX)
@@ -129,6 +132,10 @@ limiter = Limiter(
 )
 
 logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
+
+# Start automated monitoring scheduler
+monitoring_scheduler.start()
+logger.info("Automated monitoring scheduler started")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -851,30 +858,89 @@ def find_similar():
 
         logger.info(f"🔍 DEBUG: {len(similar)} comparables found, {len(urls_to_parse)} need detailed parsing")
 
+        # IMPROVED: Better error handling and timeout for parallel parsing
         if urls_to_parse:
-            try:
-                from src.parsers.async_parser import parse_multiple_urls_parallel
-                logger.info(f"🚀 Parallel parsing {len(urls_to_parse)} URLs...")
+            import signal
+            from contextlib import contextmanager
 
-                detailed_results = parse_multiple_urls_parallel(
-                    urls=urls_to_parse,
-                    headless=True,
-                    cache=property_cache,
-                    region=region,
-                    max_concurrent=2  # Reduced to avoid CIAN rate limiting
-                )
+            @contextmanager
+            def timeout_context(seconds):
+                """Context manager для таймаута операции"""
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"Operation timed out after {seconds} seconds")
 
-                # Обновляем данные аналогов детальной информацией
-                url_to_details = {d['url']: d for d in detailed_results}
-                for comparable in similar:
-                    url = comparable.get('url')
-                    if url in url_to_details:
-                        comparable.update(url_to_details[url])
+                # Устанавливаем обработчик
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(seconds)
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
 
-                logger.info(f"✓ Enhanced {len(detailed_results)} comparables with detailed data")
+            # Пробуем параллельный парсинг с таймаутом и retry
+            max_retries = 2
+            retry_count = 0
+            parsing_success = False
 
-            except Exception as e:
-                logger.warning(f"Parallel parsing failed, using basic data: {e}")
+            while retry_count < max_retries and not parsing_success:
+                try:
+                    from src.parsers.async_parser import parse_multiple_urls_parallel
+                    logger.info(f"🚀 Parallel parsing {len(urls_to_parse)} URLs (attempt {retry_count + 1}/{max_retries})...")
+
+                    # Таймаут 60 секунд на весь процесс парсинга
+                    with timeout_context(60):
+                        detailed_results = parse_multiple_urls_parallel(
+                            urls=urls_to_parse,
+                            headless=True,
+                            cache=property_cache,
+                            region=region,
+                            max_concurrent=2  # Reduced to avoid CIAN rate limiting
+                        )
+
+                        # Обновляем данные аналогов детальной информацией
+                        if detailed_results:
+                            url_to_details = {d['url']: d for d in detailed_results if d and d.get('url')}
+                            enhanced_count = 0
+
+                            for comparable in similar:
+                                url = comparable.get('url')
+                                if url and url in url_to_details:
+                                    comparable.update(url_to_details[url])
+                                    enhanced_count += 1
+
+                            logger.info(f"✓ Enhanced {enhanced_count} comparables with detailed data")
+                            parsing_success = True
+                        else:
+                            logger.warning("Parallel parsing returned empty results")
+
+                except TimeoutError as te:
+                    retry_count += 1
+                    logger.warning(f"Parallel parsing timeout (attempt {retry_count}): {te}")
+                    if retry_count < max_retries:
+                        import time
+                        time.sleep(2)  # Wait before retry
+
+                except ImportError as ie:
+                    logger.warning(f"Async parser not available: {ie}")
+                    break  # Don't retry on import errors
+
+                except Exception as e:
+                    retry_count += 1
+                    logger.warning(f"Parallel parsing failed (attempt {retry_count}): {e}", exc_info=True)
+                    if retry_count < max_retries:
+                        import time
+                        time.sleep(2)  # Wait before retry
+
+            # Если парсинг не удался, проверяем что у нас есть хотя бы базовые данные
+            if not parsing_success:
+                logger.warning("⚠️ Parallel parsing failed after retries, using basic data from search results")
+                # Фильтруем аналоги с минимально необходимыми данными
+                similar = [
+                    c for c in similar
+                    if c.get('price') or c.get('total_area')  # Хотя бы одно поле должно быть
+                ]
+                logger.info(f"Using {len(similar)} comparables with available data")
 
         # Сохраняем в сессию
         session_data['comparables'] = similar
@@ -1080,29 +1146,78 @@ def analyze():
 
         logger.info(f"Анализ для сессии {session_id}")
 
+        # IMPROVED: Better validation and error handling for missing data
+        # Проверяем наличие необходимых данных
+        if not session_data.get('target_property'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Целевой объект не найден. Пожалуйста, вернитесь к шагу 1.'
+            }), 400
+
+        if not session_data.get('comparables') or len(session_data['comparables']) == 0:
+            return jsonify({
+                'status': 'error',
+                'message': 'Аналоги не найдены. Пожалуйста, вернитесь к шагу 2 и найдите похожие объекты.'
+            }), 400
+
         # Валидация и создание моделей
         try:
             # Импортируем утилиты нормализации
             from src.models.property import normalize_property_data, validate_property_consistency
 
             # Нормализуем целевой объект
-            normalized_target = normalize_property_data(session_data['target_property'])
+            target_data = session_data['target_property']
+            logger.info(f"Target property data before normalization: price={target_data.get('price')}, area={target_data.get('total_area')}")
+
+            normalized_target = normalize_property_data(target_data)
             target_property = TargetProperty(**normalized_target)
 
             # Проверяем консистентность
             warnings = validate_property_consistency(target_property)
             if warnings:
-                logger.warning(f"Предупреждения валидации: {warnings}")
+                logger.warning(f"Предупреждения валидации целевого объекта: {warnings}")
 
-            # Нормализуем аналоги
-            comparables = [
-                ComparableProperty(**normalize_property_data(c))
-                for c in session_data['comparables']
-            ]
+            # Нормализуем и валидируем аналоги
+            comparables_data = session_data['comparables']
+            logger.info(f"Processing {len(comparables_data)} comparables")
+
+            valid_comparables = []
+            invalid_count = 0
+
+            for idx, comp in enumerate(comparables_data):
+                try:
+                    # Проверяем наличие критических полей
+                    if not comp.get('price') and not comp.get('price_raw'):
+                        logger.warning(f"Comparable {idx} missing price, skipping")
+                        invalid_count += 1
+                        continue
+
+                    if not comp.get('total_area') and not comp.get('area'):
+                        logger.warning(f"Comparable {idx} missing area, skipping")
+                        invalid_count += 1
+                        continue
+
+                    normalized_comp = normalize_property_data(comp)
+                    comparable_property = ComparableProperty(**normalized_comp)
+                    valid_comparables.append(comparable_property)
+
+                except Exception as e:
+                    logger.warning(f"Failed to normalize comparable {idx}: {e}")
+                    invalid_count += 1
+                    continue
+
+            logger.info(f"✓ Validated {len(valid_comparables)} comparables ({invalid_count} invalid)")
+
+            # Проверяем что осталось достаточно аналогов
+            if len(valid_comparables) < 3:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Недостаточно валидных аналогов для анализа ({len(valid_comparables)}/3 минимум). Пожалуйста, вернитесь к шагу 2 и добавьте больше объектов.'
+                }), 422
 
             request_model = AnalysisRequest(
                 target_property=target_property,
-                comparables=comparables,
+                comparables=valid_comparables,
                 filter_outliers=filter_outliers,
                 use_median=use_median
             )
@@ -1111,7 +1226,7 @@ def analyze():
             logger.error(f"Ошибка валидации: {e}", exc_info=True)
             return jsonify({
                 'status': 'error',
-                'message': f'Ошибка валидации данных: {e}'
+                'message': f'Ошибка валидации данных: {str(e)}. Пожалуйста, проверьте данные на шагах 1 и 2.'
             }), 400
 
         # Анализ
@@ -1484,6 +1599,222 @@ def _identify_missing_fields(parsed_data: Dict) -> List[Dict]:
         missing.append(field_info)
 
     return missing
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MONITORING & DIAGNOSTICS API
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """
+    Health Check Endpoint
+    Проверяет здоровье всех компонентов системы
+    """
+    try:
+        health_check = health_service.check_all()
+        status_code = 200 if health_check['status'] == 'healthy' else 503
+
+        return jsonify(health_check), status_code
+
+    except Exception as e:
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Health check failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/health/summary', methods=['GET'])
+def api_health_summary():
+    """
+    Health Summary - сводка по здоровью системы за период
+    Query params:
+        hours (int): период в часах (default: 1)
+    """
+    try:
+        hours = int(request.args.get('hours', 1))
+        summary = health_service.get_health_summary(hours=hours)
+
+        return jsonify({
+            'status': 'success',
+            'summary': summary
+        })
+
+    except Exception as e:
+        logger.error(f"Health summary failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Health summary failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/test-run', methods=['POST'])
+@limiter.limit("1 per 5 minutes")  # Ограничиваем запуск тестов
+def api_test_run():
+    """
+    Запускает все тесты и возвращает результаты
+    WARNING: Это операция может занять несколько минут
+    """
+    try:
+        logger.info("Manual test run triggered via API")
+        results = test_runner.run_all_tests()
+
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+
+    except Exception as e:
+        logger.error(f"Test run failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Test run failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/test-results', methods=['GET'])
+def api_test_results():
+    """
+    Возвращает результаты последнего запуска тестов
+    """
+    try:
+        results = test_runner.get_latest_results()
+
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get test results: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to get test results: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/test-summary', methods=['GET'])
+def api_test_summary():
+    """
+    Сводка по последним N запускам тестов
+    Query params:
+        count (int): количество последних запусков (default: 10)
+    """
+    try:
+        count = int(request.args.get('count', 10))
+        summary = test_runner.get_test_summary(count=count)
+
+        return jsonify({
+            'status': 'success',
+            'summary': summary
+        })
+
+    except Exception as e:
+        logger.error(f"Test summary failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Test summary failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/logs', methods=['GET'])
+def api_logs_analysis():
+    """
+    Анализ логов за период
+    Query params:
+        hours (int): период в часах (default: 1)
+    """
+    try:
+        hours = int(request.args.get('hours', 1))
+        analysis = log_analyzer.analyze_recent_logs(hours=hours)
+
+        return jsonify({
+            'status': 'success',
+            'analysis': analysis
+        })
+
+    except Exception as e:
+        logger.error(f"Log analysis failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Log analysis failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/diagnostic', methods=['POST'])
+@limiter.limit("2 per 10 minutes")  # Ограничиваем полную диагностику
+def api_full_diagnostic():
+    """
+    Полная диагностика системы
+    Запускает все проверки и возвращает подробный отчёт
+    """
+    try:
+        logger.info("Full diagnostic triggered via API")
+        diagnostic = error_detector.run_full_diagnostic()
+
+        # Создаём текстовый отчёт
+        report_text = error_detector.create_issue_report(diagnostic)
+
+        return jsonify({
+            'status': 'success',
+            'diagnostic': diagnostic,
+            'report_text': report_text
+        })
+
+    except Exception as e:
+        logger.error(f"Full diagnostic failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Full diagnostic failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/monitoring/status', methods=['GET'])
+def api_monitoring_status():
+    """
+    Быстрая сводка состояния системы
+    Возвращает краткую информацию без полной диагностики
+    """
+    try:
+        # Получаем последние результаты без запуска новых проверок
+        latest_health = health_service.checks_history[-1] if health_service.checks_history else None
+        latest_tests = test_runner.get_latest_results()
+        log_summary = log_analyzer.analyze_recent_logs(hours=1)
+
+        return jsonify({
+            'status': 'success',
+            'timestamp': datetime.now().isoformat(),
+            'health': {
+                'status': latest_health['status'] if latest_health else 'unknown',
+                'last_check': latest_health['timestamp'] if latest_health else None
+            },
+            'tests': {
+                'status': latest_tests.get('status', 'unknown'),
+                'passed': latest_tests.get('tests_passed', 0),
+                'failed': latest_tests.get('tests_failed', 0),
+                'last_run': latest_tests.get('timestamp')
+            },
+            'logs': {
+                'error_count': log_summary.get('error_count', 0),
+                'critical_issues': len(log_summary.get('critical_issues', []))
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Monitoring status failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Monitoring status failed: {str(e)}'
+        }), 500
+
+
+@app.route('/monitoring')
+def monitoring_dashboard():
+    """
+    Monitoring Dashboard - веб-интерфейс для мониторинга системы
+    """
+    return render_template('monitoring.html')
 
 
 # CLEANUP: Shutdown handler для browser pool
