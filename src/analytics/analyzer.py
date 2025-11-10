@@ -829,13 +829,30 @@ class RealEstateAnalyzer:
                 scenario.monthly_probability
             )
 
-            # Финансовый расчет
+            # Финансовый расчет с вероятностью
             scenario.financials = self._calculate_financials(
                 scenario.expected_final_price,
-                scenario.time_months
+                scenario.time_months,
+                base_probability=scenario.base_probability
             )
 
             scenarios.append(scenario)
+
+        # НОВОЕ: Автоматический выбор оптимального сценария по максимальному ожидаемому доходу
+        best_scenario = max(scenarios, key=lambda s: s.financials.get('expected_value', 0))
+        best_scenario_index = scenarios.index(best_scenario)
+
+        # Добавляем флаг "рекомендуется" к лучшему сценарию
+        for i, scenario in enumerate(scenarios):
+            scenario.is_recommended = (i == best_scenario_index)
+            # Обновляем описание для рекомендуемого сценария
+            if scenario.is_recommended:
+                scenario.description = f"⭐ РЕКОМЕНДУЕТСЯ: {scenario.description}"
+                scenario.recommendation_reason = (
+                    f"Этот сценарий даёт максимальный ожидаемый доход "
+                    f"{scenario.financials.get('expected_value', 0):,.0f} ₽ с учётом вероятности продажи. "
+                    f"Математически это лучший выбор."
+                )
 
         # Логирование сценариев
         if self.enable_tracking and self.property_log:
@@ -909,6 +926,7 @@ class RealEstateAnalyzer:
         self,
         sale_price: float,
         months_waited: int,
+        base_probability: float = 0.0,  # НОВОЕ: вероятность продажи для расчета expected value
         commission_rate: float = 0.02,
         tax_rate: float = 0.00,  # ИСПРАВЛЕНО: По умолчанию 0% (предполагаем владение > 5 лет)
         other_expenses: float = 0.001,  # ИСПРАВЛЕНО: 0.1% вместо 1% (реалистичные расходы ~150 тыс)
@@ -920,6 +938,7 @@ class RealEstateAnalyzer:
         ИСПРАВЛЕНИЯ:
         - tax_rate = 0% (предполагаем владение > 5 лет или единственное жилье)
         - other_expenses = 0.1% (~150 тыс: юрист, регистрация, оценка)
+        - НОВОЕ: Добавлен расчет ожидаемого дохода (expected_value)
 
         Если нужно учесть налог:
         - Только если владели < 5 лет
@@ -935,6 +954,10 @@ class RealEstateAnalyzer:
 
         effective_yield = (net_after_opportunity / sale_price * 100) if sale_price > 0 else 0
 
+        # НОВОЕ: Расчет ожидаемого дохода (expected value)
+        # Учитывает вероятность продажи: expected_value = net_after_opportunity × probability
+        expected_value = net_after_opportunity * (base_probability / 100.0) if base_probability > 0 else 0
+
         return {
             'gross_price': sale_price,
             'commission': commission,
@@ -946,8 +969,26 @@ class RealEstateAnalyzer:
             'other_expenses_note': 'Юрист, регистрация, оценка (~150 тыс ₽)',
             'opportunity_cost': opportunity_cost,
             'opportunity_note': f'Упущенная выгода {opportunity_rate*100:.0f}% годовых за {months_waited} мес',
+            'opportunity_explanation': (
+                f'Упущенная выгода — это деньги, которые вы могли бы заработать, '
+                f'инвестируя {sale_price:,.0f} ₽ под {opportunity_rate*100:.0f}% годовых '
+                f'в течение {months_waited} месяцев вместо ожидания продажи. '
+                f'Например, в облигации, депозит или недвижимость.'
+            ),
             'net_income': net_income,
+            'net_income_note': 'Чистый доход после всех расходов (комиссия, налоги, прочее)',
             'net_after_opportunity': net_after_opportunity,
+            'net_after_opportunity_note': (
+                'Чистый доход с учетом упущенной выгоды — реальная выгода от продажи. '
+                'Это та сумма, которую вы получите "на руки" после вычета всех расходов '
+                'и альтернативной стоимости ожидания.'
+            ),
+            'expected_value': expected_value,
+            'expected_value_note': (
+                f'Ожидаемый доход = {net_after_opportunity:,.0f} ₽ × {base_probability}% вероятность = '
+                f'{expected_value:,.0f} ₽. Это математическое ожидание — реальная выгода '
+                f'с учетом риска не продать.'
+            ),
             'effective_yield': effective_yield,
             'months_waited': months_waited
         }

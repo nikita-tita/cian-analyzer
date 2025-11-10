@@ -378,55 +378,73 @@ class RecommendationEngine:
         if not self.scenarios:
             return recs
 
-        # Найти оптимальный сценарий (максимальная чистая прибыль)
+        # ИСПРАВЛЕНО: Найти оптимальный сценарий по ОЖИДАЕМОМУ доходу (expected_value)
+        # а не просто по чистой прибыли, так как нужно учитывать вероятность продажи
         best_scenario = max(
             self.scenarios,
-            key=lambda s: s.get('financials', {}).get('net_after_opportunity', 0)
+            key=lambda s: s.get('financials', {}).get('expected_value', 0)
         )
 
         best_name = best_scenario.get('name', '')
         best_months = best_scenario.get('time_months', 0)
         best_profit = best_scenario.get('financials', {}).get('net_after_opportunity', 0)
+        best_expected_value = best_scenario.get('financials', {}).get('expected_value', 0)
         best_prob = best_scenario.get('base_probability', 0)
 
         recs.append(Recommendation(
             priority=self.INFO,
             icon='📊',
             title='Оптимальная стратегия продажи',
-            message=f'Сценарий "{best_name}" дает максимальную чистую прибыль с учетом всех факторов.',
+            message=(
+                f'Сценарий "{best_name}" дает максимальный ОЖИДАЕМЫЙ доход '
+                f'{best_expected_value:,.0f} ₽ с учетом вероятности продажи.'
+            ),
             action=f'Следовать стратегии "{best_name}"',
-            expected_result=f'Продажа за {best_months} мес. с вероятностью {best_prob}%. Чистая прибыль: {best_profit:,.0f} ₽',
+            expected_result=(
+                f'Продажа за {best_months} мес. с вероятностью {best_prob}%. '
+                f'Чистая прибыль: {best_profit:,.0f} ₽. '
+                f'Ожидаемый доход: {best_expected_value:,.0f} ₽.'
+            ),
             category='strategy',
             financial_impact={
                 'scenario': best_name,
                 'expected_time_months': best_months,
                 'probability_percent': best_prob,
-                'net_profit': best_profit
+                'net_profit': best_profit,
+                'expected_value': best_expected_value
             }
         ))
 
-        # Сравнение быстрой vs максимальной цены
+        # ИСПРАВЛЕНО: Сравнение быстрой vs максимальной цены по ОЖИДАЕМОМУ доходу
         fast_scenario = next((s for s in self.scenarios if s.get('type') == 'fast'), None)
         max_scenario = next((s for s in self.scenarios if s.get('type') == 'maximum'), None)
 
         if fast_scenario and max_scenario:
-            fast_profit = fast_scenario.get('financials', {}).get('net_after_opportunity', 0)
-            max_profit = max_scenario.get('financials', {}).get('net_after_opportunity', 0)
+            fast_expected = fast_scenario.get('financials', {}).get('expected_value', 0)
+            max_expected = max_scenario.get('financials', {}).get('expected_value', 0)
 
-            if fast_profit > max_profit:
-                diff = fast_profit - max_profit
+            if fast_expected > max_expected:
+                diff = fast_expected - max_expected
                 recs.append(Recommendation(
                     priority=self.INFO,
                     icon='⚡',
                     title='Быстрая продажа выгоднее',
-                    message=f'Попытка "выжать максимум" обойдется дороже на {diff:,.0f} ₽ из-за упущенной выгоды.',
+                    message=(
+                        f'Попытка "выжать максимум" обойдется дороже на {diff:,.0f} ₽ '
+                        f'при учете вероятности продажи и упущенной выгоды.'
+                    ),
                     action='Не затягивать с продажей',
                     expected_result='Экономия времени и денег',
                     category='strategy',
                     financial_impact={
-                        'fast_scenario_profit': fast_profit,
-                        'max_scenario_profit': max_profit,
-                        'difference': diff
+                        'fast_scenario_expected': fast_expected,
+                        'max_scenario_expected': max_expected,
+                        'difference': diff,
+                        'explanation': (
+                            'Ожидаемый доход учитывает как размер прибыли, '
+                            'так и вероятность продажи. Быстрая продажа с высокой '
+                            'вероятностью часто выгоднее долгого ожидания.'
+                        )
                     }
                 ))
 
