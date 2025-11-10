@@ -105,23 +105,41 @@ python app_new.py
 
 ## 🚀 Автоматический деплой из Claude Code
 
-Теперь можно деплоить приложение одной командой прямо из Claude Code!
+### Локальный деплой
+
+Деплой на вашем компьютере одной командой:
 
 ```bash
-/deploy
+/deploy  # В Claude Code
 ```
 
 **Или:**
 ```bash
 bash scripts/auto-deploy.sh 1  # Development
-bash scripts/auto-deploy.sh 2  # Production
+bash scripts/auto-deploy.sh 2  # Production локально
 bash scripts/auto-deploy.sh 3  # Full Stack с мониторингом
 ```
 
-**Полная документация:** [CLAUDE_CODE_DEPLOY.md](CLAUDE_CODE_DEPLOY.md) | [Краткий гайд](QUICK_DEPLOY_GUIDE.md)
+### Production деплой на housler.ru
+
+Полная автоматизация для production сервера:
+
+```bash
+# 1. Настройка сервера (один раз)
+scp scripts/setup-production-server.sh root@SERVER_IP:/tmp/
+ssh root@SERVER_IP "./tmp/setup-production-server.sh"
+
+# 2. После настройки - автодеплой при push
+git push origin main  # GitHub Actions автоматически задеплоит!
+```
+
+**📖 Документация:**
+- [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) - 🌐 Полный гайд по production деплою
+- [CLAUDE_CODE_DEPLOY.md](CLAUDE_CODE_DEPLOY.md) - 🚀 Локальный деплой из Claude Code
+- [QUICK_DEPLOY_GUIDE.md](QUICK_DEPLOY_GUIDE.md) - ⚡ Краткий справочник
 
 **Доступные команды:**
-- `/deploy` - Деплой приложения
+- `/deploy` - Деплой приложения локально
 - `/status` - Проверка статуса
 - `/logs` - Просмотр логов
 - `/stop` - Остановка сервисов
@@ -132,11 +150,12 @@ bash scripts/auto-deploy.sh 3  # Full Stack с мониторингом
 
 | Документ | Описание |
 |----------|----------|
+| [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) | 🌐 **Production деплой на housler.ru** |
 | [CLAUDE_CODE_DEPLOY.md](CLAUDE_CODE_DEPLOY.md) | 🚀 Автоматический деплой из Claude Code |
-| [QUICK_DEPLOY_GUIDE.md](QUICK_DEPLOY_GUIDE.md) | 📖 Быстрый гайд по деплою |
-| [API_DOCS.md](API_DOCS.md) | Полная API документация с примерами |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Гайд по развертыванию в production |
-| [CHANGELOG.md](#changelog) | История изменений |
+| [QUICK_DEPLOY_GUIDE.md](QUICK_DEPLOY_GUIDE.md) | ⚡ Быстрый справочник по деплою |
+| [API_DOCS.md](API_DOCS.md) | 📖 Полная API документация с примерами |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | 🐳 Docker и локальное развертывание |
+| [CHANGELOG.md](#changelog) | 📝 История изменений |
 
 ---
 
