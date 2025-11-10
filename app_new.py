@@ -1610,6 +1610,9 @@ def api_health():
     """
     Health Check Endpoint
     Проверяет здоровье всех компонентов системы
+
+    ВАЖНО: НЕ делает запросов в CIAN, только проверяет локальные компоненты.
+    Безопасно запускать часто.
     """
     try:
         health_check = health_service.check_all()
@@ -1622,6 +1625,35 @@ def api_health():
         return jsonify({
             'status': 'error',
             'message': f'Health check failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/health/cian', methods=['GET'])
+@limiter.limit("1 per hour")  # МАКСИМУМ раз в час!
+def api_health_cian():
+    """
+    Check CIAN Availability (ОСТОРОЖНО!)
+
+    Делает РЕАЛЬНЫЙ запрос к CIAN для проверки доступности.
+    Rate limit: 1 запрос в час чтобы не попасть в блокировку.
+
+    Query params:
+        force (bool): игнорировать кэш (default: false)
+    """
+    try:
+        force = request.args.get('force', 'false').lower() == 'true'
+        cian_check = health_service._check_cian_availability(force=force)
+
+        return jsonify({
+            'status': 'success',
+            'cian': cian_check
+        })
+
+    except Exception as e:
+        logger.error(f"CIAN check failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'CIAN check failed: {str(e)}'
         }), 500
 
 

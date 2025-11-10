@@ -20,6 +20,7 @@ class HealthCheckService:
         self.base_url = base_url
         self.checks_history = []
         self.max_history = 100  # Храним последние 100 проверок
+        self.last_cian_check = None  # Кэш для проверки CIAN
 
     def check_all(self) -> Dict[str, Any]:
         """Выполняет все проверки здоровья системы"""
@@ -158,11 +159,18 @@ class HealthCheckService:
             }
 
     def _check_parser(self) -> Dict[str, Any]:
-        """Проверяет работу парсера CIAN"""
+        """
+        Проверяет работу парсера CIAN
+
+        ВАЖНО: Это только проверка инициализации парсера.
+        НЕ делает реальных запросов в CIAN - только создаёт браузер и закрывает его.
+        Это безопасно и не приведёт к блокировке.
+        """
         try:
             from src.parsers.parser import Parser
 
             # Быстрая проверка - просто создаём парсер
+            # НЕ делает запросов в CIAN, только проверяет что браузер может инициализироваться
             start_time = time.time()
             parser = Parser(headless=True, delay=0.5)
             parser.close()
@@ -170,7 +178,7 @@ class HealthCheckService:
 
             return {
                 'healthy': True,
-                'message': 'OK',
+                'message': 'OK (no requests made)',
                 'init_time_ms': duration
             }
         except Exception as e:
@@ -178,6 +186,65 @@ class HealthCheckService:
                 'healthy': False,
                 'message': f'Parser initialization failed: {str(e)}'
             }
+
+    def _check_cian_availability(self, force: bool = False) -> Dict[str, Any]:
+        """
+        Проверяет реальную доступность CIAN (ОПЦИОНАЛЬНО)
+
+        ВАЖНО: Используйте эту проверку РЕДКО (раз в час), чтобы не перегружать CIAN.
+        По умолчанию кэшируется на 1 час.
+
+        Args:
+            force: Принудительная проверка, игнорируя кэш
+
+        Returns:
+            Dict с результатами проверки
+        """
+        import requests
+        from datetime import datetime, timedelta
+
+        # Проверяем кэш (1 час)
+        if not force and self.last_cian_check:
+            age = (datetime.now() - self.last_cian_check['timestamp']).total_seconds()
+            if age < 3600:  # 1 час
+                return {
+                    'healthy': self.last_cian_check['healthy'],
+                    'message': f"Cached ({int(age/60)} min ago): {self.last_cian_check['message']}",
+                    'cached': True
+                }
+
+        # Реальная проверка - делаем ЛЕГКИЙ запрос к главной странице CIAN
+        try:
+            response = requests.get(
+                'https://www.cian.ru/',
+                timeout=10,
+                headers={'User-Agent': 'Mozilla/5.0 (health check)'}
+            )
+
+            is_ok = response.status_code == 200
+
+            result = {
+                'healthy': is_ok,
+                'message': 'CIAN is available' if is_ok else f'CIAN returned {response.status_code}',
+                'status_code': response.status_code,
+                'cached': False,
+                'timestamp': datetime.now()
+            }
+
+            # Сохраняем в кэш
+            self.last_cian_check = result
+
+            return result
+
+        except Exception as e:
+            result = {
+                'healthy': False,
+                'message': f'CIAN check failed: {str(e)}',
+                'cached': False,
+                'timestamp': datetime.now()
+            }
+            self.last_cian_check = result
+            return result
 
     def _check_api_endpoints(self) -> Dict[str, Any]:
         """Проверяет доступность критических API endpoints"""

@@ -61,7 +61,7 @@ class MonitoringScheduler:
             try:
                 current_time = datetime.now()
 
-                # Health check каждые 5 минут
+                # Health check каждые 5 минут (БЕЗ реальных запросов в CIAN)
                 if self._should_run(self.last_health_check, minutes=5):
                     self._run_health_check()
                     self.last_health_check = current_time
