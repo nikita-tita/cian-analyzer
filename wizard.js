@@ -649,6 +649,7 @@ const screen3 = {
     },
 
     displayAnalysis(analysis) {
+        console.log('📊 Отображение анализа:', analysis);
         document.getElementById('analysis-results').style.display = 'block';
 
         // Сводная информация
@@ -657,11 +658,29 @@ const screen3 = {
         // Справедливая цена
         this.renderFairPrice(analysis.fair_price_analysis);
 
+        // Новые метрики (если есть)
+        if (analysis.price_range) {
+            this.renderPriceRange(analysis.price_range);
+        }
+
+        if (analysis.attractiveness_index) {
+            this.renderAttractiveness(analysis.attractiveness_index);
+        }
+
+        if (analysis.time_forecast) {
+            this.renderTimeForecast(analysis.time_forecast);
+        }
+
         // Сценарии
         this.renderScenarios(analysis.price_scenarios);
 
         // Сильные/слабые стороны
         this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+
+        // Рекомендации (если есть)
+        if (analysis.recommendations && analysis.recommendations.length > 0) {
+            this.renderRecommendations(analysis.recommendations);
+        }
 
         // График
         this.renderChart(analysis.comparison_chart_data);
@@ -841,6 +860,274 @@ const screen3 = {
                 }
             }
         });
+    },
+
+    renderPriceRange(priceRange) {
+        console.log('📊 Отображение диапазона цен:', priceRange);
+        const container = document.getElementById('price-range-container');
+        const details = document.getElementById('price-range-details');
+
+        if (!priceRange || Object.keys(priceRange).length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const interpretation = priceRange.interpretation || {};
+
+        details.innerHTML = `
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="metric-item">
+                        <div class="metric-label">Минимальная цена</div>
+                        <div class="metric-value">${utils.formatPrice(priceRange.min_price || 0)}</div>
+                        <small class="text-muted">${priceRange.min_price_description || ''}</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="metric-item">
+                        <div class="metric-label">Максимальная цена</div>
+                        <div class="metric-value">${utils.formatPrice(priceRange.max_price || 0)}</div>
+                        <small class="text-muted">${priceRange.max_price_description || ''}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="metric-item">
+                        <div class="metric-label">Рекомендуемая цена листинга</div>
+                        <div class="metric-value text-primary">${utils.formatPrice(priceRange.recommended_listing || 0)}</div>
+                        <small class="text-muted">${priceRange.recommended_listing_description || ''}</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="metric-item">
+                        <div class="metric-label">Минимальная цена продажи</div>
+                        <div class="metric-value">${utils.formatPrice(priceRange.min_acceptable_price || 0)}</div>
+                        <small class="text-muted">${priceRange.min_acceptable_description || ''}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info">
+                <strong><i class="bi bi-info-circle me-2"></i>Комната для торга:</strong>
+                ${utils.formatPrice(priceRange.negotiation_room || 0)}
+                (${utils.formatNumber(priceRange.negotiation_room_percent || 0, 1)}%)
+            </div>
+            ${interpretation.pricing_strategy ? `
+                <div class="mt-3">
+                    <h6>Стратегия ценообразования</h6>
+                    <p class="mb-2">${interpretation.pricing_strategy}</p>
+                </div>
+            ` : ''}
+            ${interpretation.expected_timeline ? `
+                <div class="mt-3">
+                    <h6>Ожидаемый срок</h6>
+                    <p class="mb-2">${interpretation.expected_timeline}</p>
+                </div>
+            ` : ''}
+            ${interpretation.negotiation_advice ? `
+                <div class="mt-3">
+                    <h6>Совет по торгу</h6>
+                    <p class="mb-2">${interpretation.negotiation_advice}</p>
+                </div>
+            ` : ''}
+            ${interpretation.risk_assessment ? `
+                <div class="mt-3">
+                    <h6>Оценка рисков</h6>
+                    <p class="mb-0">${interpretation.risk_assessment}</p>
+                </div>
+            ` : ''}
+        `;
+    },
+
+    renderAttractiveness(attractiveness) {
+        console.log('🎯 Отображение индекса привлекательности:', attractiveness);
+        const container = document.getElementById('attractiveness-container');
+        const details = document.getElementById('attractiveness-details');
+
+        if (!attractiveness || !attractiveness.total_index) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const components = attractiveness.components || {};
+        const priceComp = components.price || {};
+        const presentationComp = components.presentation || {};
+        const featuresComp = components.features || {};
+
+        details.innerHTML = `
+            <div class="text-center mb-4">
+                <div style="font-size: 3rem;">${attractiveness.category_emoji || '📊'}</div>
+                <h3 class="mb-2">${attractiveness.total_index}/100</h3>
+                <p class="lead">${attractiveness.category || ''}</p>
+                <p class="text-muted">${attractiveness.category_description || ''}</p>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="metric-item">
+                        <div class="metric-label">💰 Цена (${priceComp.weight || 0}%)</div>
+                        <div class="metric-value">${utils.formatNumber(priceComp.score || 0, 1)}/100</div>
+                        ${priceComp.details && priceComp.details.status ?
+                            `<small class="text-muted">${priceComp.details.emoji || ''} ${priceComp.details.status}</small>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-item">
+                        <div class="metric-label">📸 Презентация (${presentationComp.weight || 0}%)</div>
+                        <div class="metric-value">${utils.formatNumber(presentationComp.score || 0, 1)}/100</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-item">
+                        <div class="metric-label">✨ Характеристики (${featuresComp.weight || 0}%)</div>
+                        <div class="metric-value">${utils.formatNumber(featuresComp.score || 0, 1)}/100</div>
+                    </div>
+                </div>
+            </div>
+
+            ${this.renderAttractivenessComponent('Цена', priceComp)}
+            ${this.renderAttractivenessComponent('Презентация', presentationComp)}
+            ${this.renderAttractivenessComponent('Характеристики', featuresComp)}
+        `;
+    },
+
+    renderAttractivenessComponent(title, component) {
+        if (!component || !component.details) return '';
+
+        const recommendations = component.recommendations || [];
+
+        return `
+            <div class="mt-3">
+                <h6>${title}</h6>
+                <div class="mb-2">
+                    ${Object.entries(component.details).map(([key, value]) => `
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">${key}:</span>
+                            <span><strong>${value}</strong></span>
+                        </div>
+                    `).join('')}
+                </div>
+                ${recommendations.length > 0 ? `
+                    <div class="alert alert-warning py-2 px-3 mb-2">
+                        <small>
+                            ${recommendations.map(rec => `<div>• ${rec}</div>`).join('')}
+                        </small>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    },
+
+    renderTimeForecast(timeForecast) {
+        console.log('⏱️ Отображение прогноза времени продажи:', timeForecast);
+        const container = document.getElementById('time-forecast-container');
+        const details = document.getElementById('time-forecast-details');
+
+        if (!timeForecast || !timeForecast.expected_time_months) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const interpretation = timeForecast.interpretation || {};
+        const milestones = timeForecast.probability_milestones || {};
+
+        details.innerHTML = `
+            <div class="text-center mb-4">
+                <h3 class="mb-2">${timeForecast.expected_time_months} месяцев</h3>
+                <p class="text-muted">${timeForecast.time_range_description || ''}</p>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">Через 1 мес</div>
+                        <div class="metric-value">${utils.formatNumber(milestones['1_month'] * 100 || 0, 0)}%</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">Через 3 мес</div>
+                        <div class="metric-value">${utils.formatNumber(milestones['3_months'] * 100 || 0, 0)}%</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">Через 6 мес</div>
+                        <div class="metric-value">${utils.formatNumber(milestones['6_months'] * 100 || 0, 0)}%</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">Через 12 мес</div>
+                        <div class="metric-value">${utils.formatNumber(milestones['12_months'] * 100 || 0, 0)}%</div>
+                    </div>
+                </div>
+            </div>
+
+            ${interpretation.overall ? `
+                <div class="alert alert-info">
+                    <strong>${interpretation.overall}</strong>
+                </div>
+            ` : ''}
+
+            ${interpretation.price_factor ? `
+                <div class="mt-3">
+                    <h6>Влияние цены</h6>
+                    <p class="mb-2">${interpretation.price_factor}</p>
+                </div>
+            ` : ''}
+
+            ${interpretation.attractiveness_factor ? `
+                <div class="mt-3">
+                    <h6>Влияние привлекательности</h6>
+                    <p class="mb-2">${interpretation.attractiveness_factor}</p>
+                </div>
+            ` : ''}
+
+            ${interpretation.recommendations && interpretation.recommendations.length > 0 ? `
+                <div class="mt-3">
+                    <h6>Рекомендации для ускорения продажи</h6>
+                    <ul class="mb-0">
+                        ${interpretation.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+    },
+
+    renderRecommendations(recommendations) {
+        console.log('💡 Отображение рекомендаций:', recommendations);
+        const container = document.getElementById('recommendations-container');
+        const list = document.getElementById('recommendations-list');
+
+        if (!recommendations || recommendations.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        list.innerHTML = recommendations.map((rec, index) => `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <span class="badge bg-primary me-2">${index + 1}</span>
+                        ${rec.title || rec.type || 'Рекомендация'}
+                    </h6>
+                    <p class="card-text">${rec.description || rec.text || rec}</p>
+                    ${rec.priority ? `
+                        <span class="badge ${rec.priority === 'high' ? 'bg-danger' : rec.priority === 'medium' ? 'bg-warning' : 'bg-info'}">
+                            Приоритет: ${rec.priority === 'high' ? 'Высокий' : rec.priority === 'medium' ? 'Средний' : 'Низкий'}
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
     }
 };
 
