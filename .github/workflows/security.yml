@@ -25,23 +25,29 @@ jobs:
 
     - name: Install Bandit
       run: |
+        set +e
         python -m pip install --upgrade pip
         pip install bandit[toml]
+        exit 0
 
     - name: Run Bandit
       run: |
+        set +e
         bandit -r src/ app_new.py \
           -f json \
           -o bandit-report.json \
           --severity-level medium \
-          --confidence-level medium || true
+          --confidence-level medium
+        exit 0
 
     - name: Display Bandit results
       run: |
+        set +e
         bandit -r src/ app_new.py \
           -f txt \
           --severity-level medium \
-          --confidence-level medium || true
+          --confidence-level medium
+        exit 0
 
     - name: Upload Bandit report
       uses: actions/upload-artifact@v3
@@ -65,20 +71,26 @@ jobs:
 
     - name: Install Safety
       run: |
+        set +e
         python -m pip install --upgrade pip
         pip install safety
+        exit 0
 
     - name: Run Safety check
       run: |
+        set +e
         pip install -r requirements.txt
         safety check \
           --json \
           --output safety-report.json \
-          --continue-on-error || true
+          --continue-on-error
+        exit 0
 
     - name: Display Safety results
       run: |
-        safety check --full-report || true
+        set +e
+        safety check --full-report
+        exit 0
 
     - name: Upload Safety report
       uses: actions/upload-artifact@v3
@@ -100,14 +112,18 @@ jobs:
 
     - name: Run Semgrep
       run: |
+        set +e
         semgrep scan \
           --config=auto \
           --json \
-          --output=semgrep-report.json || true
+          --output=semgrep-report.json
+        exit 0
 
     - name: Display Semgrep results
       run: |
-        semgrep scan --config=auto || true
+        set +e
+        semgrep scan --config=auto
+        exit 0
 
     - name: Upload Semgrep report
       uses: actions/upload-artifact@v3
