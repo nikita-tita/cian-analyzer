@@ -245,6 +245,10 @@ class PriceScenario(BaseModel):
     cumulative_probability: List[float] = []
     financials: Dict[str, Any] = {}
 
+    # НОВОЕ: Флаг рекомендуемого сценария (автоматически выбирается по максимальному expected_value)
+    is_recommended: bool = False
+    recommendation_reason: Optional[str] = None
+
 
 class AnalysisResult(BaseModel):
     """Результат анализа"""
