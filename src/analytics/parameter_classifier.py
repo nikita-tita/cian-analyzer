@@ -13,7 +13,7 @@
   - Если целевой = медиане → коэффициент = 1.0 (нет изменения)
 """
 
-from typing import Set, Dict, Any, List
+from typing import Set, Dict, Any
 from enum import Enum
 
 

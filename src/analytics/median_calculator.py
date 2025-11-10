@@ -7,7 +7,7 @@
 
 import statistics
 from collections import Counter
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from ..models.property import ComparableProperty, TargetProperty
 from .parameter_classifier import get_variable_parameters
 
@@ -28,7 +28,7 @@ def calculate_medians_from_comparables(
         return {}
 
     medians = {}
-    variable_params = get_variable_parameters()
+    get_variable_parameters()
 
     # Числовые параметры
     numeric_params = {

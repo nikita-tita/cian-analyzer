@@ -5,16 +5,14 @@
 import statistics
 import math
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime
 from functools import lru_cache
-import numpy as np
 from scipy import stats as scipy_stats
 
 logger = logging.getLogger(__name__)
 
 from ..models.property import (
-    TargetProperty,
     ComparableProperty,
     AnalysisRequest,
     PriceScenario,
@@ -30,11 +28,9 @@ except ImportError:
 
 # Новая логика расчета справедливой цены
 from .fair_price_calculator import calculate_fair_price_with_medians
-from .median_calculator import calculate_medians_from_comparables, get_readable_comparison_summary
-from .parameter_classifier import explain_parameter_classification
 
 # Новые модули аналитики
-from .price_range import calculate_price_range, calculate_price_sensitivity
+from .price_range import calculate_price_range
 from .attractiveness_index import calculate_attractiveness_index
 from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
 from .recommendations import RecommendationEngine
@@ -197,7 +193,6 @@ class RealEstateAnalyzer:
 
         # Генерация рекомендаций
         try:
-            from .recommendations import RecommendationEngine
             rec_engine = RecommendationEngine({
                 'target_property': request.target_property.model_dump(),
                 'fair_price_analysis': fair_price,
@@ -1077,7 +1072,7 @@ class RealEstateAnalyzer:
         n = len(prices)
 
         q1_index = n // 4
-        q2_index = n // 2
+        n // 2
         q3_index = 3 * n // 4
 
         target = self.request.target_property

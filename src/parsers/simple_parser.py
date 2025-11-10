@@ -32,7 +32,6 @@ class SimpleParser:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Поддержка контекстного менеджера"""
-        pass
 
     def parse_detail_page(self, url: str) -> Dict[str, Any]:
         """
