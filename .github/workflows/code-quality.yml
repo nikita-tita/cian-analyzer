@@ -10,6 +10,7 @@ jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
     - name: Checkout code

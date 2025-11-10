@@ -1,293 +1,195 @@
-# Production Setup Guide for Housler.ru
+# 🚀 Production Setup Guide для housler.ru
 
-## Проблема: Калькулятор не работает на housler.ru
-
-### Диагностика
-
-Проверены следующие компоненты:
-- ✅ Backend API endpoints в [app_new.py](app_new.py:201-756)
-- ✅ Frontend JavaScript в [static/js/wizard.js](static/js/wizard.js:1-771)
-- ✅ HTML templates ([wizard.html](templates/wizard.html:1-285), [index.html](templates/index.html:1-227))
-- ✅ CSS файлы ([wizard.css](static/css/wizard.css:1-50+), [landing.css](static/css/landing.css))
-- ❌ SSL сертификат не настроен
-- ❌ Nginx конфигурация отсутствовала
-
-### Причина проблемы
-
-1. **SSL сертификат** не настроен для домена housler.ru
-2. **Nginx** конфигурация отсутствовала
-3. **Статические файлы** (CSS, JS) могут не отдаваться корректно
+Полное руководство по развертыванию Housler на production сервере с доменом housler.ru.
 
 ---
 
-## Решение
+## 📋 Содержание
 
-### 1. Настройка SSL с Let's Encrypt
-
-На VPS сервере выполните:
-
-```bash
-# Установите Certbot
-sudo apt-get update
-sudo apt-get install certbot python3-certbot-nginx
-
-# Получите SSL сертификат для housler.ru
-sudo certbot certonly --standalone -d housler.ru -d www.housler.ru
-
-# Сертификаты будут сохранены в:
-# /etc/letsencrypt/live/housler.ru/fullchain.pem
-# /etc/letsencrypt/live/housler.ru/privkey.pem
-```
-
-### 2. Обновление docker-compose.yml
-
-Добавьте volume для SSL сертификатов в nginx сервис:
-
-```yaml
-nginx:
-  image: nginx:alpine
-  container_name: housler-nginx
-  restart: unless-stopped
-  ports:
-    - "80:80"
-    - "443:443"
-  volumes:
-    - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-    - ./nginx/ssl:/etc/nginx/ssl  # Локальная папка
-    - ./static:/usr/share/nginx/html/static
-    # Или напрямую из Let's Encrypt:
-    - /etc/letsencrypt/live/housler.ru:/etc/nginx/ssl:ro
-  depends_on:
-    - app
-  networks:
-    - housler-network
-  profiles:
-    - production
-```
-
-### 3. Копирование SSL сертификатов
-
-Если используете локальную папку `nginx/ssl`:
-
-```bash
-# На VPS
-sudo cp /etc/letsencrypt/live/housler.ru/fullchain.pem ./nginx/ssl/
-sudo cp /etc/letsencrypt/live/housler.ru/privkey.pem ./nginx/ssl/
-sudo chmod 644 ./nginx/ssl/*.pem
-```
-
-### 4. Активация HTTPS в nginx.conf
-
-Раскомментируйте HTTPS server block в [nginx/nginx.conf](nginx/nginx.conf:76-139):
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name housler.ru www.housler.ru;
-
-    # SSL Certificates
-    ssl_certificate /etc/nginx/ssl/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-
-    # ... остальная конфигурация
-}
-```
-
-И раскомментируйте редирект с HTTP на HTTPS (строка 72):
-
-```nginx
-server {
-    listen 80;
-    server_name housler.ru www.housler.ru;
-
-    # Редирект на HTTPS
-    return 301 https://$server_name$request_uri;
-}
-```
-
-### 5. Перезапуск сервисов
-
-```bash
-# Пересобрать и перезапустить
-docker-compose --profile production down
-docker-compose --profile production up -d --build
-
-# Или через Makefile
-make down
-make build
-make up-production
-```
+1. [Требования](#требования)
+2. [Быстрый старт](#быстрый-старт)
+3. [GitHub Actions для auto-deploy](#github-actions)
+4. [DNS и SSL](#dns-и-ssl)
+5. [Мониторинг](#мониторинг)
 
 ---
 
-## Автоматическое обновление SSL сертификатов
+## 🖥️ Требования
 
-Настройте автоматическое обновление через cron:
+### Сервер (VPS)
+- CPU: 2+ cores
+- RAM: 4+ GB
+- Disk: 20+ GB SSD
+- OS: Ubuntu 20.04+ / Debian 11+
+
+### Домен
+- Домен: **housler.ru**
+- Доступ к DNS управлению
+
+---
+
+## 🚀 Быстрый старт
+
+### 1. Скопируйте скрипт на сервер
 
 ```bash
-# Откройте crontab
-sudo crontab -e
-
-# Добавьте строку (обновление каждый понедельник в 3:00)
-0 3 * * 1 certbot renew --quiet && cp /etc/letsencrypt/live/housler.ru/*.pem /path/to/housler/nginx/ssl/ && docker-compose -f /path/to/housler/docker-compose.yml restart nginx
+SERVER_IP="YOUR_SERVER_IP"
+scp scripts/setup-production-server.sh root@$SERVER_IP:/tmp/
+ssh root@$SERVER_IP
 ```
 
-Или используйте make команду:
+### 2. Запустите автоматическую настройку
 
 ```bash
-0 3 * * 1 cd /path/to/housler && make ssl-renew
+export DOMAIN="housler.ru"
+cd /tmp
+chmod +x setup-production-server.sh
+./setup-production-server.sh
+```
+
+Скрипт автоматически установит все необходимое.
+
+### 3. Настройте DNS
+
+В панели управления доменом:
+
+```
+A    housler.ru      YOUR_SERVER_IP
+A    www.housler.ru  YOUR_SERVER_IP
+```
+
+### 4. Получите SSL сертификат
+
+```bash
+sudo certbot certonly --nginx -d housler.ru -d www.housler.ru
+sudo systemctl restart nginx
+```
+
+### 5. Деплой
+
+```bash
+cd /opt/housler
+sudo -u housler bash scripts/deploy-production.sh main
+sudo systemctl start housler
+```
+
+### 6. Проверка
+
+https://housler.ru/health
+
+---
+
+## 🤖 GitHub Actions
+
+### Настройка SSH для auto-deploy
+
+1. Создайте SSH ключ:
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/housler_deploy
+ssh-copy-id -i ~/.ssh/housler_deploy.pub housler@housler.ru
+```
+
+2. Добавьте в GitHub Secrets (Settings → Secrets):
+
+```
+SSH_HOST        = housler.ru
+SSH_USERNAME    = housler  
+SSH_PRIVATE_KEY = [содержимое ~/.ssh/housler_deploy]
+SSH_PORT        = 22
+```
+
+3. Автоматический деплой при push в main:
+
+```bash
+git push origin main
+```
+
+GitHub Actions автоматически задеплоит на production!
+
+---
+
+## 🌐 DNS и SSL
+
+### Проверка DNS
+
+```bash
+dig housler.ru +short
+```
+
+### Автообновление SSL
+
+Certbot автоматически обновляет сертификаты.
+
+Проверка:
+```bash
+sudo certbot renew --dry-run
 ```
 
 ---
 
-## Проверка после деплоя
+## 📊 Мониторинг
 
-### 1. Проверка health endpoint
+### Health Check
 
 ```bash
-curl http://housler.ru/health
-# Должен вернуть: {"status":"healthy",...}
-
-# После настройки SSL:
 curl https://housler.ru/health
 ```
 
-### 2. Проверка статических файлов
+### Логи
 
 ```bash
-curl -I https://housler.ru/static/css/wizard.css
-# Должен вернуть: 200 OK
+# Application
+sudo docker compose -f /opt/housler/docker-compose.yml logs -f app
 
-curl -I https://housler.ru/static/js/wizard.js
-# Должен вернуть: 200 OK
+# Nginx
+sudo tail -f /var/log/nginx/housler_error.log
+
+# System
+sudo journalctl -u housler -f
 ```
 
-### 3. Проверка калькулятора
+### Backup
 
-Откройте браузер:
-```
-https://housler.ru/calculator
-```
-
-Должен загрузиться 3-step wizard интерфейс с:
-- Шаг 1: Парсинг URL
-- Шаг 2: Подбор аналогов
-- Шаг 3: Анализ и рекомендации
-
-### 4. Проверка API endpoints
+Автоматический backup каждый день в 3:00 AM
 
 ```bash
-# Тест парсинга (замените URL на реальный)
-curl -X POST https://housler.ru/api/parse \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://www.cian.ru/sale/flat/123456/"}'
+/opt/backups/housler/backup.sh
 ```
 
 ---
 
-## Troubleshooting
-
-### Ошибка: SSL сертификат не найден
+## 🔧 Полезные команды
 
 ```bash
-# Проверьте наличие сертификатов
-sudo ls -la /etc/letsencrypt/live/housler.ru/
+# Статус
+sudo systemctl status housler
 
-# Если их нет, получите заново
-sudo certbot certonly --standalone -d housler.ru -d www.housler.ru
-```
+# Перезапуск
+sudo systemctl restart housler
 
-### Ошибка: Статические файлы не загружаются (404)
+# Обновление
+cd /opt/housler
+sudo -u housler bash scripts/deploy-production.sh main
 
-```bash
-# Проверьте права доступа
-ls -la static/
-chmod -R 755 static/
-
-# Проверьте, что файлы скопировались в контейнер
-docker exec housler-nginx ls -la /usr/share/nginx/html/static/
-```
-
-### Ошибка: "Connection refused" или "502 Bad Gateway"
-
-```bash
-# Проверьте, что app контейнер запущен
-docker-compose ps
-
-# Проверьте логи
-docker-compose logs app
-docker-compose logs nginx
-
-# Перезапустите сервисы
-docker-compose restart app nginx
-```
-
-### Калькулятор загружается, но кнопки не работают
-
-1. Откройте DevTools (F12) → Console
-2. Проверьте наличие ошибок JavaScript
-3. Проверьте Network tab - загружаются ли все файлы:
-   - `/static/css/wizard.css`
-   - `/static/js/wizard.js`
-   - Bootstrap CSS и JS
-
-Если файлы не загружаются (404):
-```bash
-# Убедитесь, что static файлы смонтированы в nginx
-docker-compose exec nginx ls -la /usr/share/nginx/html/static/
+# Логи
+sudo docker compose logs -f
 ```
 
 ---
 
-## Быстрый старт для VPS
+## ✅ Checklist
 
-Если у вас чистый VPS:
-
-```bash
-# 1. Клонируйте репозиторий
-git clone https://github.com/yourusername/housler.git
-cd housler
-
-# 2. Установите Docker и Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-sudo apt-get install docker-compose-plugin
-
-# 3. Настройте SSL
-sudo apt-get install certbot
-sudo certbot certonly --standalone -d housler.ru -d www.housler.ru
-
-# 4. Создайте .env из шаблона
-cp .env.example .env
-# Отредактируйте .env при необходимости
-
-# 5. Скопируйте SSL сертификаты
-sudo cp /etc/letsencrypt/live/housler.ru/fullchain.pem ./nginx/ssl/
-sudo cp /etc/letsencrypt/live/housler.ru/privkey.pem ./nginx/ssl/
-sudo chmod 644 ./nginx/ssl/*.pem
-
-# 6. Раскомментируйте HTTPS в nginx.conf
-nano nginx/nginx.conf
-# Раскомментируйте server block для port 443
-
-# 7. Запустите через deployment script
-chmod +x deploy.sh
-./deploy.sh
-# Выберите: 2) Production (app + redis + nginx)
-
-# 8. Проверьте
-curl https://housler.ru/health
-```
+- [ ] Сервер настроен (setup-production-server.sh)
+- [ ] DNS настроен
+- [ ] SSL сертификат получен
+- [ ] Приложение задеплоено
+- [ ] Health check работает (https://housler.ru/health)
+- [ ] GitHub Actions настроен
+- [ ] Backup работает
 
 ---
 
-## Контакты для поддержки
+**Production ready! 🚀**
 
-- Email: hello@housler.ru
-- Telegram: @housler_spb
-
-## Дополнительные ресурсы
-
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
-- [Nginx Configuration Guide](https://nginx.org/en/docs/)
+Приложение доступно на **https://housler.ru**

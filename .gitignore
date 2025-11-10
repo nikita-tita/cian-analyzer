@@ -39,6 +39,7 @@ ENV/
 !railway.json
 !package*.json
 !static/manifest.json
+.last-deploy.json
 *.csv
 *.xlsx
 results/
