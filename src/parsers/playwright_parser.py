@@ -9,7 +9,7 @@ from functools import wraps
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
 
-from .base_parser import BaseCianParser, ParsingError
+from .base_parser import BaseCianParser
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,6 @@ def detect_region_from_url(url: str) -> str:
         'msk' или 'spb'
     """
     # Парсим URL для поиска региона
-    import re
 
     # Ищем упоминание городов
     if 'moskva' in url.lower() or 'moscow' in url.lower():

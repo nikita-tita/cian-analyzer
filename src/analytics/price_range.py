@@ -139,7 +139,7 @@ def _generate_interpretation(price_range: Dict, current_overpricing: float) -> D
     fair_price = price_range['fair_price']
     recommended = price_range['recommended_listing']
     min_price = price_range['min_price']
-    max_price = price_range['max_price']
+    price_range['max_price']
 
     interpretation = {
         'pricing_strategy': '',

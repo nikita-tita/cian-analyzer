@@ -2,7 +2,7 @@
 Экспорт логов обработки объектов в Markdown формат
 """
 
-from typing import List, Dict, Any
+from typing import List, Any
 from datetime import datetime
 from .property_tracker import PropertyLog, PropertyTracker, EventType
 

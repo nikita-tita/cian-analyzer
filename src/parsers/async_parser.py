@@ -9,7 +9,6 @@ import asyncio
 import logging
 from typing import List, Dict, Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
-from concurrent.futures import ThreadPoolExecutor
 import time
 
 from .base_parser import BaseCianParser, ParsingError

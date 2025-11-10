@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 class ParsingError(Exception):
     """Ошибка парсинга"""
-    pass
 
 
 class BaseCianParser(ABC):
@@ -56,7 +55,6 @@ class BaseCianParser(ABC):
 
         Должен быть реализован в подклассах
         """
-        pass
 
     @retry(
         stop=stop_after_attempt(3),

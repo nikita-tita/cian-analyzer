@@ -6,7 +6,7 @@
 import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 
 
