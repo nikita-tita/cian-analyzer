@@ -417,106 +417,116 @@
         </div>
         {% endif %}
 
-        <!-- Наши услуги продажи -->
+        <!-- Персонализированный оффер Housler -->
+        {% if housler_offer %}
         <div class="section">
-            <h2 class="section-title">🎯 Как мы можем помочь продать ваш объект</h2>
+            <h2 class="section-title">🎯 Как мы поможем продать ваш объект</h2>
 
-            <p style="margin-bottom: 30px;">
-                <strong>HOUSLER</strong> — это не просто анализ, а полный цикл продажи недвижимости.
-                Мы берем на себя всю подготовку, маркетинг и сопровождение сделки.
-            </p>
-
-            <table style="font-size: 13px;">
-                <thead>
-                    <tr>
-                        <th>Диапазон цены</th>
-                        <th>Что входит</th>
-                        <th>Срок активных продаж</th>
-                        <th>Опция A — Комиссия 2%</th>
-                        <th>Опция B — Предоплата + успех</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>до 25 млн</strong></td>
-                        <td>
-                            • Диагностика объекта<br>
-                            • Лайт-стейджинг<br>
-                            • Проф-фото/видео<br>
-                            • 3D-тур<br>
-                            • ЦИАН/Авито (подъемы)<br>
-                            • Соцсети района<br>
-                            • Отчет каждую неделю
-                        </td>
-                        <td>7–14 дней</td>
-                        <td>
-                            <strong>2%</strong>, без предоплат.<br>
-                            Оплата в день сделки.
-                        </td>
-                        <td>
-                            <strong>100 000 ₽</strong> предоплата на подготовку и маркетинг.<br><br>
-                            Если покупателя нашли мы и сделка с нашим участием — итог <strong>2%</strong> минус предоплата.<br><br>
-                            Если без нас — ничего доплачивать не нужно.
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><strong>25–50 млн</strong></td>
-                        <td>
-                            • Всё из базового пакета<br>
-                            • Лендинг объекта<br>
-                            • Ретаргет/контекст<br>
-                            • PR в локальных медиа/Telegram
-                        </td>
-                        <td>10–21 день</td>
-                        <td><strong>2%</strong></td>
-                        <td>
-                            <strong>200 000 ₽</strong> предоплата.<br><br>
-                            При нашей находке и участии доплата до <strong>2%</strong> (минус предоплата).<br><br>
-                            Если без нас — только предоплата.
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><strong>50+ млн</strong></td>
-                        <td>
-                            • Всё из расширенного<br>
-                            • Премиальный стейджинг<br>
-                            • Мебель в аренду<br>
-                            • Дрон + ночные кадры<br>
-                            • Интерактив-план<br>
-                            • Персональные показы<br>
-                            • Датарум для сделки
-                        </td>
-                        <td>14–30 дней</td>
-                        <td><strong>2%</strong></td>
-                        <td>
-                            <strong>300 000 ₽</strong> предоплата.<br><br>
-                            При нашей находке и участии — доплата до <strong>2%</strong> (минус предоплата).<br><br>
-                            Если без нас — только предоплата.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 30px;">
-                <h3 class="subsection-title" style="margin-top: 0;">Наш подход — акцент на действия</h3>
-                <p style="margin-bottom: 15px;">
-                    Мы не просто размещаем объявление. Мы создаем маркетинговую кампанию:
+            <!-- Текущая ситуация -->
+            <div style="background: #fff3cd; padding: 20px; border-left: 4px solid #ffc107; border-radius: 8px; margin-bottom: 25px;">
+                <h3 class="subsection-title" style="margin-top: 0; color: #856404;">📊 Текущая ситуация</h3>
+                <p style="margin: 0; color: #856404;">
+                    {% if housler_offer.situation.price_status == 'overpriced' %}
+                        Ваш объект оценен в <strong>{{ "%.2f"|format(housler_offer.situation.current_price / 1000000) }} млн ₽</strong>,
+                        что <strong>на {{ "%.0f"|format(housler_offer.situation.price_diff_percent) }}% выше</strong> рыночной цены
+                        <strong>{{ housler_offer.result.final_price_formatted }}</strong>.
+                        {% if housler_offer.situation.has_critical %}
+                        Также выявлены критичные проблемы, требующие внимания.
+                        {% endif %}
+                    {% elif housler_offer.situation.price_status == 'underpriced' %}
+                        Ваш объект оценен в <strong>{{ "%.2f"|format(housler_offer.situation.current_price / 1000000) }} млн ₽</strong>,
+                        что <strong>на {{ "%.0f"|format(abs(housler_offer.situation.price_diff_percent)) }}% ниже</strong> рыночной цены.
+                        Это отличное конкурентное преимущество для быстрой продажи!
+                    {% else %}
+                        Ваш объект оценен в <strong>{{ "%.2f"|format(housler_offer.situation.current_price / 1000000) }} млн ₽</strong>,
+                        что соответствует рыночной цене.
+                        {% if housler_offer.situation.has_critical %}
+                        Выявлены проблемы, которые могут замедлить продажу.
+                        {% endif %}
+                    {% endif %}
                 </p>
-                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-                    <li><strong>PR и медиа:</strong> Публикации в локальных СМИ, Telegram-каналах района</li>
-                    <li><strong>Контент:</strong> Профессиональные рилсы, 3D-туры, интерактивные планы</li>
-                    <li><strong>Таргетинг:</strong> Показываем объект именно вашей целевой аудитории</li>
-                    <li><strong>Стейджинг:</strong> Подготовка объекта для максимальной привлекательности</li>
-                    <li><strong>Аналитика:</strong> Еженедельные отчеты по просмотрам и звонкам</li>
-                </ul>
             </div>
 
-            <div style="text-align: center; margin-top: 30px; padding: 20px; background: #000; color: #fff; border-radius: 8px;">
-                <h3 style="margin: 0 0 10px 0;">Готовы начать?</h3>
-                <p style="margin: 0 0 15px 0;">Свяжитесь с нами для бесплатной консультации</p>
-                <p style="margin: 0; font-size: 18px; font-weight: 600;">HOUSLER — продаем быстро и выгодно</p>
+            <!-- Наша цель -->
+            <div style="background: #d1ecf1; padding: 20px; border-left: 4px solid #17a2b8; border-radius: 8px; margin-bottom: 25px;">
+                <h3 class="subsection-title" style="margin-top: 0; color: #0c5460;">🎯 Наша цель</h3>
+                <p style="margin: 0; color: #0c5460;">
+                    {{ housler_offer.goal }}
+                </p>
+            </div>
+
+            <!-- План действий -->
+            <div style="margin-bottom: 25px;">
+                <h3 class="subsection-title">✅ Что мы сделаем</h3>
+                <div style="display: grid; gap: 15px;">
+                    {% for action in housler_offer.actions %}
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 3px solid #007bff;">
+                        <div style="display: flex; align-items: start; gap: 10px;">
+                            <span style="font-size: 24px;">{{ action.icon }}</span>
+                            <div>
+                                <strong style="display: block; margin-bottom: 5px;">{{ action.title }}</strong>
+                                <p style="margin: 0; color: #6c757d;">{{ action.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Прогноз результата -->
+            <div style="background: #d4edda; padding: 20px; border-left: 4px solid #28a745; border-radius: 8px; margin-bottom: 25px;">
+                <h3 class="subsection-title" style="margin-top: 0; color: #155724;">💫 Прогноз результата</h3>
+                <p style="margin: 0 0 10px 0; color: #155724;">
+                    <strong>Срок продажи:</strong> {{ housler_offer.result.timeline }}<br>
+                    <strong>Ожидаемая цена продажи:</strong> {{ housler_offer.result.final_price_formatted }}<br>
+                    <strong>Уровень уверенности:</strong> {{ housler_offer.result.confidence }}
+                </p>
+            </div>
+
+            <!-- Варианты оплаты -->
+            <div style="margin-bottom: 25px;">
+                <h3 class="subsection-title">💳 Выберите удобный вариант оплаты</h3>
+                <p style="color: #6c757d; margin-bottom: 15px;">
+                    Ваш объект относится к диапазону: <strong>{{ housler_offer.price_tier.range }}</strong>
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Опция A: Комиссия -->
+                    <div style="background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 20px;">
+                        <h4 style="margin: 0 0 10px 0; color: #007bff;">Опция A — Комиссия</h4>
+                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
+                            {{ housler_offer.commission_option.value }}
+                        </div>
+                        <p style="margin: 0; color: #6c757d;">
+                            {{ housler_offer.commission_option.description }}
+                        </p>
+                    </div>
+
+                    <!-- Опция B: Предоплата -->
+                    <div style="background: #fff; border: 2px solid #28a745; border-radius: 8px; padding: 20px;">
+                        <h4 style="margin: 0 0 10px 0; color: #28a745;">Опция B — Предоплата + успех</h4>
+                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
+                            {{ housler_offer.prepay_option.prepay }}
+                        </div>
+                        <p style="margin: 0; color: #6c757d;">
+                            {{ housler_offer.prepay_option.description }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div style="text-align: center; margin-top: 30px; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                <h3 style="margin: 0 0 15px 0; font-size: 28px;">Готовы начать?</h3>
+                <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.95;">
+                    Свяжитесь с нами для бесплатной консультации.<br>
+                    Обсудим ваш объект и составим индивидуальную стратегию продажи.
+                </p>
+                <p style="margin: 0; font-size: 22px; font-weight: 600;">
+                    HOUSLER — продаем быстро и выгодно
+                </p>
             </div>
         </div>
+        {% endif %}
 
         <!-- Футер -->
         <div class="footer">
