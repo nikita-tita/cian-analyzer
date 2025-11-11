@@ -80,7 +80,9 @@ session_storage = get_session_storage()
 # Ограничивает количество одновременно открытых браузеров
 # Защищает от DoS атак и утечек памяти
 browser_pool = None
-if PLAYWRIGHT_AVAILABLE:
+# Отключаем browser pool для локальной разработки (конфликт с Flask debug mode)
+use_browser_pool = os.getenv('USE_BROWSER_POOL', 'false').lower() == 'true'
+if PLAYWRIGHT_AVAILABLE and use_browser_pool:
     max_browsers = int(os.getenv('MAX_BROWSERS', '3'))  # Production: 3-5 браузеров
     browser_pool = BrowserPool(
         max_browsers=max_browsers,
@@ -91,7 +93,7 @@ if PLAYWRIGHT_AVAILABLE:
     browser_pool.start()
     logger.info(f"Browser pool initialized with max_browsers={max_browsers}")
 else:
-    logger.warning("Browser pool not available (Playwright not installed)")
+    logger.info("Browser pool disabled (for local dev or Playwright not available)")
 
 # Rate limiting configuration
 # SECURITY: Комбинированный ключ для защиты от обхода через прокси

@@ -183,7 +183,11 @@ class RealEstateAnalyzer:
             # Оценка качества данных
             data_quality = calculate_data_quality(comparables_to_process)
             logger.info(f"Коэффициент вариации (CV): {data_quality['cv']:.1%}")
-            logger.info(f"Качество данных: {data_quality['quality']} ({data_quality['description']})")
+            desc = data_quality.get('description', '')
+            if desc:
+                logger.info(f"Качество данных: {data_quality['quality']} ({desc})")
+            else:
+                logger.info(f"Качество данных: {data_quality['quality']}")
             logger.info(f"Оценка качества: {data_quality['quality_score']}/100")
 
             # IQR-фильтрация выбросов
