@@ -1231,6 +1231,9 @@ const screen3 = {
         }
 
         container.innerHTML = html;
+
+        // Показываем контейнер рекомендаций
+        document.getElementById('recommendations-container').style.display = 'block';
     }
 };
 
