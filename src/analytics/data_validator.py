@@ -270,8 +270,12 @@ def filter_valid_comparables(
         logger.info("ИТОГИ ВАЛИДАЦИИ")
         logger.info("=" * 60)
         logger.info(f"Всего аналогов: {total}")
-        logger.info(f"Валидных: {valid_count} ({valid_count/total*100:.1f}%)")
-        logger.info(f"Исключено: {excluded_count} ({excluded_count/total*100:.1f}%)")
+        if total > 0:
+            logger.info(f"Валидных: {valid_count} ({valid_count/total*100:.1f}%)")
+            logger.info(f"Исключено: {excluded_count} ({excluded_count/total*100:.1f}%)")
+        else:
+            logger.info(f"Валидных: {valid_count}")
+            logger.info(f"Исключено: {excluded_count}")
 
         if excluded_count > 0:
             logger.info("")
