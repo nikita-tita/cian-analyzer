@@ -815,12 +815,18 @@ def find_similar():
         }
     """
     try:
+        import time
+        request_start = time.time()
+
         payload = request.json
         session_id = payload.get('session_id')
         limit = payload.get('limit', 50)  # Увеличено до 50 по умолчанию
         search_type = payload.get('search_type', 'building')  # По умолчанию ищем в ЖК
 
+        logger.info(f"📍 [STEP 2] find-similar request started (session: {session_id}, type: {search_type}, limit: {limit})")
+
         if not session_id or not session_storage.exists(session_id):
+            logger.error(f"❌ Session not found: {session_id}")
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
         session_data = session_storage.get(session_id)
@@ -829,7 +835,7 @@ def find_similar():
         # Определяем регион из URL целевого объекта
         target_url = target.get('url', '')
         region = detect_region_from_url(target_url)
-        logger.info(f"Поиск похожих объектов для сессии {session_id} (тип: {search_type}, регион: {region})")
+        logger.info(f"🔍 Searching for similar properties (session: {session_id}, type: {search_type}, region: {region}, limit: {limit})")
 
         # Поиск аналогов с кэшем и регионом
         with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
@@ -854,46 +860,55 @@ def find_similar():
         if urls_to_parse:
             try:
                 from src.parsers.async_parser import parse_multiple_urls_parallel
-                logger.info(f"🚀 Parallel parsing {len(urls_to_parse)} URLs...")
+                logger.info(f"🚀 Starting parallel parsing of {len(urls_to_parse)} URLs...")
+                import time
+                parse_start = time.time()
 
                 detailed_results = parse_multiple_urls_parallel(
                     urls=urls_to_parse,
                     headless=True,
                     cache=property_cache,
                     region=region,
-                    max_concurrent=2  # Reduced to avoid CIAN rate limiting
+                    max_concurrent=5  # FIXED: Увеличено с 2 до 5 для ускорения
                 )
+
+                parse_elapsed = time.time() - parse_start
+                logger.info(f"⏱️ Parallel parsing took {parse_elapsed:.1f}s for {len(urls_to_parse)} URLs")
 
                 # Обновляем данные аналогов детальной информацией
                 url_to_details = {d['url']: d for d in detailed_results}
+                updated_count = 0
                 for comparable in similar:
                     url = comparable.get('url')
                     if url in url_to_details:
                         comparable.update(url_to_details[url])
+                        updated_count += 1
 
-                logger.info(f"✓ Enhanced {len(detailed_results)} comparables with detailed data")
+                logger.info(f"✅ Enhanced {updated_count}/{len(similar)} comparables with detailed data")
 
             except Exception as e:
-                logger.warning(f"Parallel parsing failed, using basic data: {e}")
+                logger.error(f"❌ Parallel parsing failed, using basic data: {e}", exc_info=True)
 
         # Сохраняем в сессию
         session_data['comparables'] = similar
         session_storage.set(session_id, session_data)
 
         # Debug logging - trace object count
-        logger.info(f"🔍 DEBUG: Saved {len(similar)} comparables to session {session_id}")
-        logger.info(f"🔍 DEBUG: Returning {len(similar)} comparables in API response")
+        request_elapsed = time.time() - request_start
+        logger.info(f"🔍 Saved {len(similar)} comparables to session {session_id}")
+        logger.info(f"✅ [STEP 2] find-similar completed in {request_elapsed:.1f}s - returning {len(similar)} comparables")
 
         return jsonify({
             'status': 'success',
             'comparables': similar,
             'count': len(similar),
             'search_type': search_type,
-            'residential_complex': residential_complex
+            'residential_complex': residential_complex,
+            'elapsed_time': round(request_elapsed, 1)
         })
 
     except Exception as e:
-        logger.error(f"Ошибка поиска: {e}", exc_info=True)
+        logger.error(f"❌ [STEP 2] find-similar failed: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)

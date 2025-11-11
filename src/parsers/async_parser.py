@@ -291,12 +291,13 @@ class AsyncPlaywrightParser(BaseCianParser):
                     'error': str(e)
                 }
 
-    async def parse_multiple_async(self, urls: List[str]) -> List[Dict]:
+    async def parse_multiple_async(self, urls: List[str], timeout_per_url: int = 45) -> List[Dict]:
         """
         Параллельный парсинг множества URL
 
         Args:
             urls: Список URL для парсинга
+            timeout_per_url: Timeout для каждого URL (секунды)
 
         Returns:
             Список словарей с данными
@@ -304,14 +305,45 @@ class AsyncPlaywrightParser(BaseCianParser):
         if not urls:
             return []
 
-        logger.info(f"🚀 Starting parallel parsing of {len(urls)} URLs...")
+        logger.info(f"🚀 Starting parallel parsing of {len(urls)} URLs (timeout: {timeout_per_url}s each)...")
         start_time = time.time()
 
-        # Создаем задачи для параллельного выполнения
-        tasks = [self.parse_detail_page_async(url) for url in urls]
+        # Создаем задачи для параллельного выполнения с timeout для каждой
+        async def parse_with_timeout(url):
+            try:
+                return await asyncio.wait_for(
+                    self.parse_detail_page_async(url),
+                    timeout=timeout_per_url
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ Timeout ({timeout_per_url}s) parsing {url}")
+                return {
+                    'url': url,
+                    'title': 'Timeout при парсинге',
+                    'error': f'Превышено время ожидания ({timeout_per_url}s)'
+                }
+            except Exception as e:
+                logger.error(f"❌ Error parsing {url}: {e}")
+                return {
+                    'url': url,
+                    'title': 'Ошибка парсинга',
+                    'error': str(e)
+                }
 
-        # Запускаем все задачи параллельно
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [parse_with_timeout(url) for url in urls]
+
+        # Запускаем все задачи параллельно с общим timeout
+        try:
+            # Общий timeout = timeout_per_url * количество + запас
+            total_timeout = timeout_per_url * len(urls) + 30
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=total_timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ CRITICAL: Total timeout ({total_timeout}s) for all {len(urls)} URLs")
+            # Возвращаем заглушки для всех URL
+            return [{'url': url, 'title': 'Общий timeout', 'error': 'Превышено общее время ожидания'} for url in urls]
 
         # Фильтруем успешные результаты
         successful_results = []
