@@ -942,6 +942,11 @@ const screen3 = {
         // Рекомендации (показываем всегда, даже если пустые)
         const recommendations = analysis.recommendations || [];
         this.renderRecommendations(recommendations);
+
+        // Персонализированный оффер Housler
+        if (analysis.housler_offer) {
+            this.renderHouslerOffer(analysis.housler_offer);
+        }
     },
 
     renderSummary(analysis) {
@@ -1233,6 +1238,138 @@ const screen3 = {
 
         // Показываем контейнер рекомендаций
         document.getElementById('recommendations-container').style.display = 'block';
+    },
+
+    renderHouslerOffer(offer) {
+        const container = document.getElementById('housler-offer-container');
+        if (!container) {
+            // Создаем контейнер если его нет
+            const recommendationsContainer = document.getElementById('recommendations-container');
+            const newContainer = document.createElement('div');
+            newContainer.id = 'housler-offer-container';
+            newContainer.className = 'section mt-5';
+            recommendationsContainer.parentNode.insertBefore(newContainer, recommendationsContainer.nextSibling);
+        }
+
+        const { situation, goal, actions, result, commission_option, prepay_option, price_tier } = offer;
+
+        let html = `
+            <h3 class="mb-4">🎯 Как Housler поможет продать ваш объект</h3>
+
+            <!-- Текущая ситуация -->
+            <div class="alert alert-warning mb-4">
+                <h5 class="alert-heading">📊 Что показывает первичный анализ</h5>
+                <p class="mb-0">
+        `;
+
+        // Анализ ситуации в зависимости от статуса цены
+        if (situation.price_status === 'overpriced') {
+            html += `
+                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>.
+                Математическая модель показывает отклонение <strong>на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% выше</strong> средних аналогов.
+                <br><br>
+                <em>Важно:</em> это лишь математика по базовым параметрам. При работе мы учтём десятки дополнительных факторов —
+                от уникальности планировки до эмоциональной привлекательности объекта.
+            `;
+        } else if (situation.price_status === 'underpriced') {
+            html += `
+                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>.
+                Математическая модель показывает, что цена <strong>на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% ниже</strong> средних аналогов.
+                <br><br>
+                Это может быть конкурентным преимуществом, но также проанализируем возможность повышения
+                стоимости за счет улучшения презентации и позиционирования.
+            `;
+        } else {
+            html += `
+                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>,
+                что соответствует средним показателям аналогов по базовым параметрам.
+                <br><br>
+                При работе мы найдем уникальные преимущества вашего объекта, которые математика не учитывает,
+                и построим стратегию максимально выгодной продажи.
+            `;
+        }
+
+        html += `
+                </p>
+            </div>
+
+            <!-- Наша цель -->
+            <div class="alert alert-info mb-4">
+                <h5 class="alert-heading">🎯 Наша цель</h5>
+                <p class="mb-0">${goal}</p>
+            </div>
+
+            <!-- План действий -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">✅ Что мы сделаем</h5>
+                    <div class="row">
+        `;
+
+        actions.forEach((action, index) => {
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex">
+                        <div class="me-3" style="font-size: 24px;">${action.icon}</div>
+                        <div>
+                            <strong>${action.title}</strong>
+                            <p class="text-muted small mb-0">${action.description}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+
+            <!-- Прогноз результата -->
+            <div class="alert alert-success mb-4">
+                <h5 class="alert-heading">💫 Наш прогноз</h5>
+                <p class="mb-2">
+                    <strong>Целевой срок продажи:</strong> ${result.timeline}<br>
+                    <strong>Целевой диапазон цены:</strong> ${result.final_price_formatted}<br>
+                    <strong>Уровень уверенности:</strong> ${result.confidence}
+                </p>
+                <p class="mb-0 small"><em>
+                    Точная стратегия и финальная цена будут определены после детальной диагностики
+                    и анализа всех факторов, которые математическая модель не учитывает.
+                </em></p>
+            </div>
+
+            <!-- Варианты оплаты -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">💳 Выберите удобный вариант оплаты</h5>
+                    <p class="text-muted">Ваш объект относится к диапазону: <strong>${price_tier.range}</strong></p>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-body">
+                                    <h6 class="text-primary">Опция A — Комиссия</h6>
+                                    <div class="display-6 my-3">${commission_option.value}</div>
+                                    <p class="text-muted small">${commission_option.description}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="text-success">Опция B — Предоплата + успех</h6>
+                                    <div class="display-6 my-3">${prepay_option.prepay}</div>
+                                    <p class="text-muted small">${prepay_option.description}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('housler-offer-container').innerHTML = html;
+        document.getElementById('housler-offer-container').style.display = 'block';
     }
 };
 
