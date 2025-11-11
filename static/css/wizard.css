@@ -311,6 +311,19 @@ body {
     border-color: var(--black);
 }
 
+.btn-outline-dark {
+    border: 2px solid var(--black);
+    color: var(--black);
+    background: var(--white);
+    transition: var(--transition);
+}
+
+.btn-outline-dark:hover {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+}
+
 .btn-outline-danger {
     border: 2px solid var(--black);
     color: var(--black);
