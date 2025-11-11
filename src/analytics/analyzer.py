@@ -1160,12 +1160,10 @@ class RealEstateAnalyzer:
                 'discount_percent': 3
             })
 
-        if target.price and target.price > 150_000_000:
-            weaknesses.append({
-                'factor': 'Очень высокая цена (низкая ликвидность)',
-                'impact': 4,
-                'discount_percent': 4
-            })
+        # УДАЛЕНО: "Очень высокая цена" в слабых сторонах
+        # Причина: Циклическая логика - мы определяем справедливую цену,
+        # поэтому не можем использовать текущую цену как слабую сторону.
+        # Ликвидность показывается в прогнозе времени продажи.
 
         total_premium = sum(s['premium_percent'] for s in strengths)
         total_discount = sum(w['discount_percent'] for w in weaknesses)

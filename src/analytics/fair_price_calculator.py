@@ -519,18 +519,11 @@ def _apply_risk_adjustments(target, medians, comparison, multiplier, adjustments
         }
         multiplier *= coef
 
-    # Ликвидность (очень высокая цена)
-    if target.price:
-        coef = get_price_liquidity_coefficient(target.price)
-        if coef < 1.0:
-            adjustments['liquidity'] = {
-                'value': coef,
-                'description': f'Ликвидность: цена {target.price:,.0f} ₽ (высокая - низкая ликвидность)',
-                'target_value': target.price,
-                'median_value': None,
-                'type': 'variable'
-            }
-            multiplier *= coef
+    # УДАЛЕНО: Коэффициент ликвидности
+    # Причина: Циклическая логика - мы не можем корректировать справедливую цену
+    # на основе текущей цены объекта, т.к. мы пытаемся эту цену определить!
+    # Ликвидность влияет на скорость продажи, но не на справедливую цену.
+    # Этот показатель используется в time_forecast и attractiveness_index.
 
     return multiplier, adjustments
 
