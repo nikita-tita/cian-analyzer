@@ -939,10 +939,9 @@ const screen3 = {
         // График
         this.renderChart(analysis.comparison_chart_data);
 
-        // Рекомендации
-        if (analysis.recommendations && analysis.recommendations.length > 0) {
-            this.renderRecommendations(analysis.recommendations);
-        }
+        // Рекомендации (показываем всегда, даже если пустые)
+        const recommendations = analysis.recommendations || [];
+        this.renderRecommendations(recommendations);
     },
 
     renderSummary(analysis) {
