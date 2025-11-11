@@ -33,6 +33,7 @@ except Exception as e:
         return 'spb'
 
 from src.analytics.analyzer import RealEstateAnalyzer
+from src.analytics.offer_generator import generate_housler_offer
 from src.models.property import (
     TargetProperty,
     ComparableProperty,
@@ -1389,6 +1390,13 @@ def view_report(session_id):
         # Фильтруем исключенные аналоги
         comparables = [c for c in comparables if not c.get('excluded', False)]
 
+        # Генерируем персонализированный оффер Housler
+        housler_offer = generate_housler_offer(
+            analysis=analysis,
+            property_info=target,
+            recommendations=analysis.get('recommendations', [])
+        )
+
         # Подготавливаем данные для шаблона
         template_data = {
             'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
@@ -1400,7 +1408,8 @@ def view_report(session_id):
             'price_scenarios': analysis.get('price_scenarios', []),
             'time_forecast': analysis.get('time_forecast', {}),
             'attractiveness_index': analysis.get('attractiveness_index', {}),
-            'strengths_weaknesses': analysis.get('strengths_weaknesses', {})
+            'strengths_weaknesses': analysis.get('strengths_weaknesses', {}),
+            'housler_offer': housler_offer
         }
 
         return render_template('report.html', **template_data)
