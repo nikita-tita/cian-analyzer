@@ -1426,6 +1426,50 @@ def view_report(session_id):
         return f"Ошибка генерации отчета: {str(e)}", 500
 
 
+@app.route('/api/contact-request', methods=['POST'])
+def contact_request():
+    """
+    Обработка заявки на контакт от клиента
+    """
+    try:
+        data = request.get_json()
+
+        name = data.get('name', '').strip()
+        phone = data.get('phone', '').strip()
+        email = data.get('email', '').strip()
+        comment = data.get('comment', '').strip()
+        session_id = data.get('session_id', '')
+
+        # Валидация обязательных полей
+        if not name or not phone:
+            return jsonify({'error': 'Имя и телефон обязательны'}), 400
+
+        # Логируем заявку
+        logger.info(f"=== НОВАЯ ЗАЯВКА НА КОНТАКТ ===")
+        logger.info(f"Имя: {name}")
+        logger.info(f"Телефон: {phone}")
+        logger.info(f"Email: {email if email else 'не указан'}")
+        logger.info(f"Комментарий: {comment if comment else 'нет'}")
+        logger.info(f"Session ID: {session_id}")
+        logger.info(f"================================")
+
+        # TODO: Здесь можно добавить:
+        # - Отправку email уведомления
+        # - Отправку в CRM
+        # - Отправку в Telegram
+        # - Сохранение в базу данных
+
+        # Пока просто возвращаем успех
+        return jsonify({
+            'success': True,
+            'message': 'Заявка принята'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
+
 async def _generate_pdf_from_page(url: str) -> bytes:
     """
     Генерирует PDF из HTML страницы используя Playwright

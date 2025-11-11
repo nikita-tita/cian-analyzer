@@ -1421,11 +1421,123 @@ const screen3 = {
                         </div>
                     </div>
                 </div>
+
+                <!-- CTA кнопка -->
+                <div style="margin-top: var(--spacing-3xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--gray-300); text-align: center;">
+                    <button
+                        onclick="screen3.showContactForm()"
+                        style="background: var(--black); color: var(--white); border: 2px solid var(--black); padding: 18px 48px; font-size: var(--text-lg); font-weight: 500; cursor: pointer; transition: all var(--transition-base); letter-spacing: 0.02em;"
+                        onmouseover="this.style.background='var(--white)'; this.style.color='var(--black)'"
+                        onmouseout="this.style.background='var(--black)'; this.style.color='var(--white)'">
+                        Начать работать
+                    </button>
+                    <div style="margin-top: var(--spacing-md); font-size: var(--text-sm); color: var(--gray-600);">
+                        Оставьте заявку, и мы свяжемся с вами в течение часа
+                    </div>
+                </div>
             </div>
         `;
 
         document.getElementById('housler-offer-container').innerHTML = html;
         document.getElementById('housler-offer-container').style.display = 'block';
+    },
+
+    showContactForm() {
+        // Создаем модальное окно если его еще нет
+        let modal = document.getElementById('housler-contact-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'housler-contact-modal';
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="border: none; border-radius: 0;">
+                        <div class="modal-header" style="border-bottom: 1px solid var(--gray-300);">
+                            <h5 class="modal-title" style="font-weight: 400; letter-spacing: -0.02em;">Оставить заявку</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body" style="padding: var(--spacing-xl);">
+                            <form id="housler-contact-form">
+                                <div class="mb-3">
+                                    <label for="contact-name" class="form-label" style="font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600);">Ваше имя</label>
+                                    <input type="text" class="form-control" id="contact-name" required style="border-radius: 0; border: 1px solid var(--gray-300); padding: 12px;">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact-phone" class="form-label" style="font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600);">Телефон</label>
+                                    <input type="tel" class="form-control" id="contact-phone" required style="border-radius: 0; border: 1px solid var(--gray-300); padding: 12px;">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact-email" class="form-label" style="font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600);">Email (необязательно)</label>
+                                    <input type="email" class="form-control" id="contact-email" style="border-radius: 0; border: 1px solid var(--gray-300); padding: 12px;">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact-comment" class="form-label" style="font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600);">Комментарий (необязательно)</label>
+                                    <textarea class="form-control" id="contact-comment" rows="3" style="border-radius: 0; border: 1px solid var(--gray-300); padding: 12px;"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-dark w-100" style="border-radius: 0; padding: 14px; font-weight: 500; letter-spacing: 0.02em;">
+                                    Отправить заявку
+                                </button>
+                            </form>
+                            <div id="contact-form-success" style="display: none; margin-top: var(--spacing-lg); padding: var(--spacing-md); background: var(--gray-100); text-align: center;">
+                                <div style="font-weight: 500; margin-bottom: var(--spacing-xs);">Спасибо за заявку!</div>
+                                <div style="font-size: var(--text-sm); color: var(--gray-600);">Мы свяжемся с вами в ближайшее время</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // Обработчик отправки формы
+            document.getElementById('housler-contact-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('contact-name').value;
+                const phone = document.getElementById('contact-phone').value;
+                const email = document.getElementById('contact-email').value;
+                const comment = document.getElementById('contact-comment').value;
+
+                try {
+                    // Отправляем данные на сервер
+                    const response = await fetch('/api/contact-request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            name,
+                            phone,
+                            email,
+                            comment,
+                            session_id: state.sessionId
+                        })
+                    });
+
+                    if (response.ok) {
+                        // Показываем успешное сообщение
+                        document.getElementById('housler-contact-form').style.display = 'none';
+                        document.getElementById('contact-form-success').style.display = 'block';
+
+                        // Закрываем модал через 3 секунды
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(modal).hide();
+                            document.getElementById('housler-contact-form').style.display = 'block';
+                            document.getElementById('contact-form-success').style.display = 'none';
+                            document.getElementById('housler-contact-form').reset();
+                        }, 3000);
+                    } else {
+                        alert('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте позже.');
+                    }
+                } catch (error) {
+                    console.error('Error submitting contact form:', error);
+                    alert('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте позже.');
+                }
+            });
+        }
+
+        // Открываем модал
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
     }
 };
 

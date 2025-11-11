@@ -243,19 +243,19 @@ class HouslerOfferGenerator:
 
         # Рассчитываем диапазон оптимальной цены (учитываем вариативность)
         if status == 'overpriced':
-            timeline = '14-30 дней при оптимальной стратегии'
+            timeline = 'Определим после диагностики и анализа рынка'
             # Диапазон: от -15% до -5% от текущей
             price_min = current_price * 0.85
             price_max = current_price * 0.95
             price_description = f"{self._format_price(price_min)} — {self._format_price(price_max)}"
         elif status == 'underpriced':
-            timeline = '7-14 дней при активном маркетинге'
+            timeline = 'Определим после диагностики и анализа рынка'
             # Можем попробовать повысить на 5-10%
             price_min = current_price
             price_max = current_price * 1.10
             price_description = f"{self._format_price(price_min)} — {self._format_price(price_max)}"
         else:
-            timeline = '10-20 дней'
+            timeline = 'Определим после диагностики и анализа рынка'
             # Диапазон +/- 3%
             price_min = current_price * 0.97
             price_max = current_price * 1.03
@@ -270,12 +270,7 @@ class HouslerOfferGenerator:
 
     def _estimate_timeline(self, situation: Dict) -> str:
         """Оценивает сроки продажи"""
-        if situation['price_status'] == 'underpriced':
-            return '7-14 дней'
-        elif situation['price_status'] == 'overpriced':
-            return '14-30 дней'
-        else:
-            return '10-20 дней'
+        return 'Определим после диагностики и анализа рынка'
 
     def _get_payment_options(self, price_tier: Dict) -> tuple:
         """Возвращает варианты оплаты"""
@@ -289,7 +284,7 @@ class HouslerOfferGenerator:
             'type': 'Предоплата + успех',
             'prepay': price_tier['prepay'],
             'success_fee': price_tier['success_fee'],
-            'description': f"{price_tier['prepay']} предоплата + {price_tier['success_fee']} при продаже. Возврат, если не продадим."
+            'description': f"{price_tier['prepay']} предоплата + {price_tier['success_fee']} успех-фи при продаже клиенту, приведённому нашей активностью. Предоплата не возвращается."
         }
 
         return commission_option, prepay_option
