@@ -17,6 +17,11 @@ from .median_calculator import (
     calculate_medians_from_comparables,
     compare_target_with_medians
 )
+from .confidence_calculator import (
+    calculate_confidence,
+    generate_detailed_report,
+    generate_summary_report
+)
 from .coefficients import (
     REPAIR_LEVEL_COEFFICIENTS,
     VIEW_TYPE_COEFFICIENTS,
@@ -29,7 +34,10 @@ from .coefficients import (
     get_living_area_coefficient,
     get_floor_coefficient,
     get_building_age_coefficient,
-    get_price_liquidity_coefficient
+    get_price_liquidity_coefficient,
+    # Адаптивные коэффициенты (Фаза 3)
+    calculate_floor_coefficient_adaptive,
+    calculate_area_coefficient_adaptive
 )
 
 logger = logging.getLogger(__name__)
@@ -129,6 +137,55 @@ def calculate_fair_price_with_medians(
     is_underpriced = price_diff_percent < -5
     is_fair = -5 <= price_diff_percent <= 5
 
+    # === РАСЧЕТ УВЕРЕННОСТИ И ГЕНЕРАЦИЯ ОТЧЕТА (ФАЗА 4) ===
+    # Для расчета уверенности нужна информация о качестве данных
+    # Используем упрощенный расчет если data_quality недоступен
+    try:
+        from .statistical_analysis import calculate_data_quality
+        data_quality = calculate_data_quality(comparables)
+    except (ImportError, Exception) as e:
+        logger.warning(f"Не удалось рассчитать качество данных: {e}")
+        data_quality = {'quality': 'unknown', 'cv': 0.15, 'quality_score': 70}
+
+    # Рассчитываем уверенность
+    confidence = calculate_confidence(
+        comparables=comparables,
+        data_quality=data_quality,
+        adjustments=adjustments,
+        final_multiplier=multiplier
+    )
+
+    # Генерируем отчеты
+    detailed_report = generate_detailed_report(
+        target=target,
+        comparables=comparables,
+        fair_price_result={
+            'base_price_per_sqm': base_price_per_sqm,
+            'final_multiplier': multiplier,
+            'fair_price_per_sqm': fair_price_per_sqm,
+            'fair_price_total': fair_price_total,
+            'current_price': current_price,
+            'adjustments': adjustments,
+            'data_quality': data_quality
+        },
+        confidence=confidence
+    )
+
+    summary_report = generate_summary_report(
+        fair_price_result={
+            'fair_price_total': fair_price_total,
+            'current_price': current_price
+        },
+        confidence=confidence
+    )
+
+    # Логируем краткий отчет
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info(summary_report)
+    logger.info("=" * 70)
+    logger.info("")
+
     return {
         'base_price_per_sqm': base_price_per_sqm,
         'medians': medians,
@@ -145,7 +202,12 @@ def calculate_fair_price_with_medians(
         'is_fair': is_fair,
         'overpricing_amount': price_diff_amount,
         'overpricing_percent': price_diff_percent,
-        'method': method
+        'method': method,
+        # НОВЫЕ ПОЛЯ (Фаза 4)
+        'confidence': confidence,
+        'data_quality': data_quality,
+        'detailed_report': detailed_report,
+        'summary_report': summary_report
     }
 
 
@@ -280,19 +342,29 @@ def _apply_apartment_features_adjustments(target, medians, comparison, multiplie
         }
         multiplier *= coef
 
-    # Площадь квартиры
+    # Площадь квартиры - АДАПТИВНЫЙ РАСЧЕТ
     if 'total_area' in comparison and not comparison['total_area']['equals_median']:
         target_area = target.total_area
-        median_area = medians['total_area']
 
-        coef = get_area_coefficient(target_area, median_area)
+        # АДАПТИВНЫЙ РАСЧЕТ (учитывает разброс площадей в выборке)
+        coef, explanation = calculate_area_coefficient_adaptive(target_area, comparables)
+
+        # Логируем использование адаптивного коэффициента
+        if explanation['type'] == 'adaptive':
+            logger.info(f"✨ Адаптивный коэффициент площади: {coef:.3f}")
+            logger.info(f"   Целевая: {target_area:.1f} м², медиана: {explanation['median_area']:.1f} м²")
+        elif explanation['type'] == 'no_adjustment':
+            logger.debug(f"ℹ️ Коэффициент площади не применяется: {explanation['reason']}")
+        else:
+            logger.debug(f"⚠️ Фиксированный коэффициент площади: {coef:.3f} ({explanation['reason']})")
 
         adjustments['total_area'] = {
             'value': coef,
-            'description': f'Площадь: {target_area:.1f}м² vs {median_area:.1f}м² (медиана)',
+            'description': f'Площадь: {target_area:.1f}м²',
             'target_value': target_area,
-            'median_value': median_area,
-            'type': 'variable'
+            'median_value': explanation.get('median_area', medians.get('total_area')),
+            'type': explanation['type'],  # 'adaptive', 'no_adjustment', или 'fixed'
+            'explanation': explanation
         }
         multiplier *= coef
 
@@ -300,28 +372,41 @@ def _apply_apartment_features_adjustments(target, medians, comparison, multiplie
 
 
 def _apply_position_adjustments(target, medians, comparison, multiplier, adjustments, comparables):
-    """Применить корректировки за расположение в доме"""
+    """
+    Применить корректировки за расположение в доме
 
-    # Этаж
+    ФАЗА 3: Используем АДАПТИВНЫЙ коэффициент этажа
+    """
+
+    # Этаж - АДАПТИВНЫЙ РАСЧЕТ
     if 'floor' in comparison and not comparison['floor']['equals_median']:
         target_floor = target.floor
-        median_floor = int(medians['floor'])
 
         # Используем total_floors целевого объекта
         if target.total_floors:
-            target_coef = get_floor_coefficient(target_floor, target.total_floors)
+            # АДАПТИВНЫЙ РАСЧЕТ (рассчитывается из данных конкретного дома)
+            coef, explanation = calculate_floor_coefficient_adaptive(
+                target_floor,
+                target.total_floors,
+                comparables
+            )
 
-            # Для медианы берем те же total_floors (предполагаем, что дома похожие)
-            median_coef = get_floor_coefficient(median_floor, target.total_floors)
-
-            coef = target_coef / median_coef
+            # Логируем использование адаптивного коэффициента
+            if explanation['type'] == 'adaptive':
+                logger.info(f"✨ Адаптивный коэффициент этажа: {coef:.3f} ({explanation['zone']})")
+                logger.info(f"   Данные: низкие={explanation['data_points']['low']}, "
+                           f"средние={explanation['data_points']['mid']}, "
+                           f"высокие={explanation['data_points']['high']}")
+            else:
+                logger.debug(f"⚠️ Фиксированный коэффициент этажа: {coef:.3f} ({explanation['reason']})")
 
             adjustments['floor'] = {
                 'value': coef,
-                'description': f'Этаж: {target_floor}/{target.total_floors} vs {median_floor}/{target.total_floors} (медиана)',
+                'description': f'Этаж: {target_floor}/{target.total_floors} ({explanation["zone"]})',
                 'target_value': target_floor,
-                'median_value': median_floor,
-                'type': 'variable'
+                'median_value': medians.get('floor'),
+                'type': explanation['type'],  # 'adaptive' или 'fixed'
+                'explanation': explanation
             }
             multiplier *= coef
 
