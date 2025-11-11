@@ -104,9 +104,7 @@ class RecommendationEngine:
         recommendations.extend(self._check_strategy())
 
         # 5. Контекстный анализ корректировок
-        # ВРЕМЕННО ОТКЛЮЧЕНО: вызывает проблемы производительности
-        # TODO: Оптимизировать _analyze_adjustments_context()
-        # recommendations.extend(self._analyze_adjustments_context())
+        recommendations.extend(self._analyze_adjustments_context())
 
         # Сортируем по приоритету
         return sorted(recommendations, key=lambda r: (r.priority, -r.roi if r.roi else 0))
