@@ -1323,6 +1323,7 @@ def export_report(session_id):
         # Генерируем PDF используя Playwright
         from datetime import datetime
         import asyncio
+        import concurrent.futures
 
         if not PLAYWRIGHT_AVAILABLE:
             # Fallback to markdown if playwright not available
@@ -1333,8 +1334,18 @@ def export_report(session_id):
         base_url = request.url_root.rstrip('/')
         report_url = f"{base_url}/report/{session_id}"
 
-        # Генерируем PDF
-        pdf_bytes = asyncio.run(_generate_pdf_from_page(report_url))
+        # Генерируем PDF в отдельном потоке с новым event loop
+        def run_async_in_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(_generate_pdf_from_page(report_url))
+            finally:
+                loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async_in_thread)
+            pdf_bytes = future.result(timeout=120)  # 2 минуты на генерацию PDF
 
         # Возвращаем PDF файл
         from flask import Response
