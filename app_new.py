@@ -1192,6 +1192,24 @@ def analyze():
             logger.warning(f"Ошибка получения метрик: {metrics_error}")
             result_dict['metrics'] = {}
 
+        # Генерируем персонализированный оффер Housler
+        try:
+            logger.info(f"🔧 DEBUG: Генерирую персонализированный оффер...")
+            housler_offer = generate_housler_offer(
+                analysis=result_dict,
+                property_info=session_data.get('target_property', {}),
+                recommendations=result_dict.get('recommendations', [])
+            )
+            if housler_offer:
+                result_dict['housler_offer'] = housler_offer
+                logger.info(f"🔧 DEBUG: ✓ Оффер сгенерирован")
+            else:
+                result_dict['housler_offer'] = None
+                logger.warning("Оффер не сгенерирован (нет данных)")
+        except Exception as offer_error:
+            logger.warning(f"Ошибка генерации оффера: {offer_error}")
+            result_dict['housler_offer'] = None
+
         # Сохраняем в сессию
         logger.info(f"🔧 DEBUG: Сохраняю результат в сессию {session_id}...")
         session_data['analysis'] = result_dict

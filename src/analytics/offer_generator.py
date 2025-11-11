@@ -97,9 +97,9 @@ class HouslerOfferGenerator:
     def _analyze_situation(self, fair_price_analysis: Dict) -> Dict:
         """Анализирует текущую ситуацию с объектом"""
         status = fair_price_analysis.get('status', 'normal')
-        current_price = fair_price_analysis.get('current_price', 0)
-        fair_price = fair_price_analysis.get('fair_price', current_price)
-        diff_percent = fair_price_analysis.get('difference_percent', 0)
+        current_price = fair_price_analysis.get('current_price', 0) or 0
+        fair_price = fair_price_analysis.get('fair_price', current_price) or current_price or 0
+        diff_percent = fair_price_analysis.get('difference_percent', 0) or 0
 
         # Критичные проблемы
         critical_issues = [
@@ -296,6 +296,8 @@ class HouslerOfferGenerator:
 
     def _format_price(self, price: float) -> str:
         """Форматирует цену"""
+        if price is None or price == 0:
+            return "не указана"
         millions = price / 1_000_000
         if millions >= 1:
             return f"{millions:.1f} млн ₽"
@@ -316,5 +318,12 @@ def generate_housler_offer(analysis: Dict, property_info: Dict, recommendations:
     Returns:
         Dict с персонализированным оффером
     """
+    # Безопасная проверка данных
+    if not analysis or not property_info:
+        return None
+
+    if not property_info.get('price'):
+        return None
+
     generator = HouslerOfferGenerator(analysis, property_info, recommendations)
     return generator.generate_offer()
