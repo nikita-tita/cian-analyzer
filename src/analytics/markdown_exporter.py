@@ -50,6 +50,55 @@ class MarkdownExporter:
         md.append("")
 
         # =========================================================================
+        # ИНФОРМАЦИЯ ОБ ОБЪЕКТЕ
+        # =========================================================================
+        md.append("## Информация об объекте")
+        md.append("")
+
+        if log.property_info:
+            prop = log.property_info
+            md.append("### Ваш объект")
+            md.append("")
+            md.append(f"- **Цена:** {self.format_number(prop.get('price', 0))}")
+            md.append(f"- **Площадь:** {prop.get('total_area', 0)} м²")
+            if prop.get('living_area'):
+                md.append(f"- **Жилая площадь:** {prop.get('living_area', 0)} м²")
+            if prop.get('kitchen_area'):
+                md.append(f"- **Кухня:** {prop.get('kitchen_area', 0)} м²")
+            md.append(f"- **Комнат:** {prop.get('rooms', 0)}")
+            if prop.get('floor') and prop.get('total_floors'):
+                md.append(f"- **Этаж:** {prop.get('floor')}/{prop.get('total_floors')}")
+            if prop.get('address'):
+                md.append(f"- **Адрес:** {prop.get('address')}")
+            if prop.get('repair_level'):
+                md.append(f"- **Ремонт:** {prop.get('repair_level')}")
+            md.append("")
+
+        # Аналоги (краткая сводка)
+        if log.comparables_data:
+            md.append("### Аналоги для сравнения")
+            md.append("")
+            md.append(f"Найдено **{len(log.comparables_data)} аналогичных объектов** в том же районе.")
+            md.append("")
+
+            # Топ-3 ближайших аналога
+            md.append("**Топ-3 наиболее похожих объекта:**")
+            md.append("")
+            for i, comp in enumerate(log.comparables_data[:3], 1):
+                price = self.format_number(comp.get('price', 0))
+                area = comp.get('total_area', 0)
+                price_sqm = self.format_number(comp.get('price_per_sqm', 0))
+                rooms = comp.get('rooms', '-')
+                floor = f"{comp.get('floor', '-')}/{comp.get('total_floors', '-')}"
+                md.append(f"{i}. {rooms}-комн., {area} м², {floor} этаж - **{price}** ({price_sqm}/м²)")
+            md.append("")
+            md.append(f"_Полный список {len(log.comparables_data)} аналогов см. в разделе \"Технические детали\" ниже._")
+            md.append("")
+
+        md.append("---")
+        md.append("")
+
+        # =========================================================================
         # 1. EXECUTIVE SUMMARY - Главные выводы за 30 секунд
         # =========================================================================
         md.append("## Главные выводы")
@@ -108,6 +157,50 @@ class MarkdownExporter:
             md.append("3. **Подготовить 2-3 главных преимущества** для описания объявления")
 
         md.append("")
+
+        # Персональные рекомендации из RecommendationEngine
+        if hasattr(log, 'recommendations') and log.recommendations:
+            md.append("")
+            md.append("### 💡 Персональные рекомендации")
+            md.append("")
+            md.append("На основе глубокого анализа вашего объекта:")
+            md.append("")
+
+            # Группируем по приоритетам
+            priorities = {
+                1: {'label': '🔴 КРИТИЧНО', 'recs': []},
+                2: {'label': '🟠 ВАЖНО', 'recs': []},
+                3: {'label': '🟡 РЕКОМЕНДУЕМ', 'recs': []},
+                4: {'label': '🔵 СОВЕТ', 'recs': []}
+            }
+
+            for rec in log.recommendations:
+                priority = rec.get('priority', 4)
+                if priority in priorities:
+                    priorities[priority]['recs'].append(rec)
+
+            # Выводим по приоритетам
+            for priority in [1, 2, 3, 4]:
+                recs = priorities[priority]['recs']
+                if recs:
+                    md.append(f"**{priorities[priority]['label']}**")
+                    md.append("")
+                    for rec in recs:
+                        icon = rec.get('icon', '💡')
+                        title = rec.get('title', '')
+                        message = rec.get('message', '')
+                        action = rec.get('action', '')
+                        roi = rec.get('roi', 0)
+
+                        md.append(f"**{icon} {title}**")
+                        if message:
+                            md.append(f"- {message}")
+                        if action:
+                            md.append(f"- **Действие:** {action}")
+                        if roi and roi > 0:
+                            md.append(f"- **Потенциальная выгода:** {self.format_number(roi)}")
+                        md.append("")
+
         md.append("Детальный план действий смотрите в разделе \"План продажи\" ниже.")
         md.append("")
         md.append("---")

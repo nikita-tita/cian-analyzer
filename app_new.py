@@ -1328,9 +1328,9 @@ def export_report(session_id):
             logger.warning("Playwright не доступен, возвращаем markdown")
             return _export_markdown_fallback(session_id, session_data)
 
-        # Создаем URL для страницы с отчетом
+        # Создаем URL для HTML отчета
         base_url = request.url_root.rstrip('/')
-        report_url = f"{base_url}/calculator?session={session_id}#step-3"
+        report_url = f"{base_url}/report/{session_id}"
 
         # Генерируем PDF
         pdf_bytes = asyncio.run(_generate_pdf_from_page(report_url))
@@ -1357,6 +1357,48 @@ def export_report(session_id):
         }), 500
 
 
+@app.route('/report/<session_id>', methods=['GET'])
+def view_report(session_id):
+    """
+    Просмотр HTML отчета (для PDF генерации)
+    """
+    try:
+        if not session_storage.exists(session_id):
+            return "Сессия не найдена", 404
+
+        session_data = session_storage.get(session_id)
+
+        if 'analysis' not in session_data or not session_data['analysis']:
+            return "Анализ не выполнен", 400
+
+        analysis = session_data['analysis']
+        target = session_data.get('target_property', {})
+        comparables = session_data.get('comparables', [])
+
+        # Фильтруем исключенные аналоги
+        comparables = [c for c in comparables if not c.get('excluded', False)]
+
+        # Подготавливаем данные для шаблона
+        template_data = {
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'property_info': target,
+            'comparables': comparables,
+            'fair_price_analysis': analysis.get('fair_price_analysis', {}),
+            'market_statistics': analysis.get('market_statistics', {}),
+            'recommendations': analysis.get('recommendations', []),
+            'price_scenarios': analysis.get('price_scenarios', []),
+            'time_forecast': analysis.get('time_forecast', {}),
+            'attractiveness_index': analysis.get('attractiveness_index', {}),
+            'strengths_weaknesses': analysis.get('strengths_weaknesses', {})
+        }
+
+        return render_template('report.html', **template_data)
+
+    except Exception as e:
+        logger.error(f"Ошибка отображения отчета: {e}", exc_info=True)
+        return f"Ошибка генерации отчета: {str(e)}", 500
+
+
 async def _generate_pdf_from_page(url: str) -> bytes:
     """
     Генерирует PDF из HTML страницы используя Playwright
@@ -1368,40 +1410,35 @@ async def _generate_pdf_from_page(url: str) -> bytes:
         page = await browser.new_page()
 
         # Загружаем страницу
-        await page.goto(url, wait_until='networkidle', timeout=30000)
+        logger.info(f"Загружаем страницу для PDF: {url}")
+        await page.goto(url, wait_until='networkidle', timeout=60000)
 
-        # Ждем загрузки результатов анализа
-        await page.wait_for_selector('#analysis-results', timeout=10000)
+        # Ждем загрузки контента (report-container вместо analysis-results)
+        try:
+            await page.wait_for_selector('.report-container', timeout=10000)
+        except Exception as e:
+            logger.warning(f"Не дождались report-container: {e}, продолжаем...")
 
-        # Скрываем элементы, которые не нужны в PDF
-        await page.add_style_tag(content="""
-            .header, .progress-container, .floating-buttons,
-            .advice-ticker, #pixel-loader, .toast-container,
-            #share-btn, .nav-link {
-                display: none !important;
-            }
-            body {
-                padding-bottom: 0 !important;
-            }
-            .container {
-                max-width: 100% !important;
-            }
-        """)
+        # Даем время на загрузку шрифтов и стилей
+        await page.wait_for_timeout(2000)
 
         # Генерируем PDF
+        logger.info("Генерируем PDF...")
         pdf_bytes = await page.pdf(
             format='A4',
             margin={
-                'top': '20mm',
-                'right': '15mm',
-                'bottom': '20mm',
-                'left': '15mm'
+                'top': '15mm',
+                'right': '12mm',
+                'bottom': '15mm',
+                'left': '12mm'
             },
             print_background=True,
-            prefer_css_page_size=False
+            prefer_css_page_size=False,
+            display_header_footer=False
         )
 
         await browser.close()
+        logger.info(f"PDF сгенерирован, размер: {len(pdf_bytes)} bytes")
         return pdf_bytes
 
 

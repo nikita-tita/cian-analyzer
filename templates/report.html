@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчет по недвижимости — Housler</title>
+
+    <!-- Используем те же стили что и на сайте -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/design-system.css?v=20251111113154">
+    <link rel="stylesheet" href="/static/css/wizard.css?v=20251111113154">
+
+    <style>
+        /* Стили для печати/PDF */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        body {
+            background: white;
+            padding: 40px 20px;
+        }
+
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+        }
+
+        .report-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #000;
+        }
+
+        .report-logo {
+            font-size: 36px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 10px;
+        }
+
+        .report-date {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 50px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .subsection-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0 15px 0;
+        }
+
+        .info-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #666;
+        }
+
+        .info-value {
+            font-weight: 600;
+        }
+
+        .recommendation-card {
+            background: white;
+            border-left: 4px solid #000;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .recommendation-card.critical {
+            border-left-color: #dc3545;
+        }
+
+        .recommendation-card.high {
+            border-left-color: #fd7e14;
+        }
+
+        .recommendation-card.medium {
+            border-left-color: #ffc107;
+        }
+
+        .recommendation-card.info {
+            border-left-color: #0dcaf0;
+        }
+
+        .recommendation-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .recommendation-message {
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .recommendation-action {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .comparable-item {
+            padding: 10px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-overpriced {
+            background: #fee;
+            color: #c00;
+        }
+
+        .status-fair {
+            background: #efe;
+            color: #060;
+        }
+
+        .status-underpriced {
+            background: #eef;
+            color: #006;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #000;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Шапка -->
+        <div class="report-header">
+            <div class="report-logo">HOUSLER</div>
+            <div class="report-date">Отчет по анализу недвижимости<br>{{ date }}</div>
+        </div>
+
+        <!-- Информация об объекте -->
+        <div class="section">
+            <h2 class="section-title">📋 Информация об объекте</h2>
+
+            <div class="info-card">
+                <h3 class="subsection-title">Ваш объект</h3>
+                {% if property_info %}
+                <div class="info-row">
+                    <span class="info-label">Цена</span>
+                    <span class="info-value">{{ "{:,.0f}".format(property_info.price) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Площадь</span>
+                    <span class="info-value">{{ property_info.total_area }} м²</span>
+                </div>
+                {% if property_info.living_area %}
+                <div class="info-row">
+                    <span class="info-label">Жилая площадь</span>
+                    <span class="info-value">{{ property_info.living_area }} м²</span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">Комнат</span>
+                    <span class="info-value">{{ property_info.rooms }}</span>
+                </div>
+                {% if property_info.floor and property_info.total_floors %}
+                <div class="info-row">
+                    <span class="info-label">Этаж</span>
+                    <span class="info-value">{{ property_info.floor }}/{{ property_info.total_floors }}</span>
+                </div>
+                {% endif %}
+                {% if property_info.address %}
+                <div class="info-row">
+                    <span class="info-label">Адрес</span>
+                    <span class="info-value">{{ property_info.address }}</span>
+                </div>
+                {% endif %}
+                {% if property_info.repair_level %}
+                <div class="info-row">
+                    <span class="info-label">Ремонт</span>
+                    <span class="info-value">{{ property_info.repair_level }}</span>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+
+            {% if comparables and comparables|length > 0 %}
+            <h3 class="subsection-title">Аналоги для сравнения</h3>
+            <p>Найдено <strong>{{ comparables|length }} аналогичных объектов</strong> в том же районе.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Характеристики</th>
+                        <th>Цена</th>
+                        <th>Цена за м²</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in comparables[:10] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ comp.rooms }}-комн., {{ comp.total_area }} м², {{ comp.floor }}/{{ comp.total_floors }} эт.</td>
+                        <td>{{ "{:,.0f}".format(comp.price) }} ₽</td>
+                        <td>{{ "{:,.0f}".format(comp.price_per_sqm) }} ₽</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if comparables|length > 10 %}
+            <p style="color: #666; font-size: 14px;">... и еще {{ comparables|length - 10 }} объектов</p>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Главные выводы -->
+        <div class="section">
+            <h2 class="section-title">🎯 Главные выводы</h2>
+
+            <div class="info-card">
+                {% if fair_price_analysis %}
+                <div class="info-row">
+                    <span class="info-label">Статус цены</span>
+                    <span class="info-value">
+                        {% if fair_price_analysis.is_fair %}
+                        <span class="status-badge status-fair">СПРАВЕДЛИВАЯ</span>
+                        {% elif fair_price_analysis.is_overpriced %}
+                        <span class="status-badge status-overpriced">ЗАВЫШЕНА на {{ "%.1f"|format(fair_price_analysis.overpricing_percent|abs) }}%</span>
+                        {% elif fair_price_analysis.is_underpriced %}
+                        <span class="status-badge status-underpriced">ЗАНИЖЕНА на {{ "%.1f"|format(fair_price_analysis.price_diff_percent|abs) }}%</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Справедливая цена</span>
+                    <span class="info-value">{{ "{:,.0f}".format(fair_price_analysis.fair_price_total) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Текущая цена</span>
+                    <span class="info-value">{{ "{:,.0f}".format(property_info.price) }} ₽</span>
+                </div>
+                {% endif %}
+
+                {% if time_forecast %}
+                <div class="info-row">
+                    <span class="info-label">Прогноз продажи</span>
+                    <span class="info-value">{{ time_forecast.time_range_description }}</span>
+                </div>
+                {% endif %}
+
+                {% if attractiveness_index %}
+                <div class="info-row">
+                    <span class="info-label">Привлекательность</span>
+                    <span class="info-value">{{ "%.0f"|format(attractiveness_index.total_index) }}/100 ({{ attractiveness_index.category }})</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Персональные рекомендации -->
+        {% if recommendations and recommendations|length > 0 %}
+        <div class="section">
+            <h2 class="section-title">💡 Персональные рекомендации</h2>
+
+            <p style="margin-bottom: 20px;">На основе глубокого анализа вашего объекта:</p>
+
+            {% for rec in recommendations %}
+            <div class="recommendation-card {% if rec.priority == 1 %}critical{% elif rec.priority == 2 %}high{% elif rec.priority == 3 %}medium{% else %}info{% endif %}">
+                <div class="recommendation-title">
+                    {{ rec.icon }} {{ rec.title }}
+                </div>
+                {% if rec.message %}
+                <div class="recommendation-message">
+                    {{ rec.message }}
+                </div>
+                {% endif %}
+                {% if rec.action %}
+                <div class="recommendation-action">
+                    <strong>Действие:</strong> {{ rec.action }}
+                </div>
+                {% endif %}
+                {% if rec.roi and rec.roi > 0 %}
+                <div style="margin-top: 8px; color: #198754; font-weight: 600;">
+                    <i class="bi bi-graph-up-arrow"></i> Потенциальная выгода: {{ "{:,.0f}".format(rec.roi) }} ₽
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Рыночная статистика -->
+        {% if market_statistics %}
+        <div class="section">
+            <h2 class="section-title">📊 Рыночная статистика</h2>
+
+            <div class="info-card">
+                <div class="info-row">
+                    <span class="info-label">Количество аналогов</span>
+                    <span class="info-value">{{ market_statistics.all.count }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Медиана цены за м²</span>
+                    <span class="info-value">{{ "{:,.0f}".format(market_statistics.all.median) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Среднее</span>
+                    <span class="info-value">{{ "{:,.0f}".format(market_statistics.all.mean) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Минимум</span>
+                    <span class="info-value">{{ "{:,.0f}".format(market_statistics.all.min) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Максимум</span>
+                    <span class="info-value">{{ "{:,.0f}".format(market_statistics.all.max) }} ₽</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Сценарии продажи -->
+        {% if price_scenarios and price_scenarios|length > 0 %}
+        <div class="section">
+            <h2 class="section-title">📈 Сценарии продажи</h2>
+
+            {% for scenario in price_scenarios %}
+            <div class="info-card">
+                <h3 class="subsection-title">{{ scenario.name }}</h3>
+                <p><em>{{ scenario.description }}</em></p>
+
+                <div class="info-row">
+                    <span class="info-label">Начальная цена</span>
+                    <span class="info-value">{{ "{:,.0f}".format(scenario.start_price) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Ожидаемая финальная</span>
+                    <span class="info-value">{{ "{:,.0f}".format(scenario.expected_final_price) }} ₽</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Время продажи</span>
+                    <span class="info-value">{{ scenario.time_months }} мес.</span>
+                </div>
+                {% if scenario.financials %}
+                <div class="info-row">
+                    <span class="info-label">Чистый доход</span>
+                    <span class="info-value">{{ "{:,.0f}".format(scenario.financials.net_after_opportunity) }} ₽</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Футер -->
+        <div class="footer">
+            <p>Этот отчет создан системой <strong>HOUSLER</strong> — анализ недвижимости на основе рыночных данных.</p>
+            <p>Отчет носит информационный характер и не является финансовой рекомендацией.</p>
+            <p>© {{ date[:4] }} HOUSLER. Все права защищены.</p>
+        </div>
+    </div>
+</body>
+</html>
