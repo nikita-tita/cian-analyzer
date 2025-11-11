@@ -35,6 +35,30 @@ from .attractiveness_index import calculate_attractiveness_index
 from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
 from .recommendations import RecommendationEngine
 
+# Импорт валидатора данных
+try:
+    from .data_validator import (
+        filter_valid_comparables,
+        get_validation_summary,
+        check_minimum_comparables
+    )
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+    logger.warning("⚠️ Модуль валидации недоступен")
+
+# Импорт статистического анализа
+try:
+    from .statistical_analysis import (
+        detect_outliers_iqr,
+        calculate_data_quality,
+        check_data_sufficiency
+    )
+    STATISTICAL_ANALYSIS_AVAILABLE = True
+except ImportError:
+    STATISTICAL_ANALYSIS_AVAILABLE = False
+    logger.warning("⚠️ Модуль статистического анализа недоступен")
+
 
 class RealEstateAnalyzer:
     """
@@ -66,6 +90,7 @@ class RealEstateAnalyzer:
         self.config = config or {}
         self.request: AnalysisRequest = None
         self.filtered_comparables: List[ComparableProperty] = []
+        self.data_quality: Dict = {}  # Результаты статистического анализа
 
         # Трекинг
         self.property_id = property_id
@@ -113,18 +138,104 @@ class RealEstateAnalyzer:
                 'filter_outliers': request.filter_outliers
             })
 
-        # Фильтруем выбросы
+        # === ВАЛИДАЦИЯ КАЧЕСТВА ДАННЫХ (ФАЗА 1) ===
+        if VALIDATION_AVAILABLE:
+            logger.info("=" * 60)
+            logger.info("ШАГ 1: ВАЛИДАЦИЯ КАЧЕСТВА ДАННЫХ")
+            logger.info("=" * 60)
+
+            # Сводка качества данных
+            validation_summary = get_validation_summary(request.comparables)
+            logger.info(
+                f"Качество данных: {validation_summary['valid']}/{validation_summary['total']} "
+                f"валидных ({validation_summary['valid_percentage']:.1f}%)"
+            )
+
+            # Фильтрация невалидных
+            comparables_to_process, excluded_reports = filter_valid_comparables(
+                request.comparables,
+                verbose=True
+            )
+
+            # Логируем трекинг
+            if self.enable_tracking:
+                excluded_count = len(excluded_reports)
+                if excluded_count > 0:
+                    self._log_event(
+                        EventType.OUTLIERS_FILTERED,
+                        f"Валидация исключила {excluded_count} некачественных аналогов",
+                        {
+                            'excluded_count': excluded_count,
+                            'validation_summary': validation_summary
+                        }
+                    )
+        else:
+            # Без валидации - используем все
+            comparables_to_process = request.comparables
+            logger.info("⚠️ Валидация отключена - используются все аналоги")
+
+        # === СТАТИСТИЧЕСКИЙ АНАЛИЗ И IQR-ФИЛЬТР (ФАЗА 2) ===
+        if STATISTICAL_ANALYSIS_AVAILABLE:
+            logger.info("=" * 60)
+            logger.info("ШАГ 2: СТАТИСТИЧЕСКИЙ АНАЛИЗ ДАННЫХ")
+            logger.info("=" * 60)
+
+            # Оценка качества данных
+            data_quality = calculate_data_quality(comparables_to_process)
+            logger.info(f"Коэффициент вариации (CV): {data_quality['cv']:.1%}")
+            logger.info(f"Качество данных: {data_quality['quality']} ({data_quality['description']})")
+            logger.info(f"Оценка качества: {data_quality['quality_score']}/100")
+
+            # IQR-фильтрация выбросов
+            comparables_after_iqr, iqr_outliers = detect_outliers_iqr(comparables_to_process)
+
+            if len(iqr_outliers) > 0:
+                logger.info(f"IQR фильтр исключил {len(iqr_outliers)} статистических выбросов")
+
+                if self.enable_tracking:
+                    self._log_event(
+                        EventType.OUTLIERS_FILTERED,
+                        f"IQR фильтр исключил {len(iqr_outliers)} выбросов",
+                        {
+                            'outliers_count': len(iqr_outliers),
+                            'data_quality': data_quality
+                        }
+                    )
+
+            # Проверка достаточности данных
+            is_sufficient, sufficiency_reason = check_data_sufficiency(comparables_after_iqr)
+
+            if not is_sufficient:
+                logger.warning(f"⚠️ ПРЕДУПРЕЖДЕНИЕ: {sufficiency_reason}")
+
+                if self.enable_tracking:
+                    self._log_event(
+                        EventType.ANALYSIS_COMPLETED,
+                        f"Предупреждение о недостаточности данных: {sufficiency_reason}",
+                        {'data_quality': data_quality}
+                    )
+
+            comparables_to_process = comparables_after_iqr
+
+            # Сохраняем результаты статистического анализа
+            self.data_quality = data_quality
+        else:
+            data_quality = {'quality': 'unknown', 'cv': 0, 'quality_score': 50}
+            self.data_quality = data_quality
+            logger.info("⚠️ Статистический анализ отключен")
+
+        # Фильтруем выбросы (применяется к уже валидным данным)
         if request.filter_outliers:
-            self.filtered_comparables = self._filter_outliers(request.comparables)
-            self.metrics['comparables_filtered'] = len(request.comparables) - len(self.filtered_comparables)
+            self.filtered_comparables = self._filter_outliers(comparables_to_process)
+            self.metrics['comparables_filtered'] = len(comparables_to_process) - len(self.filtered_comparables)
 
             if self.enable_tracking:
                 self._log_event(EventType.OUTLIERS_FILTERED,
-                    f"Отфильтровано выбросов: {self.metrics['comparables_filtered']}",
+                    f"Статистическая фильтрация выбросов: {self.metrics['comparables_filtered']}",
                     {'filtered_count': self.metrics['comparables_filtered'],
                      'remaining_count': len(self.filtered_comparables)})
         else:
-            self.filtered_comparables = [c for c in request.comparables if not c.excluded]
+            self.filtered_comparables = [c for c in comparables_to_process if not c.excluded]
 
         # Сохраняем аналоги в лог
         if self.enable_tracking and self.property_log:

@@ -14,6 +14,20 @@ from .base_parser import BaseCianParser
 logger = logging.getLogger(__name__)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# ИМПОРТ ВАЛИДАТОРА
+# ═══════════════════════════════════════════════════════════════════════════
+
+try:
+    from ..analytics.data_validator import validate_comparable
+    from ..models.property import ComparableProperty
+    from pydantic import ValidationError
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+    logger.warning("⚠️ Валидатор данных недоступен - фильтрация отключена")
+
+
 def detect_region_from_url(url: str) -> str:
     """
     Автоопределение региона по URL объекта
@@ -505,6 +519,75 @@ class PlaywrightParser(BaseCianParser):
 
         return data
 
+    def _validate_and_prepare_results(
+        self,
+        results: List[Dict],
+        limit: int,
+        enable_validation: bool = True
+    ) -> List[Dict]:
+        """
+        Валидация и подготовка результатов перед возвратом
+
+        Args:
+            results: Список спарсенных объявлений
+            limit: Максимальное количество результатов
+            enable_validation: Включить валидацию данных
+
+        Returns:
+            Список валидных и подготовленных результатов
+        """
+        if not results:
+            return []
+
+        # Маппинг полей для Pydantic моделей
+        for result in results:
+            if 'area_value' in result and result['area_value']:
+                result['total_area'] = result['area_value']
+            if 'price_raw' in result and result['price_raw']:
+                result['price'] = result['price_raw']
+            # Конвертируем rooms в int если это строка с цифрой
+            if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
+                result['rooms'] = int(result['rooms'])
+
+        # Валидация (если доступна)
+        if enable_validation and VALIDATION_AVAILABLE:
+            validated = []
+            excluded_count = 0
+
+            for i, result in enumerate(results):
+                try:
+                    # Создаем ComparableProperty для валидации
+                    comp = ComparableProperty(**result)
+
+                    # Проверяем валидность
+                    is_valid, details = validate_comparable(comp)
+
+                    if is_valid:
+                        validated.append(result)
+                        logger.debug(
+                            f"✓ Результат {i+1}: валиден "
+                            f"(полнота: {details.get('completeness', 0):.0f}%)"
+                        )
+                    else:
+                        excluded_count += 1
+                        failures_str = '; '.join(details.get('failures', []))
+                        logger.debug(f"✗ Результат {i+1}: ИСКЛЮЧЕН - {failures_str}")
+
+                except ValidationError as e:
+                    excluded_count += 1
+                    logger.debug(f"✗ Результат {i+1}: невалидная структура данных - {e}")
+
+            if excluded_count > 0:
+                logger.info(
+                    f"📊 Валидация: {len(results)} → {len(validated)} "
+                    f"(исключено {excluded_count} некачественных)"
+                )
+
+            results = validated
+
+        # Ограничиваем количество
+        return results[:limit]
+
     def search_similar_in_building(self, target_property: Dict, limit: int = 20) -> List[Dict]:
         """
         Поиск похожих квартир в том же ЖК (жилом комплексе)
@@ -550,17 +633,9 @@ class PlaywrightParser(BaseCianParser):
             results = self.parse_search_page(residential_complex_url)
 
             if results:
-                # Маппинг полей для Pydantic моделей
-                for result in results:
-                    if 'area_value' in result and result['area_value']:
-                        result['total_area'] = result['area_value']
-                    if 'price_raw' in result and result['price_raw']:
-                        result['price'] = result['price_raw']
-                    if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
-                        result['rooms'] = int(result['rooms'])
-
                 logger.info(f"✓ Найдено {len(results)} объявлений через прямую ссылку на ЖК")
-                return results[:limit]
+                # Валидация и подготовка
+                return self._validate_and_prepare_results(results, limit)
             else:
                 logger.warning("⚠️ По прямой ссылке ничего не найдено, пробуем текстовый поиск")
 
@@ -642,23 +717,10 @@ class PlaywrightParser(BaseCianParser):
                 elif i < 3:
                     logger.debug(f"     ✗ Пропущена (мало совпадений: {matching_in_title} в title, {matching_in_address} в address)")
 
-        # Ограничиваем количество
-        limited_results = filtered_results[:limit]
+        logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений в ЖК {residential_complex}")
 
-        # Маппинг полей для Pydantic моделей
-        # Парсер карточек возвращает 'area_value' и 'price_raw', но модели ожидают 'total_area' и 'price'
-        for result in limited_results:
-            if 'area_value' in result and result['area_value']:
-                result['total_area'] = result['area_value']
-            if 'price_raw' in result and result['price_raw']:
-                result['price'] = result['price_raw']
-            # Конвертируем rooms в int если это строка с цифрой
-            if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
-                result['rooms'] = int(result['rooms'])
-
-        logger.info(f"✓ Найдено {len(limited_results)} похожих объявлений в ЖК {residential_complex}")
-
-        return limited_results
+        # Валидация и подготовка
+        return self._validate_and_prepare_results(filtered_results, limit)
 
     def search_similar(self, target_property: Dict, limit: int = 20) -> List[Dict]:
         """
@@ -703,20 +765,7 @@ class PlaywrightParser(BaseCianParser):
         # Парсим результаты
         results = self.parse_search_page(url)
 
-        # Ограничиваем количество
-        limited_results = results[:limit]
+        logger.info(f"✓ Найдено {len(results)} похожих объявлений")
 
-        # Маппинг полей для Pydantic моделей
-        # Парсер карточек возвращает 'area_value' и 'price_raw', но модели ожидают 'total_area' и 'price'
-        for result in limited_results:
-            if 'area_value' in result and result['area_value']:
-                result['total_area'] = result['area_value']
-            if 'price_raw' in result and result['price_raw']:
-                result['price'] = result['price_raw']
-            # Конвертируем rooms в int если это строка с цифрой
-            if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
-                result['rooms'] = int(result['rooms'])
-
-        logger.info(f"✓ Найдено {len(limited_results)} похожих объявлений")
-
-        return limited_results
+        # Валидация и подготовка
+        return self._validate_and_prepare_results(results, limit)

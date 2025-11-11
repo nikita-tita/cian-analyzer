@@ -303,3 +303,210 @@ def get_price_liquidity_coefficient(price: float) -> float:
         return 0.96
     else:
         return 1.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# АДАПТИВНЫЕ КОЭФФИЦИЕНТЫ (DATA-DRIVEN) - ФАЗА 3
+# ═══════════════════════════════════════════════════════════════════════════
+
+import statistics
+import logging
+from typing import List, Tuple, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+
+def calculate_floor_coefficient_adaptive(
+    target_floor: int,
+    target_total_floors: int,
+    comparables: List
+) -> Tuple[float, Dict[str, Any]]:
+    """
+    АДАПТИВНЫЙ коэффициент этажа - рассчитывается из данных конкретного дома
+
+    Проблема фиксированного коэффициента:
+    - В 7-этажном доме: 6/7 этаж может быть ПРЕМИУМОМ (панорама)
+    - Но фиксированный коэффициент дает штраф -2%
+    - Это СИСТЕМНАЯ ОШИБКА!
+
+    Решение:
+    - Группируем аналоги по зонам этажа (низ/середина/верх)
+    - Считаем среднюю цену/м² по зонам
+    - Если высокие этажи дороже - даем бонус, если дешевле - штраф
+
+    Args:
+        target_floor: Этаж целевого объекта
+        target_total_floors: Всего этажей в доме
+        comparables: Список аналогов (должны иметь атрибуты floor, total_floors, price_per_sqm)
+
+    Returns:
+        Tuple[float, dict]:
+            - coefficient: адаптивный коэффициент (0.85-1.15)
+            - explanation: детали расчета
+    """
+    # Фильтруем аналоги с данными об этаже
+    with_floors = [
+        c for c in comparables
+        if hasattr(c, 'floor') and c.floor
+        and hasattr(c, 'total_floors') and c.total_floors
+        and hasattr(c, 'price_per_sqm') and c.price_per_sqm
+    ]
+
+    if len(with_floors) < 5:
+        # Недостаточно данных - используем фиксированный
+        fixed_coef = get_floor_coefficient(target_floor, target_total_floors)
+        return fixed_coef, {
+            'type': 'fixed',
+            'reason': f'Недостаточно данных для адаптивного расчета ({len(with_floors)} < 5)',
+            'fallback_coefficient': fixed_coef
+        }
+
+    # Вычисляем относительный этаж целевого объекта
+    target_ratio = target_floor / target_total_floors
+
+    # Группируем аналоги по зонам
+    low_floors = []   # < 30%
+    mid_floors = []   # 30-70%
+    high_floors = []  # > 70%
+
+    for comp in with_floors:
+        ratio = comp.floor / comp.total_floors
+
+        if ratio < 0.3:
+            low_floors.append(comp.price_per_sqm)
+        elif ratio <= 0.7:
+            mid_floors.append(comp.price_per_sqm)
+        else:
+            high_floors.append(comp.price_per_sqm)
+
+    # Проверяем достаточность данных
+    zones_with_data = sum([len(low_floors) > 0, len(mid_floors) > 0, len(high_floors) > 0])
+
+    if zones_with_data < 2 or len(mid_floors) == 0:
+        # Нет данных хотя бы в 2 зонах - fallback
+        fixed_coef = get_floor_coefficient(target_floor, target_total_floors)
+        return fixed_coef, {
+            'type': 'fixed',
+            'reason': f'Недостаточно данных по зонам этажей (зон с данными: {zones_with_data})',
+            'fallback_coefficient': fixed_coef
+        }
+
+    # Считаем средние цены по зонам
+    avg_low = statistics.mean(low_floors) if low_floors else None
+    avg_mid = statistics.mean(mid_floors)
+    avg_high = statistics.mean(high_floors) if high_floors else None
+
+    # Определяем коэффициент для целевого этажа
+    if target_ratio < 0.3 and avg_low:
+        coef = avg_low / avg_mid
+        zone = 'низкий'
+        zone_description = f'{target_floor} из {target_total_floors} ({target_ratio:.0%})'
+    elif target_ratio > 0.7 and avg_high:
+        coef = avg_high / avg_mid
+        zone = 'высокий'
+        zone_description = f'{target_floor} из {target_total_floors} ({target_ratio:.0%})'
+    else:
+        coef = 1.0
+        zone = 'средний'
+        zone_description = f'{target_floor} из {target_total_floors} ({target_ratio:.0%})'
+
+    # Ограничиваем разумными пределами
+    coef_raw = coef
+    coef = max(0.85, min(coef, 1.15))
+
+    logger.debug(f"Адаптивный коэффициент этажа: {coef:.3f} (зона: {zone})")
+    logger.debug(f"  Низкие этажи: {avg_low:,.0f} ₽/м² ({len(low_floors)} шт)" if avg_low else "  Низкие этажи: нет данных")
+    logger.debug(f"  Средние этажи: {avg_mid:,.0f} ₽/м² ({len(mid_floors)} шт)")
+    logger.debug(f"  Высокие этажи: {avg_high:,.0f} ₽/м² ({len(high_floors)} шт)" if avg_high else "  Высокие этажи: нет данных")
+
+    explanation = {
+        'type': 'adaptive',
+        'zone': zone,
+        'zone_description': zone_description,
+        'avg_low': avg_low,
+        'avg_mid': avg_mid,
+        'avg_high': avg_high,
+        'coefficient_raw': coef_raw,
+        'coefficient_capped': coef,
+        'data_points': {
+            'low': len(low_floors),
+            'mid': len(mid_floors),
+            'high': len(high_floors)
+        }
+    }
+
+    return coef, explanation
+
+
+def calculate_area_coefficient_adaptive(
+    target_area: float,
+    comparables: List
+) -> Tuple[float, Dict[str, Any]]:
+    """
+    АДАПТИВНЫЙ коэффициент площади
+
+    Логика:
+    - Если все аналоги примерно одинаковой площади → нет корректировки
+    - Если есть разброс → применяем эластичность (-8% за каждые 100% увеличения)
+
+    Args:
+        target_area: Площадь целевого объекта
+        comparables: Список аналогов
+
+    Returns:
+        Tuple[float, dict]: (coefficient, explanation)
+    """
+    areas = [
+        c.total_area for c in comparables
+        if hasattr(c, 'total_area') and c.total_area
+    ]
+
+    if len(areas) < 3:
+        # Fallback на старую логику
+        median_area = statistics.median(areas) if areas else target_area
+        fixed_coef = get_area_coefficient(target_area, median_area)
+        return fixed_coef, {
+            'type': 'fixed',
+            'reason': f'Недостаточно данных ({len(areas)} < 3)'
+        }
+
+    # Проверяем разброс площадей
+    median_area = statistics.median(areas)
+    std_dev = statistics.stdev(areas) if len(areas) > 1 else 0
+    area_cv = std_dev / median_area if median_area > 0 else 0
+
+    if area_cv < 0.15:
+        # Все аналоги близки по площади - не корректируем
+        return 1.0, {
+            'type': 'no_adjustment',
+            'reason': f'Все аналоги близки по площади (CV={area_cv:.1%})',
+            'median_area': median_area,
+            'target_area': target_area
+        }
+
+    # Есть разброс - считаем эластичность
+    area_diff_pct = (target_area - median_area) / median_area
+
+    # Эластичность: -8% за каждые 100% увеличения площади
+    # (большие квартиры обычно дешевле за м²)
+    elasticity = -0.08
+    coef = 1 + (area_diff_pct * elasticity)
+
+    # Ограничиваем
+    coef_raw = coef
+    coef = max(0.90, min(coef, 1.10))
+
+    logger.debug(f"Адаптивный коэффициент площади: {coef:.3f}")
+    logger.debug(f"  Целевая: {target_area:.1f} м², медиана: {median_area:.1f} м²")
+    logger.debug(f"  Разница: {area_diff_pct:+.1%}, CV: {area_cv:.1%}")
+
+    return coef, {
+        'type': 'adaptive',
+        'median_area': median_area,
+        'target_area': target_area,
+        'area_diff_percent': area_diff_pct * 100,
+        'area_cv': area_cv * 100,
+        'elasticity': elasticity,
+        'coefficient_raw': coef_raw,
+        'coefficient_capped': coef
+    }
