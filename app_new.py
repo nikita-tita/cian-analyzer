@@ -1341,7 +1341,6 @@ def export_report(session_id):
         # Генерируем PDF используя Playwright
         from datetime import datetime
         import asyncio
-        import concurrent.futures
 
         if not PLAYWRIGHT_AVAILABLE:
             # Fallback to markdown if playwright not available
@@ -1352,18 +1351,8 @@ def export_report(session_id):
         base_url = request.url_root.rstrip('/')
         report_url = f"{base_url}/report/{session_id}"
 
-        # Генерируем PDF в отдельном потоке с новым event loop
-        def run_async_in_thread():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(_generate_pdf_from_page(report_url))
-            finally:
-                loop.close()
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_async_in_thread)
-            pdf_bytes = future.result(timeout=120)  # 2 минуты на генерацию PDF
+        # Генерируем PDF
+        pdf_bytes = asyncio.run(_generate_pdf_from_page(report_url))
 
         # Возвращаем PDF файл
         from flask import Response
@@ -1435,6 +1424,50 @@ def view_report(session_id):
     except Exception as e:
         logger.error(f"Ошибка отображения отчета: {e}", exc_info=True)
         return f"Ошибка генерации отчета: {str(e)}", 500
+
+
+@app.route('/api/contact-request', methods=['POST'])
+def contact_request():
+    """
+    Обработка заявки на контакт от клиента
+    """
+    try:
+        data = request.get_json()
+
+        name = data.get('name', '').strip()
+        phone = data.get('phone', '').strip()
+        email = data.get('email', '').strip()
+        comment = data.get('comment', '').strip()
+        session_id = data.get('session_id', '')
+
+        # Валидация обязательных полей
+        if not name or not phone:
+            return jsonify({'error': 'Имя и телефон обязательны'}), 400
+
+        # Логируем заявку
+        logger.info(f"=== НОВАЯ ЗАЯВКА НА КОНТАКТ ===")
+        logger.info(f"Имя: {name}")
+        logger.info(f"Телефон: {phone}")
+        logger.info(f"Email: {email if email else 'не указан'}")
+        logger.info(f"Комментарий: {comment if comment else 'нет'}")
+        logger.info(f"Session ID: {session_id}")
+        logger.info(f"================================")
+
+        # TODO: Здесь можно добавить:
+        # - Отправку email уведомления
+        # - Отправку в CRM
+        # - Отправку в Telegram
+        # - Сохранение в базу данных
+
+        # Пока просто возвращаем успех
+        return jsonify({
+            'success': True,
+            'message': 'Заявка принята'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
 async def _generate_pdf_from_page(url: str) -> bytes:
