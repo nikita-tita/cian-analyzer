@@ -322,6 +322,131 @@
             </div>
         </div>
 
+        <!-- Уверенность в расчете -->
+        {% if fair_price_analysis and fair_price_analysis.confidence %}
+        <div class="section">
+            <h2 class="section-title">✅ Уверенность в расчете справедливой цены</h2>
+
+            <div class="info-card">
+                {% set confidence = fair_price_analysis.confidence %}
+
+                <!-- Визуальный индикатор уверенности -->
+                <div style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span class="info-label" style="font-size: 16px;">Уровень уверенности</span>
+                        <span class="info-value" style="font-size: 20px; font-weight: 700;">
+                            {{ confidence.confidence_score }}/100 — {{ confidence.level }}
+                        </span>
+                    </div>
+
+                    <!-- Прогресс-бар с градиентной заливкой -->
+                    <div style="background: #f0f0f0; height: 24px; border-radius: 4px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                        {% if confidence.confidence_score >= 70 %}
+                            {% set bar_color = '#4ADE80' %}
+                        {% elif confidence.confidence_score >= 50 %}
+                            {% set bar_color = '#F59E0B' %}
+                        {% else %}
+                            {% set bar_color = '#EF4444' %}
+                        {% endif %}
+                        <div style="
+                            width: {{ confidence.confidence_score }}%;
+                            background: {{ bar_color }};
+                            height: 100%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: flex-end;
+                            padding-right: 10px;
+                            font-weight: 600;
+                            color: white;
+                            font-size: 13px;
+                            transition: width 0.5s ease;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        ">
+                            {% if confidence.confidence_score > 15 %}{{ confidence.confidence_score }}%{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Рекомендация (в рамке) -->
+                <div style="
+                    background: {% if confidence.confidence_score >= 70 %}#f0fdf4{% elif confidence.confidence_score >= 50 %}#fffbeb{% else %}#fef2f2{% endif %};
+                    border-left: 4px solid {{ bar_color }};
+                    padding: 16px;
+                    border-radius: 4px;
+                    margin-bottom: 25px;
+                ">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: #000;">
+                        💡 Рекомендация
+                    </div>
+                    <div style="color: #333; line-height: 1.6;">
+                        {{ confidence.recommendation }}
+                    </div>
+                </div>
+
+                <!-- Факторы уверенности -->
+                <h3 class="subsection-title">Что влияет на уверенность:</h3>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for reason in confidence.reasons %}
+                    <li style="
+                        padding: 10px 12px;
+                        margin-bottom: 8px;
+                        background: #f9fafb;
+                        border-left: 3px solid {% if '✨' in reason %}#3B82F6{% elif '+' in reason %}#4ADE80{% elif '-' in reason %}#EF4444{% else %}#9CA3AF{% endif %};
+                        border-radius: 0 4px 4px 0;
+                        font-size: 15px;
+                        line-height: 1.5;
+                    ">
+                        {{ reason }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Детальный расчет (expandable) -->
+            {% if fair_price_analysis.detailed_report %}
+            <details style="margin-top: 25px; cursor: pointer;">
+                <summary style="
+                    padding: 15px 20px;
+                    background: #f5f5f5;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 16px;
+                    list-style: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.3s;
+                    user-select: none;
+                ">
+                    <span style="font-size: 20px;">📊</span>
+                    <span>Показать детальный расчет справедливой цены</span>
+                    <span style="margin-left: auto; font-size: 12px; color: #666;">▼</span>
+                </summary>
+                <div style="
+                    background: #fafafa;
+                    border: 1px solid #e0e0e0;
+                    border-top: none;
+                    padding: 20px;
+                    margin-top: -4px;
+                    border-radius: 0 0 4px 4px;
+                ">
+                    <pre style="
+                        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+                        font-size: 13px;
+                        line-height: 1.7;
+                        color: #1a1a1a;
+                        margin: 0;
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                        overflow-x: auto;
+                    ">{{ fair_price_analysis.detailed_report }}</pre>
+                </div>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Персональные рекомендации -->
         {% if recommendations and recommendations|length > 0 %}
         <div class="section">
