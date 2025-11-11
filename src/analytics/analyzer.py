@@ -1136,12 +1136,11 @@ class RealEstateAnalyzer:
                 'premium_percent': 6
             })
 
-        if target.total_area and target.total_area > 150:
-            strengths.append({
-                'factor': 'Большая площадь',
-                'impact': 5,
-                'premium_percent': 5
-            })
+        # УДАЛЕНО: "Большая площадь" как премия
+        # Причина: Большая площадь НЕ является премией за м².
+        # - Обычно есть СКИДКА за м² при большой площади (эффект масштаба)
+        # - Большая квартира менее ликвидна (меньше покупателей)
+        # - Уже учтено в адаптивном коэффициенте площади (Phase 3)
 
         # Слабые стороны
         if target.living_area and target.total_area:
