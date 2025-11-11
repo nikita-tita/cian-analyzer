@@ -83,7 +83,7 @@ def calculate_fair_price_with_medians(
 
     # === КЛАСТЕР 2: ХАРАКТЕРИСТИКИ КВАРТИРЫ ===
     multiplier, adjustments = _apply_apartment_features_adjustments(
-        target, medians, comparison, multiplier, adjustments
+        target, medians, comparison, multiplier, adjustments, comparables
     )
 
     # === КЛАСТЕР 3: РАСПОЛОЖЕНИЕ В ДОМЕ ===
@@ -240,7 +240,7 @@ def _apply_repair_adjustment(target, medians, comparison, multiplier, adjustment
     return multiplier, adjustments
 
 
-def _apply_apartment_features_adjustments(target, medians, comparison, multiplier, adjustments):
+def _apply_apartment_features_adjustments(target, medians, comparison, multiplier, adjustments, comparables):
     """Применить корректировки за характеристики квартиры"""
 
     # Высота потолков
