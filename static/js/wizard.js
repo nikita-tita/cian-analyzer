@@ -1254,67 +1254,86 @@ const screen3 = {
         const { situation, goal, actions, result, commission_option, prepay_option, price_tier } = offer;
 
         let html = `
-            <h3 class="mb-4">🎯 Как Housler поможет продать ваш объект</h3>
+            <div style="border-top: 1px solid var(--gray-300); padding-top: var(--spacing-3xl); margin-top: var(--spacing-3xl);">
 
-            <!-- Текущая ситуация -->
-            <div class="alert alert-warning mb-4">
-                <h5 class="alert-heading">📊 Что показывает первичный анализ</h5>
-                <p class="mb-0">
+                <!-- Заголовок секции -->
+                <h2 style="font-size: var(--text-2xl); font-weight: 400; letter-spacing: -0.02em; margin-bottom: var(--spacing-xl); color: var(--black);">
+                    Как Housler продаст ваш объект
+                </h2>
+
+                <!-- Текущая ситуация -->
+                <div style="background: var(--gray-100); padding: var(--spacing-xl); border-left: 2px solid var(--gray-800); margin-bottom: var(--spacing-xl);">
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-sm); font-weight: 500;">
+                        Первичный анализ
+                    </div>
+                    <div style="font-size: var(--text-base); line-height: var(--leading-relaxed); color: var(--gray-800);">
         `;
 
         // Анализ ситуации в зависимости от статуса цены
         if (situation.price_status === 'overpriced') {
             html += `
-                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>.
-                Математическая модель показывает отклонение <strong>на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% выше</strong> средних аналогов.
+                Ваш объект оценен в <strong style="font-weight: 600;">${utils.formatPrice(situation.current_price || 0)}</strong>.
+                Математическая модель показывает отклонение <strong style="font-weight: 600;">на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% выше</strong> средних аналогов.
                 <br><br>
-                <em>Важно:</em> это лишь математика по базовым параметрам. При работе мы учтём десятки дополнительных факторов —
+                <span style="color: var(--gray-600); font-size: var(--text-sm);">
+                Это лишь математика по базовым параметрам. При работе мы учтём десятки дополнительных факторов —
                 от уникальности планировки до эмоциональной привлекательности объекта.
+                </span>
             `;
         } else if (situation.price_status === 'underpriced') {
             html += `
-                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>.
-                Математическая модель показывает, что цена <strong>на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% ниже</strong> средних аналогов.
+                Ваш объект оценен в <strong style="font-weight: 600;">${utils.formatPrice(situation.current_price || 0)}</strong>.
+                Математическая модель показывает, что цена <strong style="font-weight: 600;">на ${Math.abs(situation.price_diff_percent || 0).toFixed(0)}% ниже</strong> средних аналогов.
                 <br><br>
+                <span style="color: var(--gray-600); font-size: var(--text-sm);">
                 Это может быть конкурентным преимуществом, но также проанализируем возможность повышения
                 стоимости за счет улучшения презентации и позиционирования.
+                </span>
             `;
         } else {
             html += `
-                Ваш объект оценен в <strong>${utils.formatPrice(situation.current_price || 0)}</strong>,
+                Ваш объект оценен в <strong style="font-weight: 600;">${utils.formatPrice(situation.current_price || 0)}</strong>,
                 что соответствует средним показателям аналогов по базовым параметрам.
                 <br><br>
+                <span style="color: var(--gray-600); font-size: var(--text-sm);">
                 При работе мы найдем уникальные преимущества вашего объекта, которые математика не учитывает,
                 и построим стратегию максимально выгодной продажи.
+                </span>
             `;
         }
 
         html += `
-                </p>
-            </div>
+                    </div>
+                </div>
 
-            <!-- Наша цель -->
-            <div class="alert alert-info mb-4">
-                <h5 class="alert-heading">🎯 Наша цель</h5>
-                <p class="mb-0">${goal}</p>
-            </div>
+                <!-- Наша цель -->
+                <div style="background: var(--gray-100); padding: var(--spacing-xl); margin-bottom: var(--spacing-xl);">
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-sm); font-weight: 500;">
+                        Наша цель
+                    </div>
+                    <div style="font-size: var(--text-base); line-height: var(--leading-relaxed); color: var(--gray-800);">
+                        ${goal}
+                    </div>
+                </div>
 
-            <!-- План действий -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title">✅ Что мы сделаем</h5>
-                    <div class="row">
+                <!-- План действий -->
+                <div style="margin-bottom: var(--spacing-xl);">
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-md); font-weight: 500;">
+                        Что мы сделаем
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1px; background: var(--gray-300);">
         `;
 
         actions.forEach((action, index) => {
             html += `
-                <div class="col-md-6 mb-3">
-                    <div class="d-flex">
-                        <div class="me-3" style="font-size: 24px;">${action.icon}</div>
-                        <div>
-                            <strong>${action.title}</strong>
-                            <p class="text-muted small mb-0">${action.description}</p>
-                        </div>
+                <div style="background: white; padding: var(--spacing-lg); transition: background var(--transition-base);"
+                     onmouseover="this.style.background='var(--gray-100)'"
+                     onmouseout="this.style.background='white'">
+                    <div style="font-weight: 500; margin-bottom: var(--spacing-xs); color: var(--black);">
+                        ${action.title}
+                    </div>
+                    <div style="font-size: var(--text-sm); color: var(--gray-600); line-height: var(--leading-normal);">
+                        ${action.description}
                     </div>
                 </div>
             `;
@@ -1323,44 +1342,81 @@ const screen3 = {
         html += `
                     </div>
                 </div>
-            </div>
 
-            <!-- Прогноз результата -->
-            <div class="alert alert-success mb-4">
-                <h5 class="alert-heading">💫 Наш прогноз</h5>
-                <p class="mb-2">
-                    <strong>Целевой срок продажи:</strong> ${result.timeline}<br>
-                    <strong>Целевой диапазон цены:</strong> ${result.final_price_formatted}<br>
-                    <strong>Уровень уверенности:</strong> ${result.confidence}
-                </p>
-                <p class="mb-0 small"><em>
-                    Точная стратегия и финальная цена будут определены после детальной диагностики
-                    и анализа всех факторов, которые математическая модель не учитывает.
-                </em></p>
-            </div>
-
-            <!-- Варианты оплаты -->
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">💳 Выберите удобный вариант оплаты</h5>
-                    <p class="text-muted">Ваш объект относится к диапазону: <strong>${price_tier.range}</strong></p>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="card border-primary">
-                                <div class="card-body">
-                                    <h6 class="text-primary">Опция A — Комиссия</h6>
-                                    <div class="display-6 my-3">${commission_option.value}</div>
-                                    <p class="text-muted small">${commission_option.description}</p>
-                                </div>
+                <!-- Прогноз результата (черный блок) -->
+                <div style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: white; padding: var(--spacing-xl); margin-bottom: var(--spacing-xl);">
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: var(--spacing-md); font-weight: 500;">
+                        Наш прогноз
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-md);">
+                        <div>
+                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; margin-bottom: var(--spacing-xs);">
+                                Целевой срок
+                            </div>
+                            <div style="font-size: var(--text-xl); font-weight: 300;">
+                                ${result.timeline}
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="card border-success">
-                                <div class="card-body">
-                                    <h6 class="text-success">Опция B — Предоплата + успех</h6>
-                                    <div class="display-6 my-3">${prepay_option.prepay}</div>
-                                    <p class="text-muted small">${prepay_option.description}</p>
-                                </div>
+                        <div>
+                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; margin-bottom: var(--spacing-xs);">
+                                Целевой диапазон
+                            </div>
+                            <div style="font-size: var(--text-xl); font-weight: 300;">
+                                ${result.final_price_formatted}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; margin-bottom: var(--spacing-xs);">
+                                Уверенность
+                            </div>
+                            <div style="font-size: var(--text-xl); font-weight: 300; text-transform: capitalize;">
+                                ${result.confidence}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size: var(--text-sm); opacity: 0.7; line-height: var(--leading-relaxed); padding-top: var(--spacing-md); border-top: 1px solid rgba(255,255,255,0.1);">
+                        Точная стратегия и финальная цена будут определены после детальной диагностики
+                        и анализа всех факторов, которые математическая модель не учитывает.
+                    </div>
+                </div>
+
+                <!-- Варианты оплаты -->
+                <div style="margin-bottom: var(--spacing-xl);">
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-xs); font-weight: 500;">
+                        Выберите удобный вариант
+                    </div>
+                    <div style="font-size: var(--text-sm); color: var(--gray-600); margin-bottom: var(--spacing-lg);">
+                        Ваш объект: <strong style="color: var(--black);">${price_tier.range}</strong>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--spacing-lg);">
+
+                        <!-- Опция A -->
+                        <div style="border: 1px solid var(--gray-300); padding: var(--spacing-xl); transition: all var(--transition-base); cursor: pointer;"
+                             onmouseover="this.style.borderColor='var(--black)'; this.style.boxShadow='var(--shadow-md)'"
+                             onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none'">
+                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-lg); font-weight: 500;">
+                                Опция A — Комиссия
+                            </div>
+                            <div style="font-size: 40px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: var(--spacing-lg); color: var(--black);">
+                                ${commission_option.value}
+                            </div>
+                            <div style="font-size: var(--text-sm); color: var(--gray-600); line-height: var(--leading-relaxed);">
+                                ${commission_option.description}
+                            </div>
+                        </div>
+
+                        <!-- Опция B -->
+                        <div style="border: 1px solid var(--gray-300); padding: var(--spacing-xl); transition: all var(--transition-base); cursor: pointer;"
+                             onmouseover="this.style.borderColor='var(--black)'; this.style.boxShadow='var(--shadow-md)'"
+                             onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none'">
+                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-lg); font-weight: 500;">
+                                Опция B — Предоплата + успех
+                            </div>
+                            <div style="font-size: 40px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: var(--spacing-lg); color: var(--black);">
+                                ${prepay_option.prepay}
+                            </div>
+                            <div style="font-size: var(--text-sm); color: var(--gray-600); line-height: var(--leading-relaxed);">
+                                ${prepay_option.description}
                             </div>
                         </div>
                     </div>
