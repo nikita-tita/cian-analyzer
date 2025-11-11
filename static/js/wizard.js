@@ -192,7 +192,7 @@ const utils = {
                 // Save to localStorage
                 this.saveSessionToLocalStorage(sessionId);
 
-                // Determine which step to go to
+                // Determine which step to go to based on available data
                 let targetStep = 1;
                 if (state.analysis) {
                     targetStep = 3;
@@ -202,13 +202,26 @@ const utils = {
                     targetStep = 1;
                 }
 
-                // Check URL hash for step override
+                // ПРИОРИТЕТ: Check URL hash for step override (пользователь поделился ссылкой на конкретный шаг)
                 const hash = window.location.hash;
                 const hashMatch = hash.match(/#step-(\d+)/);
                 if (hashMatch) {
                     const hashStep = parseInt(hashMatch[1]);
+                    // Проверяем, что запрошенный шаг доступен
                     if (hashStep >= 1 && hashStep <= 3) {
-                        targetStep = hashStep;
+                        // Если запрошен шаг 3, но анализа нет - игнорируем hash
+                        if (hashStep === 3 && !state.analysis) {
+                            console.warn('Шаг 3 запрошен, но анализа нет. Переход на доступный шаг:', targetStep);
+                        }
+                        // Если запрошен шаг 2, но аналогов нет - игнорируем hash
+                        else if (hashStep === 2 && state.comparables.length === 0) {
+                            console.warn('Шаг 2 запрошен, но аналогов нет. Переход на доступный шаг:', targetStep);
+                        }
+                        // Если данные есть - используем hash
+                        else {
+                            targetStep = hashStep;
+                            console.log('Переход на шаг из URL hash:', targetStep);
+                        }
                     }
                 }
 
@@ -217,7 +230,7 @@ const utils = {
                     screen1.displayParseResult(state.targetProperty, []);
                 }
                 if (state.comparables.length > 0) {
-                    screen2.renderComparables(); // Исправлено: было displayComparables
+                    screen2.renderComparables();
                 }
                 if (state.analysis) {
                     screen3.displayAnalysis(state.analysis);
@@ -231,6 +244,7 @@ const utils = {
                     floatingButtons.updateButtons();
                 }
 
+                console.log(`Сессия загружена: шаг ${targetStep}, анализ: ${!!state.analysis}, аналогов: ${state.comparables.length}`);
                 this.showToast('Сессия загружена успешно', 'success');
                 return true;
             } else {
@@ -1154,6 +1168,16 @@ const screen3 = {
 
     renderRecommendations(recommendations) {
         const container = document.getElementById('recommendations-list');
+        const recommendationsContainer = document.getElementById('recommendations-container');
+
+        // ВСЕГДА показываем контейнер рекомендаций
+        recommendationsContainer.style.display = 'block';
+
+        // Если нет рекомендаций, показываем сообщение
+        if (!recommendations || recommendations.length === 0) {
+            container.innerHTML = '<p class="text-muted">Нет рекомендаций для данного объекта</p>';
+            return;
+        }
 
         // Группируем рекомендации по приоритету
         const priorities = {
@@ -1235,9 +1259,6 @@ const screen3 = {
         }
 
         container.innerHTML = html;
-
-        // Показываем контейнер рекомендаций
-        document.getElementById('recommendations-container').style.display = 'block';
     },
 
     renderHouslerOffer(offer) {
@@ -1425,7 +1446,7 @@ const screen3 = {
                 <!-- CTA кнопка -->
                 <div style="margin-top: var(--spacing-3xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--gray-300); text-align: center;">
                     <button
-                        onclick="screen3.showContactForm()"
+                        id="housler-cta-button"
                         style="background: var(--black); color: var(--white); border: 2px solid var(--black); padding: 18px 48px; font-size: var(--text-lg); font-weight: 500; cursor: pointer; transition: all var(--transition-base); letter-spacing: 0.02em;"
                         onmouseover="this.style.background='var(--white)'; this.style.color='var(--black)'"
                         onmouseout="this.style.background='var(--black)'; this.style.color='var(--white)'">
@@ -1440,6 +1461,19 @@ const screen3 = {
 
         document.getElementById('housler-offer-container').innerHTML = html;
         document.getElementById('housler-offer-container').style.display = 'block';
+
+        // Привязываем обработчик к кнопке CTA после рендеринга
+        const ctaButton = document.getElementById('housler-cta-button');
+        if (ctaButton) {
+            ctaButton.addEventListener('click', () => {
+                if (window.screen3 && typeof window.screen3.showContactForm === 'function') {
+                    window.screen3.showContactForm();
+                } else {
+                    console.error('screen3.showContactForm is not available');
+                    utils.showToast('Ошибка загрузки формы. Попробуйте обновить страницу.', 'error');
+                }
+            });
+        }
     },
 
     showContactForm() {
