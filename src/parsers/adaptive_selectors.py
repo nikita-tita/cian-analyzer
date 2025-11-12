@@ -13,8 +13,10 @@
 
 import re
 import logging
-from typing import List, Dict, Any, Optional, Callable
-from bs4 import BeautifulSoup, Tag
+from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bs4 import BeautifulSoup, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +26,16 @@ class AdaptiveSelector:
     Адаптивный селектор для поиска элементов с множественными стратегиями
     """
 
-    def __init__(self, soup: BeautifulSoup):
+    def __init__(self, soup):
+        """
+        Args:
+            soup: BeautifulSoup объект для парсинга
+        """
         self.soup = soup
         self.stats = {}  # Статистика успешных селекторов
 
     def find_element(self, selectors: List[Dict[str, Any]],
-                     description: str = "элемент") -> Optional[Tag]:
+                     description: str = "элемент"):
         """
         Найти элемент, пробуя множество селекторов по приоритету
 
@@ -103,7 +109,7 @@ class AdaptiveSelector:
         return None
 
     def find_elements(self, selectors: List[Dict[str, Any]],
-                      description: str = "элементы") -> List[Tag]:
+                      description: str = "элементы"):
         """
         Найти все элементы, пробуя множество селекторов
 
@@ -245,13 +251,15 @@ METRO_SELECTORS = [
 # ФУНКЦИИ ИЗВЛЕЧЕНИЯ ДАННЫХ С АДАПТИВНЫМ ПАРСИНГОМ
 # ============================================================================
 
-def extract_price_with_fallback(elem: Tag) -> Dict[str, Any]:
+def extract_price_with_fallback(elem) -> Dict[str, Any]:
     """
     Извлечь цену из элемента с множественными стратегиями
 
     Returns:
         {'price': str, 'price_raw': int} или {'price': None, 'price_raw': None}
     """
+    from bs4 import BeautifulSoup
+
     selector = AdaptiveSelector(elem if isinstance(elem, BeautifulSoup) else BeautifulSoup(str(elem), 'lxml'))
 
     # Пробуем найти элемент с ценой
@@ -271,13 +279,15 @@ def extract_price_with_fallback(elem: Tag) -> Dict[str, Any]:
     return {'price': None, 'price_raw': None}
 
 
-def extract_area_with_fallback(elem: Tag) -> Dict[str, Any]:
+def extract_area_with_fallback(elem) -> Dict[str, Any]:
     """
     Извлечь площадь из элемента с множественными стратегиями
 
     Returns:
         {'area': str, 'area_value': float} или {'area': None, 'area_value': None}
     """
+    from bs4 import BeautifulSoup
+
     selector = AdaptiveSelector(elem if isinstance(elem, BeautifulSoup) else BeautifulSoup(str(elem), 'lxml'))
 
     # Пробуем найти элемент с площадью
