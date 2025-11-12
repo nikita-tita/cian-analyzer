@@ -40,6 +40,15 @@ from .coefficients import (
     calculate_area_coefficient_adaptive
 )
 
+# Импорт новых аддитивных helper-функций
+from .fair_price_additive_helpers import (
+    _apply_repair_adjustment_additive,
+    _apply_apartment_features_adjustments_additive,
+    _apply_position_adjustments_additive,
+    _apply_view_adjustments_additive,
+    _apply_risk_adjustments_additive
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +59,15 @@ def calculate_fair_price_with_medians(
     method: str = 'median'
 ) -> Dict:
     """
-    Правильный расчет справедливой цены
+    НОВАЯ ЛОГИКА РАСЧЕТА: Аддитивная модель с усреднением
+
+    Каждый фактор дает независимую оценку от базовой медианы:
+    - Вариант 1: median * (1 + коэфф_санузлов)
+    - Вариант 2: median * (1 + коэфф_вида)
+    - Вариант 3: median * (1 + коэфф_ремонта)
+    - ...
+
+    Финальная цена = MEDIAN/MEAN всех вариантов
 
     Args:
         target: Целевой объект
@@ -61,6 +78,8 @@ def calculate_fair_price_with_medians(
     Returns:
         Результат с полным расчетом
     """
+    import statistics
+
     # ШАГ 1: Рассчитываем медианы по переменным параметрам
     medians = calculate_medians_from_comparables(comparables)
 
@@ -72,61 +91,55 @@ def calculate_fair_price_with_medians(
     # ШАГ 2: Сравниваем целевой с медианами
     comparison = compare_target_with_medians(target, medians)
 
-    # ШАГ 3: Применяем коэффициенты ТОЛЬКО за отличия
+    # ШАГ 3: Применяем коэффициенты НЕЗАВИСИМО (аддитивная модель)
     adjustments = {}
-    multiplier = 1.0
+    price_estimates = []  # Каждый фактор дает свою оценку
 
     # === КЛАСТЕР 1: ОТДЕЛКА ===
-    multiplier, adjustments = _apply_repair_adjustment(
-        target, medians, comparison, multiplier, adjustments
+    price_estimates, adjustments = _apply_repair_adjustment_additive(
+        target, medians, comparison, base_price_per_sqm, price_estimates, adjustments
     )
 
     # === КЛАСТЕР 2: ХАРАКТЕРИСТИКИ КВАРТИРЫ ===
-    multiplier, adjustments = _apply_apartment_features_adjustments(
-        target, medians, comparison, multiplier, adjustments, comparables
+    price_estimates, adjustments = _apply_apartment_features_adjustments_additive(
+        target, medians, comparison, base_price_per_sqm, price_estimates, adjustments, comparables
     )
 
     # === КЛАСТЕР 3: РАСПОЛОЖЕНИЕ В ДОМЕ ===
-    multiplier, adjustments = _apply_position_adjustments(
-        target, medians, comparison, multiplier, adjustments, comparables
+    price_estimates, adjustments = _apply_position_adjustments_additive(
+        target, medians, comparison, base_price_per_sqm, price_estimates, adjustments, comparables
     )
 
-    # === КЛАСТЕР 4: ИНДИВИДУАЛЬНЫЕ ПАРАМЕТРЫ ===
-    multiplier, adjustments = _apply_individual_adjustments(
-        target, medians, comparison, multiplier, adjustments
+    # === КЛАСТЕР 4: ВИД И ЭСТЕТИКА ===
+    price_estimates, adjustments = _apply_view_adjustments_additive(
+        target, medians, comparison, base_price_per_sqm, price_estimates, adjustments
     )
 
-    # === КЛАСТЕР 5: ВИД И ЭСТЕТИКА ===
-    multiplier, adjustments = _apply_view_adjustments(
-        target, medians, comparison, multiplier, adjustments
+    # === КЛАСТЕР 5: РИСКИ И КАЧЕСТВО МАТЕРИАЛОВ ===
+    price_estimates, adjustments = _apply_risk_adjustments_additive(
+        target, medians, comparison, base_price_per_sqm, price_estimates, adjustments
     )
 
-    # === КЛАСТЕР 6: РИСКИ ===
-    multiplier, adjustments = _apply_risk_adjustments(
-        target, medians, comparison, multiplier, adjustments
-    )
+    # ШАГ 4: Усредняем все оценки
+    if not price_estimates:
+        # Нет ни одного коэффициента - используем базовую цену
+        logger.warning("Нет ни одного примененного коэффициента, используем базовую цену")
+        fair_price_per_sqm_mean = base_price_per_sqm
+        fair_price_per_sqm_median = base_price_per_sqm
+    else:
+        fair_price_per_sqm_mean = statistics.mean(price_estimates)
+        fair_price_per_sqm_median = statistics.median(price_estimates)
 
-    # ШАГ 4: Ограничение multiplier (от 0.7 до 1.4)
-    if multiplier < 0.7:
-        logger.warning(f"Multiplier слишком низкий: {multiplier:.3f}, ограничен до 0.7")
-        adjustments['multiplier_limit'] = {
-            'value': 0.7 / multiplier,
-            'description': f'Ограничение слишком низкого multiplier ({multiplier:.3f} → 0.7)',
-            'reason': 'Защита от чрезмерного штрафа'
-        }
-        multiplier = 0.7
-    elif multiplier > 1.4:
-        logger.warning(f"Multiplier слишком высокий: {multiplier:.3f}, ограничен до 1.4")
-        adjustments['multiplier_limit'] = {
-            'value': 1.4 / multiplier,
-            'description': f'Ограничение слишком высокого multiplier ({multiplier:.3f} → 1.4)',
-            'reason': 'Защита от чрезмерной премии'
-        }
-        multiplier = 1.4
+    # Используем метод из параметра
+    if method == 'mean':
+        fair_price_per_sqm = fair_price_per_sqm_mean
+    else:
+        fair_price_per_sqm = fair_price_per_sqm_median
 
-    # ШАГ 5: Финальный расчет
-    fair_price_per_sqm = base_price_per_sqm * multiplier
     fair_price_total = fair_price_per_sqm * (target.total_area or 0)
+
+    fair_price_total_mean = fair_price_per_sqm_mean * (target.total_area or 0)
+    fair_price_total_median = fair_price_per_sqm_median * (target.total_area or 0)
 
     current_price = target.price or 0
     price_diff_amount = current_price - fair_price_total
@@ -136,6 +149,13 @@ def calculate_fair_price_with_medians(
     is_overpriced = price_diff_percent > 5
     is_underpriced = price_diff_percent < -5
     is_fair = -5 <= price_diff_percent <= 5
+
+    # Логируем детали расчета
+    logger.info(f"Базовая цена (медиана аналогов): {base_price_per_sqm:,.0f} ₽/м²")
+    logger.info(f"Применено коэффициентов: {len(price_estimates)}")
+    logger.info(f"Справедливая цена (MEAN): {fair_price_per_sqm_mean:,.0f} ₽/м²")
+    logger.info(f"Справедливая цена (MEDIAN): {fair_price_per_sqm_median:,.0f} ₽/м²")
+    logger.info(f"Используется: {method.upper()} = {fair_price_per_sqm:,.0f} ₽/м²")
 
     # === РАСЧЕТ УВЕРЕННОСТИ И ГЕНЕРАЦИЯ ОТЧЕТА (ФАЗА 4) ===
     # Для расчета уверенности нужна информация о качестве данных
@@ -191,9 +211,13 @@ def calculate_fair_price_with_medians(
         'medians': medians,
         'comparison': comparison,
         'adjustments': adjustments,
-        'final_multiplier': multiplier,
-        'fair_price_per_sqm': fair_price_per_sqm,
+        'price_estimates': price_estimates,  # НОВОЕ: все независимые оценки
+        'fair_price_per_sqm': fair_price_per_sqm,  # Основная (median или mean)
+        'fair_price_per_sqm_mean': fair_price_per_sqm_mean,  # НОВОЕ: средняя
+        'fair_price_per_sqm_median': fair_price_per_sqm_median,  # НОВОЕ: медиана
         'fair_price_total': fair_price_total,
+        'fair_price_total_mean': fair_price_total_mean,  # НОВОЕ
+        'fair_price_total_median': fair_price_total_median,  # НОВОЕ
         'current_price': current_price,
         'price_diff_amount': price_diff_amount,
         'price_diff_percent': price_diff_percent,
@@ -519,18 +543,11 @@ def _apply_risk_adjustments(target, medians, comparison, multiplier, adjustments
         }
         multiplier *= coef
 
-    # Ликвидность (очень высокая цена)
-    if target.price:
-        coef = get_price_liquidity_coefficient(target.price)
-        if coef < 1.0:
-            adjustments['liquidity'] = {
-                'value': coef,
-                'description': f'Ликвидность: цена {target.price:,.0f} ₽ (высокая - низкая ликвидность)',
-                'target_value': target.price,
-                'median_value': None,
-                'type': 'variable'
-            }
-            multiplier *= coef
+    # УДАЛЕНО: Коэффициент ликвидности
+    # Причина: Циклическая логика - мы не можем корректировать справедливую цену
+    # на основе текущей цены объекта, т.к. мы пытаемся эту цену определить!
+    # Ликвидность влияет на скорость продажи, но не на справедливую цену.
+    # Этот показатель используется в time_forecast и attractiveness_index.
 
     return multiplier, adjustments
 
