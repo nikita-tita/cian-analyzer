@@ -544,6 +544,9 @@ class RealEstateAnalyzer:
             method=method
         )
 
+        # Сохраняем для использования в calculate_strengths_weaknesses()
+        self.fair_price_result = result
+
         # Добавляем доверительные интервалы для справедливой цены
         if target.total_area and len(self.filtered_comparables) >= 3:
             # Получаем цены/м² аналогов
@@ -1109,63 +1112,104 @@ class RealEstateAnalyzer:
         }
 
     def calculate_strengths_weaknesses(self) -> Dict:
-        """Рассчитать сильные и слабые стороны"""
-        target = self.request.target_property
+        """
+        Рассчитать сильные и слабые стороны НА ОСНОВЕ РЕАЛЬНЫХ КОЭФФИЦИЕНТОВ
+
+        НОВАЯ ЛОГИКА (после исправления):
+        - Берем примененные коэффициенты из расчета справедливой цены
+        - Показываем только ЗНАЧИМЫЕ отклонения (>5% от медианы)
+        - Все сравнивается с МЕДИАНОЙ аналогов, а не с абсолютными значениями
+        - Исключены абсурдные факторы типа "премиум локация" (все аналоги в той же локации!)
+
+        Returns:
+            Словарь с сильными/слабыми сторонами
+        """
         strengths = []
         weaknesses = []
 
-        # Сильные стороны
-        if target.has_design:
-            strengths.append({
-                'factor': 'Дизайнерская отделка',
-                'impact': 8,
-                'premium_percent': 8
-            })
+        # Получаем примененные коэффициенты из расчета
+        if not hasattr(self, 'fair_price_result') or not self.fair_price_result:
+            # Fallback: если нет результата расчета, возвращаем пустое
+            return {
+                'strengths': [],
+                'weaknesses': [],
+                'total_premium_percent': 0,
+                'total_discount_percent': 0,
+                'net_adjustment': 0
+            }
 
-        if target.panoramic_views:
-            strengths.append({
-                'factor': 'Панорамные виды',
-                'impact': 7,
-                'premium_percent': 7
-            })
+        adjustments = self.fair_price_result.get('adjustments', {})
 
-        if target.premium_location:
-            strengths.append({
-                'factor': 'Премиум локация',
-                'impact': 6,
-                'premium_percent': 6
-            })
+        # Порог значимости: показываем только коэффициенты с отклонением >5%
+        THRESHOLD = 0.05
 
-        if target.total_area and target.total_area > 150:
-            strengths.append({
-                'factor': 'Большая площадь',
-                'impact': 5,
-                'premium_percent': 5
-            })
+        # Человекочитаемые названия параметров
+        FACTOR_NAMES = {
+            'floor': 'Этаж',
+            'total_area': 'Площадь квартиры',
+            'repair_level': 'Уровень ремонта',
+            'ceiling_height': 'Высота потолков',
+            'window_type': 'Тип окон',
+            'view_type': 'Вид из окон',
+            'elevator_count': 'Количество лифтов',
+            'living_area_percent': 'Процент жилой площади',
+            'bathrooms': 'Количество санузлов',
+            'photo_type': 'Качество фотографий',
+            'object_status': 'Статус объекта',
+            'build_year': 'Возраст дома',
+            # НОВЫЕ ПОЛЯ (2025-01-12)
+            'material_quality': 'Качество материалов',
+            'ownership_status': 'Статус собственности'
+        }
 
-        # Слабые стороны
-        if target.living_area and target.total_area:
-            living_percent = (target.living_area / target.total_area) * 100
-            if living_percent < 30:
-                weaknesses.append({
-                    'factor': 'Низкий процент жилой площади',
-                    'impact': 8,
-                    'discount_percent': 8
-                })
+        # Анализируем каждый коэффициент
+        for factor_key, adjustment_info in adjustments.items():
+            if not isinstance(adjustment_info, dict):
+                continue
 
-        if target.renders_only:
-            weaknesses.append({
-                'factor': 'Только рендеры (нет реальных фото)',
-                'impact': 3,
-                'discount_percent': 3
-            })
+            coef = adjustment_info.get('value', 1.0)
+            description = adjustment_info.get('description', '')
+            adj_type = adjustment_info.get('type', 'fixed')
 
-        if target.price and target.price > 150_000_000:
-            weaknesses.append({
-                'factor': 'Очень высокая цена (низкая ликвидность)',
-                'impact': 4,
-                'discount_percent': 4
-            })
+            # Пропускаем коэффициенты близкие к 1.0 (незначимые)
+            if 1.0 - THRESHOLD <= coef <= 1.0 + THRESHOLD:
+                continue
+
+            # Рассчитываем процентное отклонение
+            percent_diff = (coef - 1.0) * 100
+            abs_percent = abs(percent_diff)
+
+            # Название фактора
+            factor_name = FACTOR_NAMES.get(factor_key, factor_key.replace('_', ' ').title())
+
+            # Добавляем маркер адаптивного коэффициента
+            if adj_type == 'adaptive':
+                factor_name = f"✨ {factor_name}"
+
+            # Формируем описание
+            item = {
+                'factor': factor_name,
+                'impact': min(10, int(abs_percent)),
+                'description': description
+            }
+
+            # Добавляем в strengths или weaknesses
+            if coef > 1.0:
+                # Премия
+                item['premium_percent'] = abs_percent
+                strengths.append(item)
+            else:
+                # Скидка
+                item['discount_percent'] = abs_percent
+                weaknesses.append(item)
+
+        # Сортируем по значимости (больше процент = важнее)
+        strengths.sort(key=lambda x: x['premium_percent'], reverse=True)
+        weaknesses.sort(key=lambda x: x['discount_percent'], reverse=True)
+
+        # Ограничиваем топ-5 для удобства восприятия
+        strengths = strengths[:5]
+        weaknesses = weaknesses[:5]
 
         total_premium = sum(s['premium_percent'] for s in strengths)
         total_discount = sum(w['discount_percent'] for w in weaknesses)

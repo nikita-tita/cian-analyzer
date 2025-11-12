@@ -222,13 +222,98 @@
                                     </label>
                                     <select class="form-select" id="manual-view">
                                         <option value="">Не указано</option>
+                                        <option value="худогов">Плохой вид</option>
                                         <option value="дом">Во двор</option>
                                         <option value="улица" selected>На улицу</option>
                                         <option value="парк">На парк</option>
                                         <option value="вода">На воду</option>
                                         <option value="город">На город</option>
                                         <option value="закат">На закат</option>
-                                        <option value="премиум">Премиум вид</option>
+                                    </select>
+                                </div>
+
+                                <!-- Высота потолков -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-ceiling" class="form-label">
+                                        Высота потолков (м)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="manual-ceiling"
+                                        placeholder="2.7"
+                                        step="0.1"
+                                        min="2.0"
+                                        max="5.0"
+                                    >
+                                </div>
+
+                                <!-- Санузлы -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-bathrooms" class="form-label">
+                                        Количество санузлов
+                                    </label>
+                                    <select class="form-select" id="manual-bathrooms">
+                                        <option value="">Не указано</option>
+                                        <option value="1" selected>1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3+</option>
+                                    </select>
+                                </div>
+
+                                <!-- Тип окон -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-windows" class="form-label">
+                                        Тип окон
+                                    </label>
+                                    <select class="form-select" id="manual-windows">
+                                        <option value="">Не указано</option>
+                                        <option value="деревянные">Деревянные</option>
+                                        <option value="пластиковые" selected>Пластиковые</option>
+                                        <option value="евро">Евроокна</option>
+                                        <option value="панорамные">Панорамные</option>
+                                    </select>
+                                </div>
+
+                                <!-- Лифты -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-elevators" class="form-label">
+                                        Количество лифтов
+                                    </label>
+                                    <select class="form-select" id="manual-elevators">
+                                        <option value="">Не указано</option>
+                                        <option value="нет">Нет</option>
+                                        <option value="один" selected>Один</option>
+                                        <option value="два">Два</option>
+                                        <option value="три+">Три+</option>
+                                    </select>
+                                </div>
+
+                                <!-- Качество материалов -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-materials" class="form-label">
+                                        Качество фото/видео
+                                    </label>
+                                    <select class="form-select" id="manual-materials">
+                                        <option value="">Не указано</option>
+                                        <option value="качественные_фото_видео">Фото + видео</option>
+                                        <option value="качественные_фото" selected>Качественные фото</option>
+                                        <option value="только_рендеры">Только рендеры</option>
+                                        <option value="только_планировка">Только планировка</option>
+                                    </select>
+                                </div>
+
+                                <!-- Статус собственности -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="manual-ownership" class="form-label">
+                                        Статус собственности
+                                    </label>
+                                    <select class="form-select" id="manual-ownership">
+                                        <option value="">Не указано</option>
+                                        <option value="1_собственник_без_обременений" selected>1 собственник</option>
+                                        <option value="1+_собственников_без_обременений">Несколько собственников</option>
+                                        <option value="ипотека_рассрочка">В ипотеке / рассрочке</option>
+                                        <option value="есть_обременения">Есть обременения</option>
                                     </select>
                                 </div>
                             </div>
