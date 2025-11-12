@@ -300,7 +300,8 @@ def _apply_risk_adjustments_additive(
     # НОВОЕ: Качество фото/материалов для ЦЕЛЕВОГО объекта
     # Логика: если продаем по цене люкс-ремонта, но только с рендерами - это минус
     # ~4% в разные стороны
-    if hasattr(target, 'material_quality') and target.material_quality:
+    # ВАЖНО: Применяется ТОЛЬКО если пользователь явно указал!
+    if hasattr(target, 'material_quality') and target.material_quality and target.material_quality is not None:
         material_quality = target.material_quality
 
         MATERIAL_QUALITY_COEFFICIENTS = {
@@ -328,7 +329,8 @@ def _apply_risk_adjustments_additive(
             logger.debug(f"  Качество материалов: {material_quality} → коэфф {coef:.3f} → {price_estimate:,.0f} ₽/м²")
 
     # НОВОЕ: Статус собственности (вместо статуса объекта)
-    if hasattr(target, 'ownership_status') and target.ownership_status:
+    # ВАЖНО: Применяется ТОЛЬКО если пользователь явно указал!
+    if hasattr(target, 'ownership_status') and target.ownership_status and target.ownership_status is not None:
         ownership_status = target.ownership_status
 
         OWNERSHIP_STATUS_COEFFICIENTS = {

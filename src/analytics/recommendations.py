@@ -36,7 +36,7 @@ class Recommendation:
             'action': self.action,
             'expected_result': self.expected_result,
             'roi': self.roi,
-            'financial_impact': self.financial_impact or {},
+            # financial_impact убран - вся информация уже в message/action/expected_result
             'category': self.category
         }
 

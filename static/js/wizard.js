@@ -384,8 +384,15 @@ const screen1 = {
             floor: document.getElementById('manual-floor').value.trim(),
             living_area: parseFloat(document.getElementById('manual-living-area').value) || null,
             kitchen_area: parseFloat(document.getElementById('manual-kitchen-area').value) || null,
-            repair_level: document.getElementById('manual-repair').value || 'стандартная',
-            view_type: document.getElementById('manual-view').value || 'улица'
+            repair_level: document.getElementById('manual-repair').value || null,
+            view_type: document.getElementById('manual-view').value || null,
+            // НОВЫЕ ПОЛЯ (2025-01-12)
+            ceiling_height: parseFloat(document.getElementById('manual-ceiling').value) || null,
+            bathrooms: parseInt(document.getElementById('manual-bathrooms').value) || null,
+            window_type: document.getElementById('manual-windows').value || null,
+            elevator_count: document.getElementById('manual-elevators').value || null,
+            material_quality: document.getElementById('manual-materials').value || null,
+            ownership_status: document.getElementById('manual-ownership').value || null
         };
 
         pixelLoader.show('parsing');
@@ -1670,11 +1677,23 @@ const floatingButtons = {
         } else if (state.currentStep === 2) {
             nextText.textContent = 'К анализу';
         } else if (state.currentStep === 3) {
-            nextText.textContent = 'Скачать отчет';
+            nextText.textContent = 'Оставить заявку';
         }
     },
 
     async downloadReport() {
+        // ИЗМЕНЕНО: Вместо скачивания - открываем форму заявки
+        // Можно заменить на реальную ссылку на форму Tally/Typeform/Google Forms
+        const contactUrl = 'https://t.me/housler_bot'; // TODO: Заменить на реальную форму заявки
+
+        utils.showToast('Откроется форма для связи', 'info');
+
+        // Открываем в новой вкладке
+        window.open(contactUrl, '_blank');
+
+        return; // Остальной код скачивания больше не нужен
+
+        /* СТАРЫЙ КОД СКАЧИВАНИЯ (отключен)
         if (!state.sessionId) {
             utils.showToast('Сессия не найдена', 'error');
             return;
