@@ -493,8 +493,8 @@ class BaseCianParser(ABC):
             'адмиралтейск',
         ]
 
-        address = data.get('address', '').lower()
-        residential_complex = data.get('residential_complex', '').lower()
+        address = (data.get('address') or '').lower()
+        residential_complex = (data.get('residential_complex') or '').lower()
 
         data['премиум локация'] = any(
             loc in address or loc in residential_complex or loc in full_text
