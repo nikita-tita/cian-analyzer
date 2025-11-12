@@ -840,52 +840,37 @@ class PlaywrightParser(BaseCianParser):
         # Валидация и подготовка
         return self._validate_and_prepare_results(filtered_results, limit, target_property=target_property)
 
-    def search_similar(self, target_property: Dict, limit: int = 20) -> List[Dict]:
+    def _get_segment_tolerances(self, target_price: float):
         """
-        Автоматический поиск похожих квартир (широкий поиск по городу)
-
-        Args:
-            target_property: Целевой объект с полями price, total_area, rooms
-            limit: максимальное количество результатов
+        Определяет допуски в зависимости от сегмента недвижимости
 
         Returns:
-            Список похожих объявлений
+            tuple: (price_tolerance, area_tolerance, segment)
         """
-        logger.info("🔍 Начинаем широкий поиск похожих квартир по городу...")
-
-        # Формируем критерии поиска
-        target_price = target_property.get('price', 100_000_000)
-        target_area = target_property.get('total_area', 100)
-        target_rooms = target_property.get('rooms', 2)
-
-        # ═══════════════════════════════════════════════════════════════════════════
-        # ДОРАБОТКА #2: АДАПТИВНЫЕ ДИАПАЗОНЫ ПОИСКА (в зависимости от сегмента)
-        # ═══════════════════════════════════════════════════════════════════════════
         if target_price >= 300_000_000:  # Элитная недвижимость (300+ млн)
-            price_tolerance = 0.20  # ±20%
-            area_tolerance = 0.15   # ±15%
-            segment = "элитная"
+            return 0.20, 0.15, "элитная"  # ±20% цена, ±15% площадь
         elif target_price >= 100_000_000:  # Премиум (100-300 млн)
-            price_tolerance = 0.30  # ±30%
-            area_tolerance = 0.25   # ±25%
-            segment = "премиум"
+            return 0.30, 0.25, "премиум"  # ±30% цена, ±25% площадь
         elif target_price >= 30_000_000:   # Средний+ (30-100 млн)
-            price_tolerance = 0.40  # ±40%
-            area_tolerance = 0.30   # ±30%
-            segment = "средний+"
+            return 0.40, 0.30, "средний+"  # ±40% цена, ±30% площадь
         else:  # Эконом (до 30 млн)
-            price_tolerance = 0.50  # ±50%
-            area_tolerance = 0.40   # ±40%
-            segment = "эконом"
+            return 0.50, 0.40, "эконом"  # ±50% цена, ±40% площадь
 
-        # DEBUG: Показываем параметры поиска
-        logger.info("📋 DEBUG: Параметры широкого поиска:")
-        logger.info(f"   - Сегмент: {segment} (адаптивные допуски: цена ±{price_tolerance*100:.0f}%, площадь ±{area_tolerance*100:.0f}%)")
-        logger.info(f"   - Цена: {target_price:,} ₽ (диапазон: {int(target_price * (1-price_tolerance)):,} - {int(target_price * (1+price_tolerance)):,})")
-        logger.info(f"   - Площадь: {target_area} м² (диапазон: {int(target_area * (1-area_tolerance))} - {int(target_area * (1+area_tolerance))})")
-        logger.info(f"   - Комнаты: {target_rooms} (диапазон: {max(1, target_rooms - 1)} - {target_rooms + 1})")
+    def _build_search_url(self, target_price: float, target_area: float, target_rooms: int,
+                          price_tolerance: float, area_tolerance: float) -> str:
+        """
+        Строит URL для поиска на Циан
 
-        # Строим URL поиска
+        Args:
+            target_price: Целевая цена
+            target_area: Целевая площадь
+            target_rooms: Количество комнат
+            price_tolerance: Допуск по цене (0.2 = ±20%)
+            area_tolerance: Допуск по площади (0.15 = ±15%)
+
+        Returns:
+            str: URL для поиска
+        """
         search_params = {
             'deal_type': 'sale',
             'offer_type': 'flat',
@@ -903,14 +888,202 @@ class PlaywrightParser(BaseCianParser):
         for i in range(rooms_min, rooms_max + 1):
             search_params[f'room{i}'] = '1'
 
-        url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
+        return f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
-        logger.info(f"URL поиска: {url}")
+    def _filter_by_location(self, results: List[Dict], target_property: Dict, strict: bool = True) -> List[Dict]:
+        """
+        Фильтрует результаты по локации (метро, район)
 
-        # Парсим результаты
-        results = self.parse_search_page(url)
+        Args:
+            results: Список найденных объявлений
+            target_property: Целевой объект
+            strict: Если True, требуется точное совпадение метро/района
+                   Если False, допускается совпадение хотя бы части адреса
 
-        logger.info(f"✓ Найдено {len(results)} похожих объявлений")
+        Returns:
+            Отфильтрованный список
+        """
+        target_metro = target_property.get('metro', '').lower().strip()
+        target_address = target_property.get('address', '').lower().strip()
 
-        # Валидация и подготовка
-        return self._validate_and_prepare_results(results, limit, target_property=target_property)
+        if not target_metro and not target_address:
+            logger.info("   ℹ️ Нет данных о локации целевого объекта, фильтрация пропущена")
+            return results
+
+        filtered = []
+
+        # Извлекаем ключевые слова из адреса (районы, улицы)
+        # Игнорируем город, короткие слова и стоп-слова
+        stop_words = {'москва', 'санкт-петербург', 'спб', 'мск', 'улица', 'проспект', 'переулок',
+                      'бульвар', 'шоссе', 'набережная', 'площадь', 'аллея', 'проезд'}
+
+        target_keywords = set()
+        if target_address:
+            for word in target_address.replace(',', ' ').split():
+                word = word.strip()
+                if len(word) > 3 and word not in stop_words:
+                    target_keywords.add(word)
+
+        for result in results:
+            result_metro = result.get('metro', '').lower().strip()
+            result_address = result.get('address', '').lower().strip()
+
+            # Строгий режим: совпадение метро
+            if strict and target_metro:
+                if target_metro in result_metro or result_metro in target_metro:
+                    filtered.append(result)
+                    continue
+
+            # Нестрогий режим: совпадение части адреса
+            if not strict and target_keywords:
+                result_keywords = set()
+                for word in result_address.replace(',', ' ').split():
+                    word = word.strip()
+                    if len(word) > 3 and word not in stop_words:
+                        result_keywords.add(word)
+
+                # Если есть хотя бы 1 общее ключевое слово (район, улица и т.д.)
+                if target_keywords & result_keywords:
+                    filtered.append(result)
+                    continue
+
+        return filtered
+
+    def search_similar(self, target_property: Dict, limit: int = 20) -> List[Dict]:
+        """
+        Многоуровневый поиск похожих квартир (ДОРАБОТКА #5)
+
+        Уровень 1: Поиск с базовыми допусками + фильтр по району/метро
+        Уровень 2: Поиск по всему городу (без фильтра локации)
+        Уровень 3: Расширенный поиск (+50% к допускам)
+
+        Args:
+            target_property: Целевой объект с полями price, total_area, rooms, metro, address
+            limit: максимальное количество результатов
+
+        Returns:
+            Список похожих объявлений
+        """
+        logger.info("=" * 80)
+        logger.info("🔍 НАЧИНАЕМ МНОГОУРОВНЕВЫЙ ПОИСК АНАЛОГОВ (ДОРАБОТКА #5)")
+        logger.info("=" * 80)
+
+        # Формируем критерии поиска
+        target_price = target_property.get('price', 100_000_000)
+        target_area = target_property.get('total_area', 100)
+        target_rooms = target_property.get('rooms', 2)
+        target_metro = target_property.get('metro', '')
+        target_address = target_property.get('address', '')
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # ДОРАБОТКА #2: АДАПТИВНЫЕ ДИАПАЗОНЫ ПОИСКА (в зависимости от сегмента)
+        # ═══════════════════════════════════════════════════════════════════════════
+        price_tolerance, area_tolerance, segment = self._get_segment_tolerances(target_price)
+
+        logger.info(f"📋 Параметры целевого объекта:")
+        logger.info(f"   - Сегмент: {segment} (адаптивные допуски: цена ±{price_tolerance*100:.0f}%, площадь ±{area_tolerance*100:.0f}%)")
+        logger.info(f"   - Цена: {target_price:,} ₽")
+        logger.info(f"   - Площадь: {target_area} м²")
+        logger.info(f"   - Комнаты: {target_rooms}")
+        logger.info(f"   - Метро: {target_metro or 'не указано'}")
+        logger.info(f"   - Адрес: {target_address or 'не указан'}")
+        logger.info("")
+
+        final_results = []
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 1: Поиск в том же районе/у того же метро
+        # ═══════════════════════════════════════════════════════════════════════════
+        logger.info("🎯 УРОВЕНЬ 1: Поиск аналогов в том же районе/у метро")
+        logger.info(f"   Диапазон цен: {int(target_price * (1-price_tolerance)):,} - {int(target_price * (1+price_tolerance)):,} ₽")
+        logger.info(f"   Диапазон площади: {int(target_area * (1-area_tolerance))} - {int(target_area * (1+area_tolerance))} м²")
+
+        url_level1 = self._build_search_url(target_price, target_area, target_rooms,
+                                            price_tolerance, area_tolerance)
+        logger.info(f"   URL: {url_level1[:100]}...")
+
+        results_level1 = self.parse_search_page(url_level1)
+        logger.info(f"   ✓ Найдено объявлений: {len(results_level1)}")
+
+        # Фильтруем по локации (строгий режим - только совпадение метро)
+        if target_metro or target_address:
+            filtered_level1 = self._filter_by_location(results_level1, target_property, strict=True)
+            logger.info(f"   ✓ После фильтрации по локации: {len(filtered_level1)} объявлений")
+        else:
+            filtered_level1 = results_level1
+            logger.info(f"   ℹ️ Фильтрация по локации пропущена (нет данных о метро/адресе)")
+
+        # Валидация и добавление
+        validated_level1 = self._validate_and_prepare_results(filtered_level1, limit, target_property=target_property)
+        final_results.extend(validated_level1)
+        logger.info(f"   ✅ УРОВЕНЬ 1: Добавлено {len(validated_level1)} валидных аналогов")
+        logger.info("")
+
+        # Проверяем, достаточно ли аналогов
+        if len(final_results) >= 10:
+            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info("=" * 80)
+            return final_results[:limit]
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 2: Расширенный поиск по городу (без фильтра локации)
+        # ═══════════════════════════════════════════════════════════════════════════
+        logger.info(f"🌆 УРОВЕНЬ 2: Расширяем поиск на весь город")
+        logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 10)")
+
+        # Используем все результаты с уровня 1, но без фильтра локации
+        validated_level2 = self._validate_and_prepare_results(results_level1, limit, target_property=target_property)
+
+        # Добавляем только новые (которых нет в final_results)
+        existing_urls = {r.get('url') for r in final_results}
+        new_results = [r for r in validated_level2 if r.get('url') not in existing_urls]
+
+        final_results.extend(new_results)
+        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results)} новых аналогов из города")
+        logger.info("")
+
+        # Проверяем снова
+        if len(final_results) >= 5:
+            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info("=" * 80)
+            return final_results[:limit]
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 3: Сверхрасширенный поиск (допуски +50%)
+        # ═══════════════════════════════════════════════════════════════════════════
+        logger.info(f"🚀 УРОВЕНЬ 3: Расширяем диапазоны поиска (+50% к допускам)")
+        logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 5)")
+
+        expanded_price_tolerance = price_tolerance * 1.5
+        expanded_area_tolerance = area_tolerance * 1.5
+
+        logger.info(f"   Новые допуски: цена ±{expanded_price_tolerance*100:.0f}%, площадь ±{expanded_area_tolerance*100:.0f}%")
+        logger.info(f"   Диапазон цен: {int(target_price * (1-expanded_price_tolerance)):,} - {int(target_price * (1+expanded_price_tolerance)):,} ₽")
+        logger.info(f"   Диапазон площади: {int(target_area * (1-expanded_area_tolerance))} - {int(target_area * (1+expanded_area_tolerance))} м²")
+
+        url_level3 = self._build_search_url(target_price, target_area, target_rooms,
+                                            expanded_price_tolerance, expanded_area_tolerance)
+        logger.info(f"   URL: {url_level3[:100]}...")
+
+        results_level3 = self.parse_search_page(url_level3)
+        logger.info(f"   ✓ Найдено объявлений: {len(results_level3)}")
+
+        validated_level3 = self._validate_and_prepare_results(results_level3, limit, target_property=target_property)
+
+        # Добавляем только новые
+        existing_urls = {r.get('url') for r in final_results}
+        new_results = [r for r in validated_level3 if r.get('url') not in existing_urls]
+
+        final_results.extend(new_results)
+        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results)} новых аналогов")
+        logger.info("")
+
+        # Итоговый результат
+        logger.info("=" * 80)
+        logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
+        logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
+        logger.info(f"   - Уровень 2 (город): +{len(final_results) - len(validated_level1) - len(new_results)} шт.")
+        logger.info(f"   - Уровень 3 (расширенный): +{len(new_results)} шт.")
+        logger.info("=" * 80)
+
+        return final_results[:limit]
