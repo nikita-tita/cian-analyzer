@@ -452,13 +452,82 @@ def test_tolerance_expansion():
     logger.info("")
 
 
+def test_address_extraction():
+    """
+    ТЕСТ: Извлечение адреса дома (Доработка #6)
+
+    Проверяет правильность извлечения улицы и номера дома из полного адреса.
+    """
+    logger.info("="*80)
+    logger.info("ТЕСТ: Извлечение адреса дома (Доработка #6)")
+    logger.info("="*80)
+
+    import re
+
+    test_cases = [
+        {
+            'full_address': 'Москва, Центральный округ, улица Арбат, 10',
+            'expected': 'улица Арбат, 10',
+            'name': 'Москва с округом'
+        },
+        {
+            'full_address': 'Санкт-Петербург, Невский проспект, 28',
+            'expected': 'Невский проспект, 28',
+            'name': 'СПБ без округа'
+        },
+        {
+            'full_address': 'Москва, ЦАО, Пречистенка, 15к1',
+            'expected': 'Пречистенка, 15к1',
+            'name': 'С сокращением округа и корпусом'
+        },
+        {
+            'full_address': 'СПб, Адмиралтейский район, Вознесенский проспект, 5',
+            'expected': 'Вознесенский проспект, 5',
+            'name': 'СПб с районом'
+        },
+    ]
+
+    for case in test_cases:
+        logger.info(f"Тест: {case['name']}")
+        logger.info(f"  Полный адрес: {case['full_address']}")
+
+        # Логика из playwright_parser.py (строки 779-793)
+        address_clean = case['full_address']
+
+        # Удаляем город
+        for city in ['Москва', 'Санкт-Петербург', 'СПб']:
+            address_clean = address_clean.replace(city + ',', '').replace(city, '')
+
+        # Удаляем округи/районы
+        address_clean = re.sub(r'[А-Яа-яёЁ]+\s+(округ|район|АО),?\s*', '', address_clean)
+        address_clean = address_clean.strip().strip(',').strip()
+
+        # Извлекаем последние 2 части
+        address_parts = [p.strip() for p in address_clean.split(',') if p.strip()]
+
+        if len(address_parts) >= 2:
+            street_and_house = ', '.join(address_parts[-2:])
+        else:
+            street_and_house = address_clean
+
+        logger.info(f"  Извлечено: {street_and_house}")
+        logger.info(f"  Ожидалось: {case['expected']}")
+
+        assert street_and_house == case['expected'], f"Ожидалось '{case['expected']}', получено '{street_and_house}'"
+        logger.info(f"  ✅ PASSED")
+        logger.info("")
+
+    logger.info("✅ ВСЕ АДРЕСА PASSED")
+    logger.info("")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ЗАПУСК ВСЕХ ТЕСТОВ
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
     logger.info("╔" + "="*78 + "╗")
-    logger.info("║" + " "*20 + "ТЕСТИРОВАНИЕ ДОРАБОТОК #1-5" + " "*31 + "║")
+    logger.info("║" + " "*20 + "ТЕСТИРОВАНИЕ ДОРАБОТОК #1-6" + " "*31 + "║")
     logger.info("╚" + "="*78 + "╝")
     logger.info("")
 
@@ -474,8 +543,11 @@ if __name__ == '__main__':
         test_multilevel_search_logic()
         test_tolerance_expansion()
 
+        # Доработка #6 (fallback на поиск по адресу)
+        test_address_extraction()
+
         logger.info("╔" + "="*78 + "╗")
-        logger.info("║" + " "*20 + "ВСЕ ТЕСТЫ ПРОЙДЕНЫ ✅ (7 тестов)" + " "*27 + "║")
+        logger.info("║" + " "*20 + "ВСЕ ТЕСТЫ ПРОЙДЕНЫ ✅ (8 тестов)" + " "*27 + "║")
         logger.info("╚" + "="*78 + "╝")
 
     except AssertionError as e:
