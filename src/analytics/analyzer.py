@@ -1195,12 +1195,12 @@ class RealEstateAnalyzer:
 
             # Добавляем в strengths или weaknesses
             if coef > 1.0:
-                # Премия
-                item['premium_percent'] = abs_percent
+                # Премия - округляем до 2 знаков
+                item['premium_percent'] = round(abs_percent, 2)
                 strengths.append(item)
             else:
-                # Скидка
-                item['discount_percent'] = abs_percent
+                # Скидка - округляем до 2 знаков
+                item['discount_percent'] = round(abs_percent, 2)
                 weaknesses.append(item)
 
         # Сортируем по значимости (больше процент = важнее)
@@ -1217,9 +1217,9 @@ class RealEstateAnalyzer:
         return {
             'strengths': strengths,
             'weaknesses': weaknesses,
-            'total_premium_percent': total_premium,
-            'total_discount_percent': total_discount,
-            'net_adjustment': total_premium - total_discount
+            'total_premium_percent': round(total_premium, 2),
+            'total_discount_percent': round(total_discount, 2),
+            'net_adjustment': round(total_premium - total_discount, 2)
         }
 
     def generate_comparison_chart_data(self) -> Dict:
