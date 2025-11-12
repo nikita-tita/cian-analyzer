@@ -167,6 +167,9 @@ def calculate_fair_price_with_medians(
         logger.warning(f"Не удалось рассчитать качество данных: {e}")
         data_quality = {'quality': 'unknown', 'cv': 0.15, 'quality_score': 70}
 
+    # В аддитивной модели нет единого multiplier, вычисляем как отношение
+    multiplier = fair_price_per_sqm / base_price_per_sqm if base_price_per_sqm > 0 else 1.0
+
     # Рассчитываем уверенность
     confidence = calculate_confidence(
         comparables=comparables,
