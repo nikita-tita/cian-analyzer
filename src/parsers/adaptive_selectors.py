@@ -13,10 +13,8 @@
 
 import re
 import logging
-from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from bs4 import BeautifulSoup, Tag
+from typing import List, Dict, Any, Optional, Callable
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -255,12 +253,14 @@ def extract_price_with_fallback(elem) -> Dict[str, Any]:
     """
     Извлечь цену из элемента с множественными стратегиями
 
+    Args:
+        elem: BeautifulSoup элемент или объект
+
     Returns:
         {'price': str, 'price_raw': int} или {'price': None, 'price_raw': None}
     """
-    from bs4 import BeautifulSoup
-
-    selector = AdaptiveSelector(elem if isinstance(elem, BeautifulSoup) else BeautifulSoup(str(elem), 'lxml'))
+    # Элемент уже должен быть BeautifulSoup объектом
+    selector = AdaptiveSelector(elem)
 
     # Пробуем найти элемент с ценой
     price_elem = selector.find_element(PRICE_SELECTORS, "цена")
@@ -283,12 +283,14 @@ def extract_area_with_fallback(elem) -> Dict[str, Any]:
     """
     Извлечь площадь из элемента с множественными стратегиями
 
+    Args:
+        elem: BeautifulSoup элемент или объект
+
     Returns:
         {'area': str, 'area_value': float} или {'area': None, 'area_value': None}
     """
-    from bs4 import BeautifulSoup
-
-    selector = AdaptiveSelector(elem if isinstance(elem, BeautifulSoup) else BeautifulSoup(str(elem), 'lxml'))
+    # Элемент уже должен быть BeautifulSoup объектом
+    selector = AdaptiveSelector(elem)
 
     # Пробуем найти элемент с площадью
     area_elem = selector.find_element(AREA_SELECTORS, "площадь")
