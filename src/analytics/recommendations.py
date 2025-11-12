@@ -380,14 +380,14 @@ class RecommendationEngine:
         # а не просто по чистой прибыли, так как нужно учитывать вероятность продажи
         best_scenario = max(
             self.scenarios,
-            key=lambda s: s.get('financials', {}).get('expected_value', 0)
+            key=lambda s: s.financials.get('expected_value', 0)
         )
 
-        best_name = best_scenario.get('name', '')
-        best_months = best_scenario.get('time_months', 0)
-        best_profit = best_scenario.get('financials', {}).get('net_after_opportunity', 0)
-        best_expected_value = best_scenario.get('financials', {}).get('expected_value', 0)
-        best_prob = best_scenario.get('base_probability', 0)
+        best_name = best_scenario.name
+        best_months = best_scenario.time_months
+        best_profit = best_scenario.financials.get('net_after_opportunity', 0)
+        best_expected_value = best_scenario.financials.get('expected_value', 0)
+        best_prob = best_scenario.base_probability
 
         recs.append(Recommendation(
             priority=self.INFO,
@@ -414,12 +414,12 @@ class RecommendationEngine:
         ))
 
         # ИСПРАВЛЕНО: Сравнение быстрой vs максимальной цены по ОЖИДАЕМОМУ доходу
-        fast_scenario = next((s for s in self.scenarios if s.get('type') == 'fast'), None)
-        max_scenario = next((s for s in self.scenarios if s.get('type') == 'maximum'), None)
+        fast_scenario = next((s for s in self.scenarios if s.type == 'fast'), None)
+        max_scenario = next((s for s in self.scenarios if s.type == 'maximum'), None)
 
         if fast_scenario and max_scenario:
-            fast_expected = fast_scenario.get('financials', {}).get('expected_value', 0)
-            max_expected = max_scenario.get('financials', {}).get('expected_value', 0)
+            fast_expected = fast_scenario.financials.get('expected_value', 0)
+            max_expected = max_scenario.financials.get('expected_value', 0)
 
             if fast_expected > max_expected:
                 diff = fast_expected - max_expected
