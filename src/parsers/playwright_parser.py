@@ -537,7 +537,8 @@ class PlaywrightParser(BaseCianParser):
         self,
         results: List[Dict],
         limit: int,
-        enable_validation: bool = True
+        enable_validation: bool = True,
+        target_property: Dict = None
     ) -> List[Dict]:
         """
         Валидация и подготовка результатов перед возвратом
@@ -546,6 +547,7 @@ class PlaywrightParser(BaseCianParser):
             results: Список спарсенных объявлений
             limit: Максимальное количество результатов
             enable_validation: Включить валидацию данных
+            target_property: Целевой объект для проверки разумности аналогов (опционально)
 
         Returns:
             Список валидных и подготовленных результатов
@@ -565,6 +567,82 @@ class PlaywrightParser(BaseCianParser):
             # Конвертируем rooms в int если это строка с цифрой
             if 'rooms' in result and isinstance(result['rooms'], str) and result['rooms'].isdigit():
                 result['rooms'] = int(result['rooms'])
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # ДОРАБОТКА #1: ФИЛЬТРАЦИЯ ПО РЕГИОНУ
+        # ═══════════════════════════════════════════════════════════════════════════
+        region_filtered = []
+        region_excluded = 0
+        for result in results:
+            result_url = result.get('url', '')
+            result_region = detect_region_from_url(result_url)
+
+            if result_region == self.region:
+                region_filtered.append(result)
+            else:
+                region_excluded += 1
+                logger.warning(
+                    f"⚠️ Исключен аналог из другого региона: "
+                    f"{result_region} (ожидался {self.region}), "
+                    f"URL: {result_url[:80]}..."
+                )
+
+        if region_excluded > 0:
+            logger.info(f"📊 Фильтрация по региону: {len(results)} → {len(region_filtered)} (исключено {region_excluded} из других регионов)")
+
+        results = region_filtered
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # ДОРАБОТКА #3: ВАЛИДАЦИЯ РАЗУМНОСТИ АНАЛОГОВ
+        # ═══════════════════════════════════════════════════════════════════════════
+        if target_property:
+            target_price = target_property.get('price', 0)
+            target_area = target_property.get('total_area', 0)
+
+            if target_price > 0 and target_area > 0:
+                reasonable = []
+                unreasonable_count = 0
+
+                for result in results:
+                    comp_price = result.get('price') or result.get('price_raw') or 0
+                    comp_area = result.get('total_area') or result.get('area_value') or 0
+
+                    # Пропускаем если нет данных
+                    if not comp_price or not comp_area:
+                        reasonable.append(result)
+                        continue
+
+                    # Проверка 1: Цена не должна отличаться больше чем в 3 раза
+                    price_ratio = max(comp_price, target_price) / min(comp_price, target_price)
+                    if price_ratio > 3.0:
+                        unreasonable_count += 1
+                        logger.warning(
+                            f"⚠️ Исключен неразумный аналог: цена отличается в {price_ratio:.1f} раз "
+                            f"(аналог {comp_price:,} ₽ vs целевой {target_price:,} ₽), "
+                            f"URL: {result.get('url', '')[:60]}..."
+                        )
+                        continue
+
+                    # Проверка 2: Площадь не должна отличаться больше чем в 1.5 раза
+                    area_ratio = max(comp_area, target_area) / min(comp_area, target_area)
+                    if area_ratio > 1.5:
+                        unreasonable_count += 1
+                        logger.warning(
+                            f"⚠️ Исключен неразумный аналог: площадь отличается в {area_ratio:.1f} раз "
+                            f"(аналог {comp_area} м² vs целевой {target_area} м²), "
+                            f"URL: {result.get('url', '')[:60]}..."
+                        )
+                        continue
+
+                    reasonable.append(result)
+
+                if unreasonable_count > 0:
+                    logger.info(
+                        f"📊 Проверка разумности: {len(results)} → {len(reasonable)} "
+                        f"(исключено {unreasonable_count} несопоставимых)"
+                    )
+
+                results = reasonable
 
         # Валидация (если доступна)
         if enable_validation and VALIDATION_AVAILABLE:
@@ -673,7 +751,7 @@ class PlaywrightParser(BaseCianParser):
             if results:
                 logger.info(f"✓ Найдено {len(results)} объявлений через прямую ссылку на ЖК")
                 # Валидация и подготовка
-                return self._validate_and_prepare_results(results, limit)
+                return self._validate_and_prepare_results(results, limit, target_property=target_property)
             else:
                 logger.warning("⚠️ По прямой ссылке ничего не найдено, пробуем текстовый поиск")
 
@@ -760,7 +838,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений после фильтрации по ЖК '{residential_complex}'")
 
         # Валидация и подготовка
-        return self._validate_and_prepare_results(filtered_results, limit)
+        return self._validate_and_prepare_results(filtered_results, limit, target_property=target_property)
 
     def search_similar(self, target_property: Dict, limit: int = 20) -> List[Dict]:
         """
@@ -780,10 +858,31 @@ class PlaywrightParser(BaseCianParser):
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # ДОРАБОТКА #2: АДАПТИВНЫЕ ДИАПАЗОНЫ ПОИСКА (в зависимости от сегмента)
+        # ═══════════════════════════════════════════════════════════════════════════
+        if target_price >= 300_000_000:  # Элитная недвижимость (300+ млн)
+            price_tolerance = 0.20  # ±20%
+            area_tolerance = 0.15   # ±15%
+            segment = "элитная"
+        elif target_price >= 100_000_000:  # Премиум (100-300 млн)
+            price_tolerance = 0.30  # ±30%
+            area_tolerance = 0.25   # ±25%
+            segment = "премиум"
+        elif target_price >= 30_000_000:   # Средний+ (30-100 млн)
+            price_tolerance = 0.40  # ±40%
+            area_tolerance = 0.30   # ±30%
+            segment = "средний+"
+        else:  # Эконом (до 30 млн)
+            price_tolerance = 0.50  # ±50%
+            area_tolerance = 0.40   # ±40%
+            segment = "эконом"
+
         # DEBUG: Показываем параметры поиска
         logger.info("📋 DEBUG: Параметры широкого поиска:")
-        logger.info(f"   - Цена: {target_price:,} ₽ (диапазон: {int(target_price * 0.5):,} - {int(target_price * 1.5):,})")
-        logger.info(f"   - Площадь: {target_area} м² (диапазон: {int(target_area * 0.6)} - {int(target_area * 1.4)})")
+        logger.info(f"   - Сегмент: {segment} (адаптивные допуски: цена ±{price_tolerance*100:.0f}%, площадь ±{area_tolerance*100:.0f}%)")
+        logger.info(f"   - Цена: {target_price:,} ₽ (диапазон: {int(target_price * (1-price_tolerance)):,} - {int(target_price * (1+price_tolerance)):,})")
+        logger.info(f"   - Площадь: {target_area} м² (диапазон: {int(target_area * (1-area_tolerance))} - {int(target_area * (1+area_tolerance))})")
         logger.info(f"   - Комнаты: {target_rooms} (диапазон: {max(1, target_rooms - 1)} - {target_rooms + 1})")
 
         # Строим URL поиска
@@ -791,10 +890,10 @@ class PlaywrightParser(BaseCianParser):
             'deal_type': 'sale',
             'offer_type': 'flat',
             'engine_version': '2',
-            'price_min': int(target_price * 0.5),
-            'price_max': int(target_price * 1.5),
-            'minArea': int(target_area * 0.6),
-            'maxArea': int(target_area * 1.4),
+            'price_min': int(target_price * (1 - price_tolerance)),
+            'price_max': int(target_price * (1 + price_tolerance)),
+            'minArea': int(target_area * (1 - area_tolerance)),
+            'maxArea': int(target_area * (1 + area_tolerance)),
             'region': self.region_code,
         }
 
@@ -814,4 +913,4 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"✓ Найдено {len(results)} похожих объявлений")
 
         # Валидация и подготовка
-        return self._validate_and_prepare_results(results, limit)
+        return self._validate_and_prepare_results(results, limit, target_property=target_property)
