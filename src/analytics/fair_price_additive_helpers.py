@@ -320,8 +320,9 @@ def _apply_risk_adjustments_additive(
                 'value': coef,
                 'percent': (coef - 1.0) * 100,
                 'price_estimate': price_estimate,
-                'description': f'Качество материалов: {material_quality}',
+                'description': f'Качество материалов: {material_quality} vs - (нет данных)',
                 'target_value': material_quality,
+                'median_value': '-',
                 'type': 'target_only'
             }
 
@@ -348,8 +349,9 @@ def _apply_risk_adjustments_additive(
                 'value': coef,
                 'percent': (coef - 1.0) * 100,
                 'price_estimate': price_estimate,
-                'description': f'Статус собственности: {ownership_status.replace("_", " ")}',
+                'description': f'Статус собственности: {ownership_status.replace("_", " ")} vs - (нет данных)',
                 'target_value': ownership_status,
+                'median_value': '-',
                 'type': 'target_only'
             }
 

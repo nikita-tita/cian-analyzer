@@ -1234,11 +1234,44 @@ const screen3 = {
                     // Финансовый эффект если есть
                     if (Object.keys(financial).length > 0) {
                         html += '<div class="alert alert-light mt-2"><strong>Финансовый эффект:</strong><ul class="mb-0 mt-2">';
+
+                        // Маппинг технических названий на понятные
+                        const keyLabels = {
+                            'investment': 'Инвестиции',
+                            'views_increase_percent': 'Увеличение просмотров',
+                            'conversion_boost_percent': 'Увеличение конверсии',
+                            'estimated_time_reduction': 'Сокращение времени продажи',
+                            'expected_time': 'Ожидаемое время',
+                            'expected_time_months': 'Ожидаемое время',
+                            'торг_диапазон': 'Диапазон торга',
+                            'expected_value': 'Ожидаемый доход',
+                            'net_profit': 'Чистая прибыль',
+                            'probability_percent': 'Вероятность',
+                            'scenario': 'Сценарий',
+                            'difference': 'Разница',
+                            'explanation': 'Пояснение',
+                            'fast_scenario_expected': 'Быстрая продажа (ожидаемое)',
+                            'max_scenario_expected': 'Максимум (ожидаемое)'
+                        };
+
                         for (const [key, value] of Object.entries(financial)) {
-                            if (typeof value === 'number' && Math.abs(value) > 1000) {
-                                html += `<li>${key}: ${utils.formatPrice(value)}</li>`;
+                            const label = keyLabels[key] || key;
+
+                            if (typeof value === 'number') {
+                                if (Math.abs(value) > 1000) {
+                                    // Большие числа - это деньги
+                                    html += `<li><strong>${label}:</strong> ${utils.formatPrice(value)}</li>`;
+                                } else if (key.includes('percent')) {
+                                    // Проценты
+                                    html += `<li><strong>${label}:</strong> ${value}%</li>`;
+                                } else if (key.includes('months')) {
+                                    // Месяцы
+                                    html += `<li><strong>${label}:</strong> ${value} мес.</li>`;
+                                } else {
+                                    html += `<li><strong>${label}:</strong> ${value}</li>`;
+                                }
                             } else {
-                                html += `<li>${key}: ${value}</li>`;
+                                html += `<li><strong>${label}:</strong> ${value}</li>`;
                             }
                         }
                         html += '</ul></div>';
