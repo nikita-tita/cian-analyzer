@@ -312,7 +312,7 @@ class PlaywrightParser(BaseCianParser):
 
     def parse_search_page(self, url: str) -> List[Dict]:
         """
-        Парсинг страницы с результатами поиска
+        Парсинг страницы с результатами поиска с адаптивными селекторами
 
         Args:
             url: URL страницы поиска
@@ -324,33 +324,51 @@ class PlaywrightParser(BaseCianParser):
 
         html = self._get_page_content(url)
         if not html:
+            logger.warning("⚠️ DEBUG: _get_page_content вернул пустой HTML")
             return []
 
         soup = BeautifulSoup(html, 'lxml')
 
-        # Поиск карточек объявлений
-        cards = soup.find_all('article', {'data-name': 'CardComponent'})
+        # Используем адаптивные селекторы для поиска карточек
+        from .adaptive_selectors import AdaptiveSelector, CARD_SELECTORS
 
-        if not cards:
-            cards = soup.find_all('div', class_=lambda x: x and 'offer-card' in str(x).lower())
+        selector = AdaptiveSelector(soup)
+        cards = selector.find_elements(CARD_SELECTORS, "карточки объявлений")
 
-        logger.info(f"Найдено {len(cards)} объявлений")
+        logger.info(f"Найдено {len(cards)} карточек объявлений на странице")
+
+        if len(cards) == 0:
+            logger.warning("⚠️ DEBUG: На странице не найдено ни одной карточки объявления")
+            logger.warning(f"⚠️ DEBUG: Размер HTML: {len(html)} байт")
+            # Сохраним первые 2000 символов HTML для диагностики
+            logger.debug(f"⚠️ DEBUG: Начало HTML: {html[:2000]}")
 
         listings = []
-        for card in cards:
+        for i, card in enumerate(cards):
             try:
                 listing_data = self._parse_listing_card(card)
                 if listing_data.get('title'):
                     listings.append(listing_data)
+                    if i < 3:  # Логируем первые 3 для отладки
+                        logger.debug(f"✓ Карточка {i+1} спарсена: {listing_data.get('title', '')[:80]}")
+                else:
+                    logger.debug(f"✗ Карточка {i+1}: отсутствует title, пропущена")
             except Exception as e:
-                logger.warning(f"Ошибка при парсинге карточки: {e}")
+                logger.warning(f"Ошибка при парсинге карточки {i+1}: {e}")
                 continue
+
+        logger.info(f"✓ Успешно спарсено {len(listings)} объявлений из {len(cards)} карточек")
+
+        # Логируем статистику успешных селекторов
+        stats = selector.get_stats()
+        if stats:
+            logger.debug(f"📊 Статистика селекторов: {stats}")
 
         return listings
 
     def _parse_listing_card(self, card: BeautifulSoup) -> Dict:
         """
-        Парсинг карточки объявления из списка
+        Парсинг карточки объявления из списка с адаптивными селекторами
 
         Args:
             card: BeautifulSoup объект карточки
@@ -358,6 +376,12 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Словарь с данными объявления
         """
+        from .adaptive_selectors import (
+            AdaptiveSelector, TITLE_SELECTORS, PRICE_SELECTORS,
+            ADDRESS_SELECTORS, AREA_SELECTORS, METRO_SELECTORS,
+            extract_rooms_from_text, extract_floor_from_text
+        )
+
         data = {
             'title': None,
             'price': None,
@@ -374,30 +398,18 @@ class PlaywrightParser(BaseCianParser):
             'image_url': None,
         }
 
-        # Заголовок - пробуем несколько вариантов
-        title_elem = (
-            card.find('span', {'data-mark': 'OfferTitle'}) or
-            card.find('h3') or
-            card.find('a', {'data-name': 'LinkArea'})
-        )
-        if title_elem:
-            data['title'] = title_elem.get_text(strip=True)
+        # Создаем адаптивный селектор для карточки
+        selector = AdaptiveSelector(BeautifulSoup(str(card), 'lxml'))
 
-            # Извлекаем количество комнат из заголовка
-            import re
-            title_lower = data['title'].lower()
-            if 'студи' in title_lower:
-                data['rooms'] = 'студия'
-            else:
-                match = re.search(r'(\d+)-комн', data['title'])
-                if match:
-                    data['rooms'] = match.group(1)
+        # Заголовок - используем адаптивные селекторы
+        data['title'] = selector.extract_text(TITLE_SELECTORS, "заголовок")
 
-        # Цена - пробуем несколько вариантов
-        price_elem = (
-            card.find('span', {'data-mark': 'MainPrice'}) or
-            card.find('span', class_=lambda x: x and 'price' in str(x).lower())
-        )
+        # Извлекаем количество комнат из заголовка
+        if data['title']:
+            data['rooms'] = extract_rooms_from_text(data['title'])
+
+        # Цена - используем адаптивные селекторы
+        price_elem = selector.find_element(PRICE_SELECTORS, "цена")
         if price_elem:
             price_text = price_elem.get_text(strip=True)
             data['price'] = price_text
@@ -408,7 +420,8 @@ class PlaywrightParser(BaseCianParser):
             if price_numbers:
                 data['price_raw'] = int(price_numbers)
 
-        # Адрес - собираем ВСЕ GeoLabel (breadcrumbs)
+        # Адрес - используем адаптивные селекторы
+        # Сначала пробуем найти множественные GeoLabel
         geo_labels = card.find_all('a', {'data-name': 'GeoLabel'})
         if geo_labels:
             # Собираем все части адреса
@@ -420,14 +433,9 @@ class PlaywrightParser(BaseCianParser):
                     unique_parts.append(part)
             data['address'] = ', '.join(unique_parts)
 
-        # Если GeoLabel не найдены
+        # Если GeoLabel не найдены, используем адаптивные селекторы
         if not data['address']:
-            address_elem = (
-                card.find('div', {'data-name': 'AddressContainer'}) or
-                card.find('div', class_=lambda x: x and 'address' in str(x).lower())
-            )
-            if address_elem:
-                data['address'] = address_elem.get_text(strip=True)
+            data['address'] = selector.extract_text(ADDRESS_SELECTORS, "адрес")
 
         # Если адрес все еще не найден, пробуем найти любой текст с городом
         if not data['address']:
@@ -439,8 +447,8 @@ class PlaywrightParser(BaseCianParser):
                         data['address'] = text
                         break
 
-        # Метро
-        metro_elem = card.find('a', {'data-name': 'UndergroundLabel'})
+        # Метро - используем адаптивные селекторы
+        metro_elem = selector.find_element(METRO_SELECTORS, "метро")
         if metro_elem:
             data['metro'] = metro_elem.get_text(strip=True)
 
@@ -461,22 +469,27 @@ class PlaywrightParser(BaseCianParser):
                 except ValueError:
                     pass
 
-            # Извлекаем этаж (4/9 этаж → 4)
-            floor_match = re.search(r'(\d+)/\d+\s*этаж', subtitle_text)
-            if floor_match:
-                try:
-                    data['floor'] = int(floor_match.group(1))  # Только номер этажа, не "4/9"
-                except ValueError:
-                    pass
+            # Извлекаем этаж используя новую функцию
+            if not data.get('floor'):
+                data['floor'] = extract_floor_from_text(subtitle_text)
 
             # Извлекаем количество комнат (2-комн.)
             if not data['rooms']:  # Если еще не извлекли из заголовка
-                if 'студи' in subtitle_text.lower():
-                    data['rooms'] = 'студия'
-                else:
-                    rooms_match = re.search(r'(\d+)-комн', subtitle_text)
-                    if rooms_match:
-                        data['rooms'] = rooms_match.group(1)
+                data['rooms'] = extract_rooms_from_text(subtitle_text)
+
+        # Если площадь не найдена в подзаголовке, используем адаптивные селекторы
+        if not data['area_value']:
+            area_elem = selector.find_element(AREA_SELECTORS, "площадь")
+            if area_elem:
+                area_text = area_elem.get_text(strip=True)
+                area_match = re.search(r'([\d,\.]+)\s*м²', area_text)
+                if area_match:
+                    data['area'] = area_match.group(0)
+                    area_str = area_match.group(1).replace(',', '.')
+                    try:
+                        data['area_value'] = float(area_str)
+                    except ValueError:
+                        pass
 
         # Характеристики (FALLBACK - если не нашли в подзаголовке)
         characteristics = card.find_all('span', {'data-mark': 'OfferCharacteristics'})
@@ -485,7 +498,6 @@ class PlaywrightParser(BaseCianParser):
             if 'м²' in text and not data['area_value']:
                 data['area'] = text
                 # Извлекаем числовое значение площади
-                import re
                 area_match = re.search(r'([\d,\.]+)\s*м²', text)
                 if area_match:
                     area_str = area_match.group(1).replace(',', '.')
@@ -494,7 +506,9 @@ class PlaywrightParser(BaseCianParser):
                     except ValueError:
                         pass
             elif 'этаж' in text.lower() and not data['floor']:
-                data['floor'] = text
+                floor_extracted = extract_floor_from_text(text)
+                if floor_extracted:
+                    data['floor'] = floor_extracted
             elif 'ремонт' in text.lower() or 'отделк' in text.lower():
                 data['renovation'] = text
 
@@ -537,7 +551,10 @@ class PlaywrightParser(BaseCianParser):
             Список валидных и подготовленных результатов
         """
         if not results:
+            logger.info("⚠️ DEBUG: _validate_and_prepare_results получил пустой список результатов")
             return []
+
+        logger.info(f"🔍 DEBUG: Начинаем валидацию {len(results)} результатов (enable_validation={enable_validation})")
 
         # Маппинг полей для Pydantic моделей
         for result in results:
@@ -571,21 +588,29 @@ class PlaywrightParser(BaseCianParser):
                     else:
                         excluded_count += 1
                         failures_str = '; '.join(details.get('failures', []))
-                        logger.debug(f"✗ Результат {i+1}: ИСКЛЮЧЕН - {failures_str}")
+                        logger.info(f"✗ Результат {i+1}: ИСКЛЮЧЕН - {failures_str}")
+                        logger.info(f"   URL: {result.get('url', 'N/A')}")
+                        logger.info(f"   Цена: {result.get('price', 'N/A')}, Площадь: {result.get('total_area', 'N/A')}, Цена/м²: {result.get('price_per_sqm', 'N/A')}")
 
                 except ValidationError as e:
                     excluded_count += 1
-                    logger.debug(f"✗ Результат {i+1}: невалидная структура данных - {e}")
+                    logger.info(f"✗ Результат {i+1}: невалидная структура данных - {e}")
+                    logger.info(f"   URL: {result.get('url', 'N/A')}")
 
             if excluded_count > 0:
                 logger.info(
                     f"📊 Валидация: {len(results)} → {len(validated)} "
                     f"(исключено {excluded_count} некачественных)"
                 )
+            else:
+                logger.info(f"✓ Все {len(validated)} результатов прошли валидацию")
 
             results = validated
+        else:
+            logger.info(f"⚠️ DEBUG: Валидация отключена или недоступна (VALIDATION_AVAILABLE={VALIDATION_AVAILABLE})")
 
         # Ограничиваем количество
+        logger.info(f"✓ Возвращаем {min(len(results), limit)} результатов (limit={limit})")
         return results[:limit]
 
     def search_similar_in_building(self, target_property: Dict, limit: int = 20) -> List[Dict]:
@@ -605,6 +630,15 @@ class PlaywrightParser(BaseCianParser):
         residential_complex_url = target_property.get('residential_complex_url')
         address = target_property.get('address', '')
 
+        # DEBUG: Показываем, какие данные мы получили
+        logger.info("📋 DEBUG: Данные целевой квартиры:")
+        logger.info(f"   - residential_complex: {residential_complex}")
+        logger.info(f"   - residential_complex_url: {residential_complex_url}")
+        logger.info(f"   - address: {address}")
+        logger.info(f"   - price: {target_property.get('price', 'N/A')}")
+        logger.info(f"   - total_area: {target_property.get('total_area', 'N/A')}")
+        logger.info(f"   - rooms: {target_property.get('rooms', 'N/A')}")
+
         # ПРИОРИТЕТ 1: Используем прямую ссылку на страницу ЖК (самый точный метод!)
         if residential_complex_url:
             logger.info(f"✨ Используем прямую ссылку на ЖК: {residential_complex_url}")
@@ -620,16 +654,20 @@ class PlaywrightParser(BaseCianParser):
 
                     # Ищем ссылку на каталог квартир ЖК
                     catalog_links = soup.find_all('a', href=True)
+                    logger.info(f"🔍 DEBUG: Найдено {len(catalog_links)} ссылок на странице ЖК")
                     for link in catalog_links:
                         href = link.get('href')
 
                         if ('/kupit-kvartiru-zhiloy-kompleks-' in href or
                                 ('/cat.php' in href and 'newobject' in href)):
                             residential_complex_url = href if href.startswith('http') else f"https://www.cian.ru{href}"
-                            logger.info(f"   Найдена ссылка на каталог: {residential_complex_url[:80]}")
+                            logger.info(f"   ✓ Найдена ссылка на каталог: {residential_complex_url[:100]}")
                             break
+                else:
+                    logger.warning(f"⚠️ DEBUG: Не удалось загрузить HTML страницы ЖК: {residential_complex_url}")
 
             # Парсим страницу с объявлениями ЖК
+            logger.info(f"🔍 DEBUG: Парсим страницу ЖК: {residential_complex_url}")
             results = self.parse_search_page(residential_complex_url)
 
             if results:
@@ -677,6 +715,8 @@ class PlaywrightParser(BaseCianParser):
         # Парсим результаты
         results = self.parse_search_page(url)
 
+        logger.info(f"🔍 DEBUG: parse_search_page вернул {len(results)} результатов для текстового поиска")
+
         # Фильтруем результаты - оставляем только те, что точно из этого ЖК
         filtered_results = []
         rc_lower = residential_complex.lower()
@@ -699,7 +739,7 @@ class PlaywrightParser(BaseCianParser):
             # Полное совпадение (приоритет)
             if rc_lower in result_title or rc_lower in result_address:
                 filtered_results.append(result)
-                logger.debug("     ✓ Добавлена (полное совпадение)")
+                logger.info(f"     ✓ Добавлена (полное совпадение)")
                 continue
 
             # Частичное совпадение - проверяем основные слова
@@ -713,11 +753,11 @@ class PlaywrightParser(BaseCianParser):
 
                 if matching_in_title >= 2 or matching_in_address >= 2:
                     filtered_results.append(result)
-                    logger.debug(f"     ✓ Добавлена (частичное совпадение: {matching_in_title} в title, {matching_in_address} в address)")
-                elif i < 3:
-                    logger.debug(f"     ✗ Пропущена (мало совпадений: {matching_in_title} в title, {matching_in_address} в address)")
+                    logger.info(f"     ✓ Добавлена (частичное совпадение: {matching_in_title} в title, {matching_in_address} в address)")
+                elif i < 5:
+                    logger.info(f"     ✗ Пропущена (мало совпадений: {matching_in_title} в title, {matching_in_address} в address)")
 
-        logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений в ЖК {residential_complex}")
+        logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений после фильтрации по ЖК '{residential_complex}'")
 
         # Валидация и подготовка
         return self._validate_and_prepare_results(filtered_results, limit)
@@ -733,12 +773,18 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Список похожих объявлений
         """
-        logger.info("🔍 Начинаем поиск похожих квартир...")
+        logger.info("🔍 Начинаем широкий поиск похожих квартир по городу...")
 
         # Формируем критерии поиска
         target_price = target_property.get('price', 100_000_000)
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
+
+        # DEBUG: Показываем параметры поиска
+        logger.info("📋 DEBUG: Параметры широкого поиска:")
+        logger.info(f"   - Цена: {target_price:,} ₽ (диапазон: {int(target_price * 0.5):,} - {int(target_price * 1.5):,})")
+        logger.info(f"   - Площадь: {target_area} м² (диапазон: {int(target_area * 0.6)} - {int(target_area * 1.4)})")
+        logger.info(f"   - Комнаты: {target_rooms} (диапазон: {max(1, target_rooms - 1)} - {target_rooms + 1})")
 
         # Строим URL поиска
         search_params = {
