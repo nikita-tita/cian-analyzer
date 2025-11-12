@@ -711,7 +711,12 @@ const screen2 = {
                     floatingButtons.updateButtons();
                 }
 
-                utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
+                // ДОРАБОТКА #4: Отображение предупреждений о качестве аналогов
+                if (result.warnings && result.warnings.length > 0) {
+                    this.showQualityWarnings(result.warnings);
+                } else {
+                    utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
+                }
             } else {
                 const errorData = getErrorMessage(result.message || 'no_comparables');
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
@@ -892,6 +897,57 @@ const screen2 = {
         } catch (error) {
             console.error('Include error:', error);
             utils.showToast('Ошибка включения', 'error');
+        }
+    },
+
+    showQualityWarnings(warnings) {
+        /**
+         * ДОРАБОТКА #4: Отображение предупреждений о качестве аналогов
+         *
+         * Показывает алерты с предупреждениями о проблемах с подобранными аналогами:
+         * - error (красный): критичные проблемы (мало аналогов, нет цен, очень большой разброс)
+         * - warning (желтый): некритичные проблемы (средний разброс, неполные данные)
+         */
+        const container = document.getElementById('comparables-list');
+
+        // Группируем warnings по типу
+        const errors = warnings.filter(w => w.type === 'error');
+        const warningsOnly = warnings.filter(w => w.type === 'warning');
+
+        let alertsHtml = '';
+
+        // Показываем errors (критичные)
+        errors.forEach(warning => {
+            alertsHtml += `
+                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>${warning.title}</strong><br>
+                    ${warning.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+        });
+
+        // Показываем warnings (некритичные)
+        warningsOnly.forEach(warning => {
+            alertsHtml += `
+                <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+                    <i class="bi bi-exclamation-circle-fill me-2"></i>
+                    <strong>${warning.title}</strong><br>
+                    ${warning.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+        });
+
+        // Вставляем алерты в начало контейнера
+        container.insertAdjacentHTML('afterbegin', alertsHtml);
+
+        // Также показываем toast для быстрого уведомления
+        if (errors.length > 0) {
+            utils.showToast(`Обнаружено ${errors.length + warningsOnly.length} проблем с аналогами. Проверьте предупреждения выше.`, 'warning');
+        } else if (warningsOnly.length > 0) {
+            utils.showToast(`Найдено ${state.comparables.length} аналогов (есть ${warningsOnly.length} замечание)`, 'info');
         }
     }
 };
