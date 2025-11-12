@@ -892,13 +892,84 @@ def find_similar():
             except Exception as e:
                 logger.error(f"❌ Parallel parsing failed, using basic data: {e}", exc_info=True)
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # ДОРАБОТКА #4: ПРОВЕРКА КАЧЕСТВА ПОДОБРАННЫХ АНАЛОГОВ
+        # ═══════════════════════════════════════════════════════════════════════════
+        warnings = []
+
+        # Проверка 1: Достаточно ли аналогов?
+        if len(similar) == 0:
+            warnings.append({
+                'type': 'error',
+                'title': 'Аналоги не найдены',
+                'message': 'Не найдено ни одного аналога. Попробуйте изменить параметры поиска или добавить аналоги вручную.'
+            })
+        elif len(similar) < 5:
+            warnings.append({
+                'type': 'error',
+                'title': 'Недостаточно аналогов',
+                'message': f'Найдено всего {len(similar)} аналог(ов). Для точной оценки рекомендуется минимум 10-15 аналогов. Добавьте аналоги вручную или расширьте критерии поиска.'
+            })
+        elif len(similar) < 10:
+            warnings.append({
+                'type': 'warning',
+                'title': 'Мало аналогов',
+                'message': f'Найдено {len(similar)} аналогов. Для более точной оценки рекомендуется 15-20 аналогов. Можно продолжить, но точность может быть ниже.'
+            })
+
+        # Проверка 2: Разброс цен (коэффициент вариации)
+        if len(similar) >= 3:
+            prices_per_sqm = [c.get('price_per_sqm', 0) for c in similar if c.get('price_per_sqm')]
+
+            if len(prices_per_sqm) >= 3:
+                import statistics
+                median_price = statistics.median(prices_per_sqm)
+
+                if median_price > 0:
+                    stdev_price = statistics.stdev(prices_per_sqm)
+                    cv = stdev_price / median_price  # Коэффициент вариации
+
+                    if cv > 0.5:  # >50% - очень большой разброс
+                        warnings.append({
+                            'type': 'error',
+                            'title': 'Очень большой разброс цен',
+                            'message': f'Разброс цен у аналогов составляет {cv*100:.0f}%. Это слишком много - возможно, аналоги подобраны некорректно. Проверьте список и удалите неподходящие объекты.'
+                        })
+                    elif cv > 0.3:  # >30% - большой разброс
+                        warnings.append({
+                            'type': 'warning',
+                            'title': 'Большой разброс цен',
+                            'message': f'Разброс цен у аналогов составляет {cv*100:.0f}%. Рекомендуется проверить список аналогов и убедиться, что все объекты действительно сопоставимы.'
+                        })
+
+        # Проверка 3: Есть ли аналоги с ценой за м²?
+        if len(similar) > 0:
+            with_price = sum(1 for c in similar if c.get('price_per_sqm'))
+            if with_price == 0:
+                warnings.append({
+                    'type': 'error',
+                    'title': 'Нет данных о ценах',
+                    'message': 'Ни у одного аналога нет информации о цене за м². Невозможно провести анализ.'
+                })
+            elif with_price < len(similar) * 0.5:  # Меньше 50% с ценой
+                warnings.append({
+                    'type': 'warning',
+                    'title': 'Неполные данные о ценах',
+                    'message': f'Только у {with_price} из {len(similar)} аналогов есть данные о цене за м². Это может снизить точность оценки.'
+                })
+
         # Сохраняем в сессию
         session_data['comparables'] = similar
+        session_data['comparables_warnings'] = warnings  # Сохраняем warnings в сессию
         session_storage.set(session_id, session_data)
 
         # Debug logging - trace object count
         request_elapsed = time.time() - request_start
         logger.info(f"🔍 Saved {len(similar)} comparables to session {session_id}")
+        if warnings:
+            logger.warning(f"⚠️ Quality warnings: {len(warnings)} issue(s) detected")
+            for w in warnings:
+                logger.warning(f"  - [{w['type'].upper()}] {w['title']}: {w['message']}")
         logger.info(f"✅ [STEP 2] find-similar completed in {request_elapsed:.1f}s - returning {len(similar)} comparables")
 
         return jsonify({
@@ -907,7 +978,8 @@ def find_similar():
             'count': len(similar),
             'search_type': search_type,
             'residential_complex': residential_complex,
-            'elapsed_time': round(request_elapsed, 1)
+            'elapsed_time': round(request_elapsed, 1),
+            'warnings': warnings  # Добавляем warnings в ответ
         })
 
     except Exception as e:
