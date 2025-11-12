@@ -1156,7 +1156,10 @@ class RealEstateAnalyzer:
             'bathrooms': 'Количество санузлов',
             'photo_type': 'Качество фотографий',
             'object_status': 'Статус объекта',
-            'build_year': 'Возраст дома'
+            'build_year': 'Возраст дома',
+            # НОВЫЕ ПОЛЯ (2025-01-12)
+            'material_quality': 'Качество материалов',
+            'ownership_status': 'Статус собственности'
         }
 
         # Анализируем каждый коэффициент
