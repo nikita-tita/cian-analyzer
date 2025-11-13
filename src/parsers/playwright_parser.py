@@ -883,8 +883,20 @@ class PlaywrightParser(BaseCianParser):
         }
 
         # Комнаты (диапазон ±1)
-        rooms_min = max(1, target_rooms - 1)
-        rooms_max = target_rooms + 1
+        # Обработка различных типов target_rooms
+        if isinstance(target_rooms, str):
+            if 'студия' in target_rooms.lower():
+                target_rooms_int = 1
+            else:
+                # Извлекаем число из строки (например, "2-комн." -> 2)
+                import re
+                match = re.search(r'\d+', target_rooms)
+                target_rooms_int = int(match.group()) if match else 2
+        else:
+            target_rooms_int = int(target_rooms) if target_rooms else 2
+
+        rooms_min = max(1, target_rooms_int - 1)
+        rooms_max = target_rooms_int + 1
         for i in range(rooms_min, rooms_max + 1):
             search_params[f'room{i}'] = '1'
 
@@ -903,7 +915,14 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Отфильтрованный список
         """
-        target_metro = target_property.get('metro', '').lower().strip()
+        # Обработка metro как списка или строки
+        target_metro_raw = target_property.get('metro', '')
+        if isinstance(target_metro_raw, list):
+            # Если metro - список, берем первую станцию или объединяем через запятую
+            target_metro = ', '.join(target_metro_raw).lower().strip() if target_metro_raw else ''
+        else:
+            target_metro = str(target_metro_raw).lower().strip()
+
         target_address = target_property.get('address', '').lower().strip()
 
         if not target_metro and not target_address:
@@ -990,6 +1009,9 @@ class PlaywrightParser(BaseCianParser):
         logger.info("")
 
         final_results = []
+        # Инициализируем переменные для отслеживания новых результатов каждого уровня
+        new_results_level2 = []
+        new_results_level3 = []
 
         # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 1: Поиск в том же районе/у того же метро
@@ -1036,10 +1058,10 @@ class PlaywrightParser(BaseCianParser):
 
         # Добавляем только новые (которых нет в final_results)
         existing_urls = {r.get('url') for r in final_results}
-        new_results = [r for r in validated_level2 if r.get('url') not in existing_urls]
+        new_results_level2 = [r for r in validated_level2 if r.get('url') not in existing_urls]
 
-        final_results.extend(new_results)
-        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results)} новых аналогов из города")
+        final_results.extend(new_results_level2)
+        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results_level2)} новых аналогов из города")
         logger.info("")
 
         # Проверяем снова
@@ -1072,18 +1094,18 @@ class PlaywrightParser(BaseCianParser):
 
         # Добавляем только новые
         existing_urls = {r.get('url') for r in final_results}
-        new_results = [r for r in validated_level3 if r.get('url') not in existing_urls]
+        new_results_level3 = [r for r in validated_level3 if r.get('url') not in existing_urls]
 
-        final_results.extend(new_results)
-        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results)} новых аналогов")
+        final_results.extend(new_results_level3)
+        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
         logger.info("")
 
         # Итоговый результат
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
         logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
-        logger.info(f"   - Уровень 2 (город): +{len(final_results) - len(validated_level1) - len(new_results)} шт.")
-        logger.info(f"   - Уровень 3 (расширенный): +{len(new_results)} шт.")
+        logger.info(f"   - Уровень 2 (город): +{len(new_results_level2)} шт.")
+        logger.info(f"   - Уровень 3 (расширенный): +{len(new_results_level3)} шт.")
         logger.info("=" * 80)
 
         return final_results[:limit]
