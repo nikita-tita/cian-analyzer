@@ -190,21 +190,27 @@ class RealEstateAnalyzer:
                 logger.info(f"Качество данных: {data_quality['quality']}")
             logger.info(f"Оценка качества: {data_quality['quality_score']}/100")
 
-            # IQR-фильтрация выбросов
-            comparables_after_iqr, iqr_outliers = detect_outliers_iqr(comparables_to_process)
+            # PATCH 3: АДАПТИВНАЯ IQR-фильтрация выбросов (только если n >= 5)
+            n = len(comparables_to_process)
+            if n >= 5:
+                comparables_after_iqr, iqr_outliers = detect_outliers_iqr(comparables_to_process)
 
-            if len(iqr_outliers) > 0:
-                logger.info(f"IQR фильтр исключил {len(iqr_outliers)} статистических выбросов")
+                if len(iqr_outliers) > 0:
+                    logger.info(f"IQR фильтр исключил {len(iqr_outliers)} статистических выбросов")
 
-                if self.enable_tracking:
-                    self._log_event(
-                        EventType.OUTLIERS_FILTERED,
-                        f"IQR фильтр исключил {len(iqr_outliers)} выбросов",
-                        {
-                            'outliers_count': len(iqr_outliers),
-                            'data_quality': data_quality
-                        }
-                    )
+                    if self.enable_tracking:
+                        self._log_event(
+                            EventType.OUTLIERS_FILTERED,
+                            f"IQR фильтр исключил {len(iqr_outliers)} выбросов",
+                            {
+                                'outliers_count': len(iqr_outliers),
+                                'data_quality': data_quality
+                            }
+                        )
+            else:
+                # Слишком мало данных для IQR - используем все аналоги
+                logger.info(f"⚠️ IQR пропущен: только {n} аналог(ов), нужно минимум 5")
+                comparables_after_iqr = comparables_to_process
 
             # Проверка достаточности данных
             is_sufficient, sufficiency_reason = check_data_sufficiency(comparables_after_iqr)
@@ -248,8 +254,8 @@ class RealEstateAnalyzer:
                 for c in self.filtered_comparables
             ]
 
-        # Проверка на достаточное количество аналогов
-        min_comparables_required = 3
+        # PATCH 3: Снижаем порог с 3 до 1 (graceful degradation)
+        min_comparables_required = 1
         if len(self.filtered_comparables) < min_comparables_required:
             error_msg = (
                 f"Недостаточно аналогов для анализа: найдено {len(self.filtered_comparables)}, "

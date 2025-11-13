@@ -3,7 +3,7 @@ Pydantic модели для валидации данных
 """
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 from datetime import datetime
 
 
@@ -219,6 +219,47 @@ class ComparableProperty(TargetProperty):
     similarity_score: Optional[float] = Field(None, ge=0, le=1)  # Оценка схожести
     excluded: bool = False  # Исключен из анализа
 
+    # PATCH 2: Флаги качества данных (вместо ValidationError)
+    quality_flags: List[str] = []
+
+    @root_validator(pre=False)
+    def validate_minimum_data(cls, values):
+        """
+        PATCH 2: Soft validation - добавляем флаги качества вместо исключений
+
+        Вместо того чтобы выбрасывать ValidationError, помечаем проблемные аналоги
+        флагами. Это позволяет продолжить анализ даже с неполными данными.
+        """
+        flags = values.get('quality_flags', [])
+        price = values.get('price')
+        area = values.get('total_area')
+        ppsm = values.get('price_per_sqm')
+
+        # Проверка минимальных обязательных полей
+        has_price_area = bool(price and area)
+        has_ppsm_area = bool(ppsm and area)
+
+        if not (has_price_area or has_ppsm_area):
+            flags.append('insufficient_numeric_fields')
+
+        # Проверка адреса и локации
+        if not values.get('address'):
+            flags.append('missing_address')
+
+        # Проверка количества комнат
+        if not values.get('rooms'):
+            flags.append('missing_rooms')
+
+        # Проверка наличия критичных полей
+        if price and price <= 0:
+            flags.append('invalid_price')
+
+        if area and area <= 0:
+            flags.append('invalid_area')
+
+        values['quality_flags'] = flags
+        return values
+
     class Config(TargetProperty.Config):
         validate_assignment = True
 
@@ -324,10 +365,41 @@ def normalize_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     normalized = data.copy()
 
-    # 1. Базовые расчеты
-    if normalized.get('price') and normalized.get('total_area'):
-        if not normalized.get('price_per_sqm'):
-            normalized['price_per_sqm'] = normalized['price'] / normalized['total_area']
+    # 1. PATCH 2: Восстановление недостающих полей (price ↔ price_per_sqm ↔ total_area)
+    price = normalized.get('price')
+    ppsm = normalized.get('price_per_sqm')
+    area = normalized.get('total_area')
+
+    # Приводим к числам если строки
+    try:
+        price = float(price) if price else None
+    except (ValueError, TypeError):
+        price = None
+
+    try:
+        ppsm = float(ppsm) if ppsm else None
+    except (ValueError, TypeError):
+        ppsm = None
+
+    try:
+        area = float(area) if area else None
+    except (ValueError, TypeError):
+        area = None
+
+    # Восстанавливаем price_per_sqm из price и area
+    if not ppsm and price and area and area > 0:
+        ppsm = price / area
+        normalized['price_per_sqm'] = ppsm
+
+    # НОВОЕ: Восстанавливаем price из price_per_sqm и area
+    if not price and ppsm and area:
+        price = ppsm * area
+        normalized['price'] = price
+
+    # НОВОЕ: Восстанавливаем total_area из price и price_per_sqm
+    if not area and price and ppsm and ppsm > 0:
+        area = price / ppsm
+        normalized['total_area'] = area
 
     # 2. Умные дефолты для высоты потолков
     if not normalized.get('ceiling_height'):

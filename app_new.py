@@ -867,16 +867,27 @@ def find_similar():
                 import time
                 parse_start = time.time()
 
-                detailed_results = parse_multiple_urls_parallel(
+                # PATCH 1: Robust parsing with retry + quality metrics
+                detailed_results, parse_quality = parse_multiple_urls_parallel(
                     urls=urls_to_parse,
                     headless=True,
                     cache=property_cache,
                     region=region,
-                    max_concurrent=5  # FIXED: Увеличено с 2 до 5 для ускорения
+                    max_concurrent=3,  # Снижено с 5 до 3 для избежания rate limiting
+                    max_retries=2
                 )
 
                 parse_elapsed = time.time() - parse_start
-                logger.info(f"⏱️ Parallel parsing took {parse_elapsed:.1f}s for {len(urls_to_parse)} URLs")
+                logger.info(
+                    f"⏱️ Parallel parsing took {parse_elapsed:.1f}s for {len(urls_to_parse)} URLs | "
+                    f"Success: {parse_quality['successfully_parsed']}, "
+                    f"Failed: {parse_quality['parse_failed']}, "
+                    f"Retries: {parse_quality['total_retries']}"
+                )
+
+                # Логируем ошибки по типам
+                if parse_quality['error_breakdown']:
+                    logger.warning(f"Parse errors breakdown: {parse_quality['error_breakdown']}")
 
                 # Обновляем данные аналогов детальной информацией
                 url_to_details = {d['url']: d for d in detailed_results}
@@ -896,6 +907,40 @@ def find_similar():
         # ДОРАБОТКА #4: ПРОВЕРКА КАЧЕСТВА ПОДОБРАННЫХ АНАЛОГОВ
         # ═══════════════════════════════════════════════════════════════════════════
         warnings = []
+
+        # PATCH 4: Добавляем предупреждения о проблемах парсинга (если были)
+        if urls_to_parse and 'parse_quality' in locals():
+            parse_failed = parse_quality.get('parse_failed', 0)
+            total_found = parse_quality.get('total_found', 0)
+
+            if parse_failed > 0:
+                failed_percent = (parse_failed / total_found * 100) if total_found > 0 else 0
+                error_breakdown = parse_quality.get('error_breakdown', {})
+
+                error_details = []
+                if 'rate_limited' in error_breakdown:
+                    error_details.append(f"rate limiting ({error_breakdown['rate_limited']})")
+                if 'timeout' in error_breakdown:
+                    error_details.append(f"timeout ({error_breakdown['timeout']})")
+                if 'captcha' in error_breakdown:
+                    error_details.append(f"captcha ({error_breakdown['captcha']})")
+
+                if failed_percent > 50:
+                    warnings.append({
+                        'type': 'error',
+                        'title': 'Критическая проблема с загрузкой данных',
+                        'message': f'Не удалось загрузить детальные данные для {parse_failed} из {total_found} аналогов ({failed_percent:.0f}%). ' +
+                                   (f'Основные причины: {", ".join(error_details)}. ' if error_details else '') +
+                                   'Анализ может быть неточным. Попробуйте повторить позже или обратитесь в поддержку.'
+                    })
+                elif failed_percent > 20:
+                    warnings.append({
+                        'type': 'warning',
+                        'title': 'Проблемы с загрузкой данных',
+                        'message': f'Не удалось загрузить детальные данные для {parse_failed} из {total_found} аналогов ({failed_percent:.0f}%). ' +
+                                   (f'Причины: {", ".join(error_details)}. ' if error_details else '') +
+                                   'Точность анализа может быть снижена.'
+                    })
 
         # Проверка 1: Достаточно ли аналогов?
         if len(similar) == 0:
@@ -1212,20 +1257,54 @@ def analyze():
             result = analyzer.analyze(request_model)
             logger.info(f"🔧 DEBUG: ✓ Анализ завершён, тип результата: {type(result)}")
         except ValueError as ve:
-            # Специфичные ошибки валидации (например, мало аналогов)
+            # PATCH 4: Специфичные ошибки валидации с детальными сообщениями
+            error_str = str(ve).lower()
             logger.warning(f"Ошибка валидации анализа: {ve}")
+
+            # Определяем тип ошибки для более информативных сообщений
+            if 'недостаточно аналогов' in error_str or 'insufficient' in error_str:
+                error_type = 'insufficient_comparables'
+                user_message = str(ve)
+            elif 'цена' in error_str or 'price' in error_str:
+                error_type = 'invalid_price_data'
+                user_message = f'Проблема с данными о ценах: {ve}'
+            elif 'площадь' in error_str or 'area' in error_str:
+                error_type = 'invalid_area_data'
+                user_message = f'Проблема с данными о площади: {ve}'
+            else:
+                error_type = 'validation_error'
+                user_message = str(ve)
+
             return jsonify({
                 'status': 'error',
-                'error_type': 'validation_error',
-                'message': str(ve)
+                'error_type': error_type,
+                'message': user_message,
+                'details': str(ve)
             }), 422
         except Exception as analysis_error:
-            # Любые другие ошибки анализа
+            # PATCH 4: Любые другие ошибки анализа с детальной информацией
+            error_str = str(analysis_error)
             logger.error(f"Ошибка во время анализа: {analysis_error}", exc_info=True)
+
+            # Пытаемся определить тип ошибки
+            error_type = 'analysis_error'
+            if 'pydantic' in error_str.lower() or 'validation' in error_str.lower():
+                error_type = 'data_validation_error'
+                user_message = 'Ошибка валидации данных аналогов. Проверьте корректность введенных данных.'
+            elif 'division' in error_str.lower() or 'zerodivision' in error_str.lower():
+                error_type = 'calculation_error'
+                user_message = 'Ошибка расчетов. Возможно, отсутствуют необходимые данные.'
+            elif 'key' in error_str.lower():
+                error_type = 'missing_data_error'
+                user_message = 'Отсутствуют необходимые поля данных. Проверьте полноту информации об аналогах.'
+            else:
+                user_message = f'Ошибка анализа: {error_str[:200]}'  # Ограничиваем длину
+
             return jsonify({
                 'status': 'error',
-                'error_type': 'analysis_error',
-                'message': f'Ошибка анализа: {str(analysis_error)}'
+                'error_type': error_type,
+                'message': user_message,
+                'technical_details': error_str
             }), 500
 
         # Конвертируем в JSON
