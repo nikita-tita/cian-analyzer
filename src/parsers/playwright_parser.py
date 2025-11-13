@@ -883,8 +883,20 @@ class PlaywrightParser(BaseCianParser):
         }
 
         # Комнаты (диапазон ±1)
-        rooms_min = max(1, target_rooms - 1)
-        rooms_max = target_rooms + 1
+        # Обработка различных типов target_rooms
+        if isinstance(target_rooms, str):
+            if 'студия' in target_rooms.lower():
+                target_rooms_int = 1
+            else:
+                # Извлекаем число из строки (например, "2-комн." -> 2)
+                import re
+                match = re.search(r'\d+', target_rooms)
+                target_rooms_int = int(match.group()) if match else 2
+        else:
+            target_rooms_int = int(target_rooms) if target_rooms else 2
+
+        rooms_min = max(1, target_rooms_int - 1)
+        rooms_max = target_rooms_int + 1
         for i in range(rooms_min, rooms_max + 1):
             search_params[f'room{i}'] = '1'
 
@@ -903,14 +915,15 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Отфильтрованный список
         """
-        # Обработка метро (может быть списком или строкой)
+        # Обработка metro как списка или строки
         target_metro_raw = target_property.get('metro', '')
         if isinstance(target_metro_raw, list):
+            # Если metro - список, берем первую станцию или объединяем через запятую
             target_metro = ', '.join(target_metro_raw).lower().strip() if target_metro_raw else ''
         else:
-            target_metro = target_metro_raw.lower().strip() if target_metro_raw else ''
+            target_metro = str(target_metro_raw).lower().strip()
 
-        target_address = target_property.get('address', '').lower().strip() if target_property.get('address') else ''
+        target_address = target_property.get('address', '').lower().strip()
 
         if not target_metro and not target_address:
             logger.info("   ℹ️ Нет данных о локации целевого объекта, фильтрация пропущена")
@@ -1019,7 +1032,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info("")
 
         final_results = []
-        # Инициализируем переменные для подсчета результатов по уровням
+        # Инициализируем переменные для отслеживания новых результатов каждого уровня
         new_results_level2 = []
         new_results_level3 = []
 
