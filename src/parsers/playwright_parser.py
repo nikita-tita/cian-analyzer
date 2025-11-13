@@ -944,8 +944,14 @@ class PlaywrightParser(BaseCianParser):
                     target_keywords.add(word)
 
         for result in results:
-            result_metro = result.get('metro', '').lower().strip()
-            result_address = result.get('address', '').lower().strip()
+            # Обработка метро результата (может быть списком или строкой)
+            result_metro_raw = result.get('metro', '')
+            if isinstance(result_metro_raw, list):
+                result_metro = ', '.join(result_metro_raw).lower().strip() if result_metro_raw else ''
+            else:
+                result_metro = result_metro_raw.lower().strip() if result_metro_raw else ''
+
+            result_address = result.get('address', '').lower().strip() if result.get('address') else ''
 
             # Строгий режим: совпадение метро
             if strict and target_metro:
@@ -991,7 +997,24 @@ class PlaywrightParser(BaseCianParser):
         target_price = target_property.get('price', 100_000_000)
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
-        target_metro = target_property.get('metro', '')
+
+        # Обработка случая "студия" - считаем как 1 комнату
+        if isinstance(target_rooms, str):
+            if 'студ' in target_rooms.lower():
+                target_rooms = 1
+            else:
+                # Попытка извлечь число из строки
+                import re
+                match = re.search(r'\d+', target_rooms)
+                target_rooms = int(match.group()) if match else 2
+
+        # Обработка метро (может быть списком или строкой)
+        target_metro_raw = target_property.get('metro', '')
+        if isinstance(target_metro_raw, list):
+            target_metro = ', '.join(target_metro_raw) if target_metro_raw else ''
+        else:
+            target_metro = target_metro_raw if target_metro_raw else ''
+
         target_address = target_property.get('address', '')
 
         # ═══════════════════════════════════════════════════════════════════════════
