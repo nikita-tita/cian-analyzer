@@ -903,8 +903,14 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Отфильтрованный список
         """
-        target_metro = target_property.get('metro', '').lower().strip()
-        target_address = target_property.get('address', '').lower().strip()
+        # Обработка метро (может быть списком или строкой)
+        target_metro_raw = target_property.get('metro', '')
+        if isinstance(target_metro_raw, list):
+            target_metro = ', '.join(target_metro_raw).lower().strip() if target_metro_raw else ''
+        else:
+            target_metro = target_metro_raw.lower().strip() if target_metro_raw else ''
+
+        target_address = target_property.get('address', '').lower().strip() if target_property.get('address') else ''
 
         if not target_metro and not target_address:
             logger.info("   ℹ️ Нет данных о локации целевого объекта, фильтрация пропущена")
@@ -925,8 +931,14 @@ class PlaywrightParser(BaseCianParser):
                     target_keywords.add(word)
 
         for result in results:
-            result_metro = result.get('metro', '').lower().strip()
-            result_address = result.get('address', '').lower().strip()
+            # Обработка метро результата (может быть списком или строкой)
+            result_metro_raw = result.get('metro', '')
+            if isinstance(result_metro_raw, list):
+                result_metro = ', '.join(result_metro_raw).lower().strip() if result_metro_raw else ''
+            else:
+                result_metro = result_metro_raw.lower().strip() if result_metro_raw else ''
+
+            result_address = result.get('address', '').lower().strip() if result.get('address') else ''
 
             # Строгий режим: совпадение метро
             if strict and target_metro:
@@ -972,7 +984,24 @@ class PlaywrightParser(BaseCianParser):
         target_price = target_property.get('price', 100_000_000)
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
-        target_metro = target_property.get('metro', '')
+
+        # Обработка случая "студия" - считаем как 1 комнату
+        if isinstance(target_rooms, str):
+            if 'студ' in target_rooms.lower():
+                target_rooms = 1
+            else:
+                # Попытка извлечь число из строки
+                import re
+                match = re.search(r'\d+', target_rooms)
+                target_rooms = int(match.group()) if match else 2
+
+        # Обработка метро (может быть списком или строкой)
+        target_metro_raw = target_property.get('metro', '')
+        if isinstance(target_metro_raw, list):
+            target_metro = ', '.join(target_metro_raw) if target_metro_raw else ''
+        else:
+            target_metro = target_metro_raw if target_metro_raw else ''
+
         target_address = target_property.get('address', '')
 
         # ═══════════════════════════════════════════════════════════════════════════
@@ -990,6 +1019,9 @@ class PlaywrightParser(BaseCianParser):
         logger.info("")
 
         final_results = []
+        # Инициализируем переменные для подсчета результатов по уровням
+        new_results_level2 = []
+        new_results_level3 = []
 
         # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 1: Поиск в том же районе/у того же метро
@@ -1036,10 +1068,10 @@ class PlaywrightParser(BaseCianParser):
 
         # Добавляем только новые (которых нет в final_results)
         existing_urls = {r.get('url') for r in final_results}
-        new_results = [r for r in validated_level2 if r.get('url') not in existing_urls]
+        new_results_level2 = [r for r in validated_level2 if r.get('url') not in existing_urls]
 
-        final_results.extend(new_results)
-        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results)} новых аналогов из города")
+        final_results.extend(new_results_level2)
+        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results_level2)} новых аналогов из города")
         logger.info("")
 
         # Проверяем снова
@@ -1072,18 +1104,18 @@ class PlaywrightParser(BaseCianParser):
 
         # Добавляем только новые
         existing_urls = {r.get('url') for r in final_results}
-        new_results = [r for r in validated_level3 if r.get('url') not in existing_urls]
+        new_results_level3 = [r for r in validated_level3 if r.get('url') not in existing_urls]
 
-        final_results.extend(new_results)
-        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results)} новых аналогов")
+        final_results.extend(new_results_level3)
+        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
         logger.info("")
 
         # Итоговый результат
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
         logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
-        logger.info(f"   - Уровень 2 (город): +{len(final_results) - len(validated_level1) - len(new_results)} шт.")
-        logger.info(f"   - Уровень 3 (расширенный): +{len(new_results)} шт.")
+        logger.info(f"   - Уровень 2 (город): +{len(new_results_level2)} шт.")
+        logger.info(f"   - Уровень 3 (расширенный): +{len(new_results_level3)} шт.")
         logger.info("=" * 80)
 
         return final_results[:limit]
