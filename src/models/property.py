@@ -222,7 +222,7 @@ class ComparableProperty(TargetProperty):
     # PATCH 2: Флаги качества данных (вместо ValidationError)
     quality_flags: List[str] = []
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def validate_minimum_data(cls, values):
         """
         PATCH 2: Soft validation - добавляем флаги качества вместо исключений
