@@ -347,7 +347,7 @@ class DomClickParser(BaseRealEstateParser):
 
     def _extract_offer_fields(self, offer: Dict) -> Dict:
         """Извлечь поля из объекта offer"""
-        return {
+        data = {
             'title': offer.get('title') or offer.get('name'),
             'description': offer.get('description'),
             'price': offer.get('price') or self._get_nested(offer, 'bargainTerms.price'),
@@ -363,7 +363,18 @@ class DomClickParser(BaseRealEstateParser):
             'build_year': self._get_nested(offer, 'building.buildYear'),
             'house_type': self._get_nested(offer, 'building.type'),
             'images': offer.get('photos') or offer.get('images') or [],
+
+            # Дополнительные поля для полного анализа
+            'ceilingHeight': offer.get('ceilingHeight') or self._get_nested(offer, 'building.ceilingHeight'),
+            'bathroomsCount': offer.get('bathroomsCount') or offer.get('bathrooms') or offer.get('wcCount'),
+            'windowType': offer.get('windowType') or offer.get('windows'),
+            'elevatorCount': self._get_nested(offer, 'building.elevators') or offer.get('elevatorsCount') or offer.get('elevatorCount'),
+            'decoration': offer.get('decoration') or offer.get('repairType') or offer.get('finishType'),
+            'view': offer.get('view') or offer.get('viewType') or offer.get('windowView'),
+            'ownershipType': offer.get('ownershipType') or offer.get('ownership') or self._get_nested(offer, 'seller.type'),
         }
+
+        return data
 
     def _get_nested(self, obj: Dict, path: str, default=None):
         """Получить вложенное значение по пути"""
