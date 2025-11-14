@@ -219,13 +219,15 @@ class DomClickParser(BaseRealEstateParser):
             ID или None
         """
         # Паттерны URL Домклика:
-        # https://domclick.ru/card/sale_flat_12345
+        # https://domclick.ru/card/sale__flat__12345 (двойное подчеркивание)
+        # https://domclick.ru/card/sale_flat_12345 (одинарное подчеркивание)
         # https://domclick.ru/offers/12345
         # https://domclick.ru/card/12345
 
         patterns = [
-            r'/card/sale_flat_(\d+)',
-            r'/card/(\d+)',
+            r'/card/sale_+flat_+(\d+)',  # Гибкий паттерн для одного или нескольких подчеркиваний
+            r'/card/[^/]*_(\d+)',  # Любой префикс с подчеркиванием
+            r'/card/(\d+)',  # Только ID
             r'/offers/(\d+)',
             r'/object/(\d+)',
         ]
