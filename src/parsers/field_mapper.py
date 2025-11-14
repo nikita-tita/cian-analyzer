@@ -125,6 +125,20 @@ class FieldMapper:
             if key not in self.mappings and key not in result:
                 result[key] = value
 
+        # Вычисляем material_quality на основе количества фотографий
+        if 'material_quality' not in result and 'images' in result:
+            images = result['images']
+            if isinstance(images, list):
+                photo_count = len(images)
+                if photo_count == 0:
+                    result['material_quality'] = 'только_планировка'
+                elif photo_count < 5:
+                    result['material_quality'] = 'только_планировка'
+                elif photo_count < 10:
+                    result['material_quality'] = 'качественные_фото'
+                else:
+                    result['material_quality'] = 'качественные_фото_видео'
+
         # Добавляем метаданные
         result['source'] = self.source_name
 
@@ -262,6 +276,163 @@ def create_domclick_mapper() -> FieldMapper:
         return []
 
     mapper.add_mapping('photos', 'images', transformer=parse_images)
+
+    # Санузлы
+    def parse_bathrooms(bathrooms_data):
+        """Парсинг количества санузлов"""
+        if isinstance(bathrooms_data, dict):
+            # Может быть {count: 2} или {total: 2}
+            count = bathrooms_data.get('count') or bathrooms_data.get('total') or bathrooms_data.get('value')
+            return int(count) if count else None
+        try:
+            return int(bathrooms_data) if bathrooms_data else None
+        except (ValueError, TypeError):
+            return None
+
+    mapper.add_mapping('bathroomsCount', 'bathrooms', transformer=parse_bathrooms)
+    mapper.add_mapping('bathrooms', 'bathrooms', transformer=parse_bathrooms)
+    mapper.add_mapping('wcCount', 'bathrooms', transformer=parse_bathrooms)
+
+    # Тип окон
+    def parse_window_type(windows_data):
+        """Парсинг типа окон"""
+        if not windows_data:
+            return 'пластиковые'  # дефолтное значение
+        windows_str = str(windows_data).lower()
+        if 'дерев' in windows_str:
+            return 'деревянные'
+        elif 'алюм' in windows_str:
+            return 'алюм'
+        elif 'панорам' in windows_str:
+            return 'панорамные'
+        elif 'евро' in windows_str:
+            return 'евро'
+        elif 'пластик' in windows_str or 'пвх' in windows_str:
+            return 'пластиковые'
+        return 'пластиковые'
+
+    mapper.add_mapping('windowType', 'window_type', transformer=parse_window_type)
+    mapper.add_mapping('windows', 'window_type', transformer=parse_window_type)
+
+    # Лифты
+    def parse_elevators(elevator_data):
+        """Парсинг количества лифтов"""
+        if isinstance(elevator_data, dict):
+            count = elevator_data.get('count') or elevator_data.get('total') or elevator_data.get('value')
+            if count is None:
+                return 'нет'
+            count = int(count)
+        else:
+            try:
+                count = int(elevator_data) if elevator_data else 0
+            except (ValueError, TypeError):
+                return 'нет'
+
+        if count == 0:
+            return 'нет'
+        elif count == 1:
+            return 'один'
+        elif count == 2:
+            return 'два'
+        else:
+            return 'три+'
+
+    mapper.add_mapping('building.elevators', 'elevator_count', transformer=parse_elevators)
+    mapper.add_mapping('elevatorCount', 'elevator_count', transformer=parse_elevators)
+    mapper.add_mapping('elevatorsCount', 'elevator_count', transformer=parse_elevators)
+
+    # Уровень отделки
+    def parse_finish_type(finish_data):
+        """Парсинг уровня отделки"""
+        if not finish_data:
+            return 'стандартная'  # дефолтное значение
+        finish_str = str(finish_data).lower()
+
+        if 'черн' in finish_str or 'без отдел' in finish_str:
+            return 'черновая'
+        elif 'премиум' in finish_str or 'элит' in finish_str:
+            return 'премиум'
+        elif 'люкс' in finish_str:
+            return 'люкс'
+        elif 'улучш' in finish_str or 'дизайн' in finish_str:
+            return 'улучшенная'
+        elif 'стандарт' in finish_str or 'обычн' in finish_str:
+            return 'стандартная'
+        elif 'евро' in finish_str:
+            return 'улучшенная'
+
+        return 'стандартная'
+
+    mapper.add_mapping('decoration', 'repair_level', transformer=parse_finish_type)
+    mapper.add_mapping('repairType', 'repair_level', transformer=parse_finish_type)
+    mapper.add_mapping('finishType', 'repair_level', transformer=parse_finish_type)
+
+    # Вид из окна
+    def parse_view(view_data):
+        """Парсинг вида из окна"""
+        if not view_data:
+            return 'улица'  # дефолтное значение
+        view_str = str(view_data).lower()
+
+        if 'вод' in view_str or 'рек' in view_str or 'озер' in view_str or 'мор' in view_str:
+            return 'вода'
+        elif 'парк' in view_str or 'сквер' in view_str or 'лес' in view_str:
+            return 'парк'
+        elif 'город' in view_str or 'панорам' in view_str:
+            return 'город'
+        elif 'двор' in view_str or 'дом' in view_str:
+            return 'дом'
+        elif 'закат' in view_str:
+            return 'закат'
+        elif 'премиум' in view_str:
+            return 'премиум'
+        else:
+            return 'улица'
+
+    mapper.add_mapping('view', 'view_type', transformer=parse_view)
+    mapper.add_mapping('viewType', 'view_type', transformer=parse_view)
+    mapper.add_mapping('windowView', 'view_type', transformer=parse_view)
+
+    # Качество материалов (фото/видео)
+    def parse_material_quality(photos_data):
+        """Парсинг качества материалов на основе фотографий"""
+        # Эта функция будет вызвана с массивом photos
+        if not photos_data or not isinstance(photos_data, list):
+            return 'только_планировка'
+
+        photo_count = len(photos_data)
+
+        if photo_count == 0:
+            return 'только_планировка'
+        elif photo_count < 5:
+            return 'только_планировка'
+        elif photo_count < 10:
+            return 'качественные_фото'
+        else:
+            return 'качественные_фото_видео'
+
+    # Не используем маппинг для material_quality, так как он будет вычисляться отдельно
+
+    # Статус собственности
+    def parse_ownership(ownership_data):
+        """Парсинг статуса собственности"""
+        if not ownership_data:
+            return '1_собственник_без_обременений'  # дефолтное значение
+
+        ownership_str = str(ownership_data).lower()
+
+        if 'ипотек' in ownership_str or 'рассрочк' in ownership_str:
+            return 'ипотека_рассрочка'
+        elif 'обремен' in ownership_str:
+            return 'есть_обременения'
+        elif 'несколько' in ownership_str or '2' in ownership_str or '3' in ownership_str:
+            return '1+_собственников_без_обременений'
+        else:
+            return '1_собственник_без_обременений'
+
+    mapper.add_mapping('ownershipType', 'ownership_status', transformer=parse_ownership)
+    mapper.add_mapping('ownership', 'ownership_status', transformer=parse_ownership)
+    mapper.add_mapping('seller.type', 'ownership_status', transformer=parse_ownership)
 
     return mapper
 
