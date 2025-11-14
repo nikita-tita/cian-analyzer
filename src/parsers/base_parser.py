@@ -401,14 +401,20 @@ class BaseCianParser(ABC):
             # Площадь (ИСПРАВЛЕНО: total_area вместо area для совместимости с Pydantic)
             'Общая площадь': ('total_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
             'Площадь': ('total_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
-            # Жилая площадь
+            'Общая, м²': ('total_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
+            # Жилая площадь - РАСШИРЕНО: больше вариантов ключей
             'Жилая площадь': ('living_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
+            'Жилая': ('living_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
+            'Жилая, м²': ('living_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
             # Площадь кухни
             'Площадь кухни': ('kitchen_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
+            'Кухня': ('kitchen_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
+            'Кухня, м²': ('kitchen_area', lambda x: float(re.sub(r'[^\d,.]', '', x).replace(',', '.')) if x else None),
             # Этаж (извлекает floor из формата "5 из 10")
             'Этаж': ('floor', lambda x: int(x.split()[0]) if x and 'из' in x else (int(x) if x.isdigit() else None)),
             # Год постройки
             'Год постройки': ('build_year', lambda x: int(re.sub(r'[^\d]', '', x)) if x else None),
+            'Построен': ('build_year', lambda x: int(re.sub(r'[^\d]', '', x)) if x else None),
         }
 
         for char_key, (data_key, transform_func) in mappings.items():
@@ -550,15 +556,25 @@ class BaseCianParser(ABC):
         data['парковка'] = parking_value
 
         # === ВЫСОТА ПОТОЛКОВ ===
-        # Ищем паттерн типа "3.2 м", "высота потолков 3 м"
-        ceiling_match = re.search(r'(?:потолк|высот)[^\d]*?(\d+(?:[.,]\d+)?)\s*м', full_text)
-        if ceiling_match:
-            try:
-                ceiling_height = float(ceiling_match.group(1).replace(',', '.'))
-                if 2.5 <= ceiling_height <= 5.0:  # Разумный диапазон
-                    data['высота потолков'] = ceiling_height
-            except ValueError:
-                pass
+        # Ищем паттерн типа "3.2 м", "высота потолков 3 м", "потолки 3.5м"
+        # УЛУЧШЕНО: больше вариантов паттернов
+        ceiling_patterns = [
+            r'потолк[а-я]*[^\d]{0,20}?(\d+(?:[.,]\d+)?)\s*м',  # "потолки 3.2 м"
+            r'высот[а-я]*\s*потолк[а-я]*[^\d]{0,20}?(\d+(?:[.,]\d+)?)\s*м',  # "высота потолков 3 м"
+            r'высот[а-я]*[^\d]{0,20}?(\d+(?:[.,]\d+)?)\s*м',  # "высота 3.5 м"
+        ]
+
+        for pattern in ceiling_patterns:
+            ceiling_match = re.search(pattern, full_text)
+            if ceiling_match:
+                try:
+                    ceiling_height = float(ceiling_match.group(1).replace(',', '.'))
+                    if 2.3 <= ceiling_height <= 6.0:  # Расширенный разумный диапазон
+                        data['высота потолков'] = ceiling_height
+                        logger.debug(f"Найдена высота потолков: {ceiling_height}м (паттерн: {pattern})")
+                        break
+                except (ValueError, IndexError):
+                    continue
 
         # === ОХРАНА 24/7 ===
         security_keywords = [
