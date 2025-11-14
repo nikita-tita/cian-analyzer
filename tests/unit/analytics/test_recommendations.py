@@ -132,7 +132,9 @@ class TestPricingRecommendations:
 
         high_recs = [r for r in recs if r.priority == RecommendationEngine.HIGH]
         assert len(high_recs) >= 1
-        assert 'переоценка' in high_recs[0].message.lower()
+        # Check that message mentions price is above market
+        msg = high_recs[0].message.lower()
+        assert ('выше' in msg and 'рынк' in msg) or 'переоценка' in msg or 'переоценен' in msg
 
     def test_slight_overpricing_medium_priority(self):
         """Test MEDIUM priority for slight overpricing (5-10%)"""

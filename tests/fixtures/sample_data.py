@@ -5,7 +5,77 @@
 """
 
 from typing import Dict, List
-from src.models.property import ComparableProperty
+from src.models.property import ComparableProperty, PriceScenario
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _create_price_scenarios(fair_price: float) -> List[PriceScenario]:
+    """Create realistic price scenarios for testing"""
+    return [
+        PriceScenario(
+            name='Быстрая продажа',
+            type='quick',
+            description='Продажа за 1-2 месяца',
+            start_price=fair_price * 0.95,
+            expected_final_price=fair_price * 0.93,
+            time_months=2,
+            base_probability=85.0,
+            reduction_rate=0.02,
+            financials={
+                'expected_value': fair_price * 0.93 * 0.85,
+                'net_after_opportunity': fair_price * 0.92,
+                'opportunity_cost': fair_price * 0.01
+            }
+        ),
+        PriceScenario(
+            name='Стандартная продажа',
+            type='standard',
+            description='Продажа за 3-4 месяца',
+            start_price=fair_price,
+            expected_final_price=fair_price * 0.97,
+            time_months=4,
+            base_probability=75.0,
+            reduction_rate=0.03,
+            financials={
+                'expected_value': fair_price * 0.97 * 0.75,
+                'net_after_opportunity': fair_price * 0.94,
+                'opportunity_cost': fair_price * 0.03
+            }
+        ),
+        PriceScenario(
+            name='Терпеливая продажа',
+            type='patient',
+            description='Продажа за 5-6 месяцев',
+            start_price=fair_price * 1.05,
+            expected_final_price=fair_price * 1.02,
+            time_months=6,
+            base_probability=60.0,
+            reduction_rate=0.05,
+            financials={
+                'expected_value': fair_price * 1.02 * 0.60,
+                'net_after_opportunity': fair_price * 0.96,
+                'opportunity_cost': fair_price * 0.06
+            }
+        ),
+        PriceScenario(
+            name='Премиальная продажа',
+            type='luxury',
+            description='Продажа за 10-12 месяцев',
+            start_price=fair_price * 1.10,
+            expected_final_price=fair_price * 1.05,
+            time_months=12,
+            base_probability=40.0,
+            reduction_rate=0.08,
+            financials={
+                'expected_value': fair_price * 1.05 * 0.40,
+                'net_after_opportunity': fair_price * 0.93,
+                'opportunity_cost': fair_price * 0.12
+            }
+        ),
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -36,12 +106,7 @@ def get_overpriced_analysis() -> Dict:
                 'margin': 500_000
             }
         },
-        'price_scenarios': [
-            {'type': 'quick', 'price': 9_500_000, 'months': 2},
-            {'type': 'standard', 'price': 10_000_000, 'months': 4},
-            {'type': 'patient', 'price': 10_500_000, 'months': 6},
-            {'type': 'luxury', 'price': 11_000_000, 'months': 12}
-        ],
+        'price_scenarios': _create_price_scenarios(10_000_000),
         'comparables': [],
         'market_statistics': {
             'median_price_per_sqm': 165_000,
@@ -74,12 +139,7 @@ def get_fair_priced_analysis() -> Dict:
                 'margin': 700_000
             }
         },
-        'price_scenarios': [
-            {'type': 'quick', 'price': 14_500_000, 'months': 2},
-            {'type': 'standard', 'price': 15_200_000, 'months': 3},
-            {'type': 'patient', 'price': 15_900_000, 'months': 5},
-            {'type': 'luxury', 'price': 16_500_000, 'months': 8}
-        ],
+        'price_scenarios': _create_price_scenarios(15_200_000),
         'comparables': [],
         'market_statistics': {
             'median_price_per_sqm': 203_000,
@@ -112,12 +172,7 @@ def get_underpriced_analysis() -> Dict:
                 'margin': 300_000
             }
         },
-        'price_scenarios': [
-            {'type': 'quick', 'price': 8_500_000, 'months': 1},
-            {'type': 'standard', 'price': 9_000_000, 'months': 2},
-            {'type': 'patient', 'price': 9_300_000, 'months': 3},
-            {'type': 'luxury', 'price': 9_500_000, 'months': 5}
-        ],
+        'price_scenarios': _create_price_scenarios(9_000_000),
         'comparables': [],
         'market_statistics': {
             'median_price_per_sqm': 180_000,
@@ -150,12 +205,7 @@ def get_needs_improvement_analysis() -> Dict:
                 'margin': 400_000
             }
         },
-        'price_scenarios': [
-            {'type': 'quick', 'price': 9_800_000, 'months': 2},
-            {'type': 'standard', 'price': 10_200_000, 'months': 4},
-            {'type': 'patient', 'price': 10_600_000, 'months': 6},
-            {'type': 'luxury', 'price': 11_000_000, 'months': 10}
-        ],
+        'price_scenarios': _create_price_scenarios(10_200_000),
         'comparables': [],
         'market_statistics': {
             'median_price_per_sqm': 157_000,

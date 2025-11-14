@@ -164,7 +164,7 @@ class TestCalculateDataQuality:
         assert isinstance(quality, dict)
         # Should detect high variance
         if 'cv' in quality:
-            assert quality['cv'] > 15  # High coefficient of variation
+            assert quality['cv'] > 0.15  # High coefficient of variation (15%)
 
     def test_quality_with_small_sample(self):
         """Test quality calculation with small sample"""
@@ -285,50 +285,45 @@ class TestCheckDataSufficiency:
         """Test recognition of sufficient data"""
         comparables = get_clean_comparables()  # 8 items
 
-        result = check_data_sufficiency(comparables, min_required=5)
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=5)
 
-        assert isinstance(result, dict)
-        if 'is_sufficient' in result:
-            assert result['is_sufficient'] is True
+        assert isinstance(is_sufficient, bool)
+        assert is_sufficient is True
 
     def test_insufficient_data(self):
         """Test recognition of insufficient data"""
         comparables = get_small_sample()  # 3 items
 
-        result = check_data_sufficiency(comparables, min_required=5)
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=5)
 
-        assert isinstance(result, dict)
-        if 'is_sufficient' in result:
-            assert result['is_sufficient'] is False
+        assert isinstance(is_sufficient, bool)
+        assert is_sufficient is False
 
     def test_empty_data_insufficient(self):
         """Test empty data is insufficient"""
-        result = check_data_sufficiency([], min_required=5)
+        is_sufficient, message = check_data_sufficiency([], minimum_count=5)
 
-        assert isinstance(result, dict)
-        if 'is_sufficient' in result:
-            assert result['is_sufficient'] is False
+        assert isinstance(is_sufficient, bool)
+        assert is_sufficient is False
 
     def test_exact_minimum(self):
         """Test data size exactly at minimum"""
         comparables = get_small_sample()  # 3 items
 
-        result = check_data_sufficiency(comparables, min_required=3)
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=3)
 
-        assert isinstance(result, dict)
-        if 'is_sufficient' in result:
-            assert result['is_sufficient'] is True
+        assert isinstance(is_sufficient, bool)
+        assert is_sufficient is True
 
     def test_sufficiency_warning_messages(self):
         """Test warning messages for insufficient data"""
         comparables = get_small_sample()
 
-        result = check_data_sufficiency(comparables, min_required=10)
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=10)
 
         # Should include some information about insufficiency
-        if 'message' in result or 'warning' in result:
-            msg = result.get('message', result.get('warning', ''))
-            assert len(msg) > 0
+        assert isinstance(message, str)
+        assert len(message) > 0
 
 
 class TestAnalyzeBySegments:
@@ -338,40 +333,41 @@ class TestAnalyzeBySegments:
         """Test basic segment analysis"""
         comparables = get_clean_comparables()
 
-        # Analyze by price segments
+        # Analyze by rooms (grouping field)
         result = analyze_by_segments(
             comparables,
-            segment_field='price',
-            bins=3
+            segment_field='rooms',
+            value_field='price_per_sqm'
         )
 
-        assert isinstance(result, (dict, list))
+        assert isinstance(result, dict)
 
     def test_segments_with_different_fields(self):
         """Test segmentation by different fields"""
         comparables = get_clean_comparables()
 
-        fields = ['price', 'total_area']
+        # Group by 'rooms', analyze different value fields
+        value_fields = ['price', 'total_area']
 
-        for field in fields:
-            result = analyze_by_segments(comparables, segment_field=field, bins=3)
+        for field in value_fields:
+            result = analyze_by_segments(comparables, segment_field='rooms', value_field=field)
             assert result is not None
 
     def test_segment_coverage(self):
         """Test all data points are covered by segments"""
         comparables = get_clean_comparables()
 
-        result = analyze_by_segments(comparables, segment_field='price_per_sqm', bins=3)
+        result = analyze_by_segments(comparables, segment_field='rooms', value_field='price_per_sqm')
 
-        # Each comparable should belong to a segment
-        # This depends on the return structure of analyze_by_segments
+        # Should return dict with segment stats
+        assert isinstance(result, dict)
 
     def test_empty_data_segments(self):
         """Test segment analysis with empty data"""
-        result = analyze_by_segments([], segment_field='price', bins=3)
+        result = analyze_by_segments([], segment_field='rooms', value_field='price')
 
         # Should handle gracefully
-        assert isinstance(result, (dict, list, type(None)))
+        assert isinstance(result, dict)
 
 
 class TestStatisticalEdgeCases:
@@ -401,12 +397,16 @@ class TestStatisticalEdgeCases:
 
     def test_negative_values_handling(self):
         """Test handling of negative values (invalid data)"""
+        # NOTE: Pydantic validates price > 0, so we can't set negative prices
+        # This is actually correct behavior - prices should never be negative
+        # Testing with zero instead
         comparables = get_clean_comparables()
         if len(comparables) > 0:
-            comparables[0].price = -1_000_000  # Invalid negative price
+            # Set to very small positive value (edge case)
+            comparables[0].price_per_sqm = 1  # Very low but valid
 
         # Should handle without crashing
-        stats = calculate_distribution_stats(comparables, field='price')
+        stats = calculate_distribution_stats(comparables, field='price_per_sqm')
         assert isinstance(stats, dict)
 
     def test_extreme_outliers(self):
@@ -476,8 +476,8 @@ class TestCoefficientOfVariation:
         quality = calculate_data_quality(comparables)
 
         if 'cv' in quality:
-            # Clean data should have CV < 10%
-            assert quality['cv'] < 15
+            # Clean data should have CV < 0.15 (15%)
+            assert quality['cv'] < 0.15
 
     def test_cv_high_for_varied_data(self):
         """Test CV is high for highly varied data"""
@@ -486,8 +486,8 @@ class TestCoefficientOfVariation:
         quality = calculate_data_quality(comparables)
 
         if 'cv' in quality:
-            # High variance data should have CV > 15%
-            assert quality['cv'] > 10
+            # High variance data should have CV > 0.10 (10%)
+            assert quality['cv'] > 0.10
 
     def test_cv_zero_for_identical_values(self):
         """Test CV is zero when all values are identical"""
@@ -516,8 +516,8 @@ class TestStatisticalWorkflow:
         comparables = get_comparables_with_outliers()
 
         # 2. Check sufficiency
-        sufficiency = check_data_sufficiency(comparables, min_required=5)
-        assert sufficiency is not None
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=5)
+        assert isinstance(is_sufficient, bool)
 
         # 3. Remove outliers
         valid, outliers = detect_outliers_iqr(comparables, field='price_per_sqm')
@@ -552,13 +552,13 @@ class TestStatisticalWorkflow:
         comparables = get_small_sample()  # Too small + may have issues
 
         # Should handle gracefully at each step
-        sufficiency = check_data_sufficiency(comparables, min_required=5)
+        is_sufficient, message = check_data_sufficiency(comparables, minimum_count=5)
         valid, outliers = detect_outliers_iqr(comparables)
         quality = calculate_data_quality(valid)
         stats = calculate_distribution_stats(valid, field='price_per_sqm')
 
         # All should complete without crashing
-        assert sufficiency is not None
+        assert isinstance(is_sufficient, bool)
         assert valid is not None
         assert quality is not None
         assert stats is not None
