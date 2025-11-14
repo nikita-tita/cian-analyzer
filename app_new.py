@@ -636,9 +636,33 @@ def parse_url():
 
     except Exception as e:
         logger.error(f"Ошибка парсинга: {e}", exc_info=True)
+
+        # Определяем тип ошибки
+        error_str = str(e).lower()
+        error_type = 'parsing_error'
+        user_message = 'Не удалось загрузить данные объявления'
+
+        if 'url' in error_str and ('invalid' in error_str or 'некорректн' in error_str):
+            error_type = 'invalid_url'
+            user_message = 'Некорректная ссылка. Введите правильный URL с Cian.ru'
+        elif 'timeout' in error_str or 'timed out' in error_str:
+            error_type = 'timeout'
+            user_message = 'Превышено время ожидания. Попробуйте еще раз.'
+        elif 'not found' in error_str or '404' in error_str:
+            error_type = 'no_data'
+            user_message = 'Объявление не найдено. Проверьте ссылку.'
+        elif 'captcha' in error_str or 'blocked' in error_str:
+            error_type = 'parsing_failed'
+            user_message = 'Не удалось загрузить данные. Попробуйте через несколько минут.'
+        elif 'browser' in error_str or 'playwright' in error_str:
+            error_type = 'browser_error'
+            user_message = 'Техническая ошибка. Повторите попытку.'
+
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'error_type': error_type,
+            'message': user_message,
+            'technical_details': str(e)
         }), 500
 
 
@@ -685,7 +709,8 @@ def create_manual():
                 errors.append(f"{field}: {msg}")
             return jsonify({
                 'status': 'error',
-                'message': 'Ошибка валидации данных',
+                'error_type': 'data_validation_error',
+                'message': 'Ошибка валидации данных. Проверьте введенные значения.',
                 'errors': errors
             }), 400
 
@@ -1031,9 +1056,33 @@ def find_similar():
 
     except Exception as e:
         logger.error(f"❌ [STEP 2] find-similar failed: {e}", exc_info=True)
+
+        # Определяем тип ошибки для лучшей диагностики
+        error_str = str(e).lower()
+        error_type = 'search_error'
+        user_message = 'Ошибка при поиске аналогов'
+
+        if 'session' in error_str or 'not found' in error_str:
+            error_type = 'session_error'
+            user_message = 'Сессия не найдена или истекла. Начните сначала.'
+        elif 'timeout' in error_str or 'timed out' in error_str:
+            error_type = 'timeout'
+            user_message = 'Превышено время ожидания при загрузке данных. Попробуйте еще раз.'
+        elif 'parsing' in error_str or 'parse' in error_str:
+            error_type = 'parsing_error'
+            user_message = 'Ошибка при обработке страниц объявлений. Попробуйте позже.'
+        elif 'browser' in error_str or 'playwright' in error_str:
+            error_type = 'browser_error'
+            user_message = 'Техническая ошибка браузера. Повторите попытку через несколько секунд.'
+        elif 'network' in error_str or 'connection' in error_str:
+            error_type = 'network_error'
+            user_message = 'Ошибка сети при загрузке данных. Проверьте соединение.'
+
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'error_type': error_type,
+            'message': user_message,
+            'technical_details': str(e)
         }), 500
 
 
@@ -1248,7 +1297,9 @@ def analyze():
             logger.error(f"Ошибка валидации: {e}", exc_info=True)
             return jsonify({
                 'status': 'error',
-                'message': f'Ошибка валидации данных: {e}'
+                'error_type': 'data_validation_error',
+                'message': 'Ошибка валидации данных аналогов. Проверьте корректность введенных данных.',
+                'technical_details': str(e)
             }), 400
 
         # Анализ
