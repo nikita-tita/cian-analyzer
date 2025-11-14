@@ -5,7 +5,7 @@
 import statistics
 import math
 import logging
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from datetime import datetime
 from functools import lru_cache
 from scipy import stats as scipy_stats
@@ -18,6 +18,7 @@ from ..models.property import (
     PriceScenario,
     AnalysisResult
 )
+from ..utils.market_rates import MarketRatesService
 
 try:
     from .property_tracker import get_tracker, EventType
@@ -34,6 +35,8 @@ from .price_range import calculate_price_range
 from .attractiveness_index import calculate_attractiveness_index
 from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
 from .recommendations import RecommendationEngine
+from .liquidity_profile import build_liquidity_profile
+from .confidence_interval import calculate_price_confidence
 
 # Импорт валидатора данных
 try:
@@ -91,6 +94,7 @@ class RealEstateAnalyzer:
         self.request: AnalysisRequest = None
         self.filtered_comparables: List[ComparableProperty] = []
         self.data_quality: Dict = {}  # Результаты статистического анализа
+        self.market_profile: Dict[str, Any] = {}
 
         # Трекинг
         self.property_id = property_id
@@ -105,6 +109,12 @@ class RealEstateAnalyzer:
             'cache_hits': 0
         }
 
+        try:
+            self.market_rates_service = MarketRatesService()
+        except Exception as exc:  # pragma: no cover - защитный код
+            logger.warning("Не удалось инициализировать сервис рыночных ставок: %s", exc)
+            self.market_rates_service = None
+
     def analyze(self, request: AnalysisRequest) -> AnalysisResult:
         """
         Полный анализ объекта недвижимости
@@ -118,6 +128,7 @@ class RealEstateAnalyzer:
         start_time = datetime.now()
 
         self.request = request
+        self.market_profile = {}
 
         # Инициализация трекинга
         if self.enable_tracking and self.property_id:
@@ -308,6 +319,12 @@ class RealEstateAnalyzer:
             attractiveness_index=attractiveness.get('total_index', 50)
         )
 
+        # 5. Доверительные интервалы для цены продажи
+        confidence_interval = calculate_price_confidence(
+            target=request.target_property,
+            comparables=self.filtered_comparables
+        )
+
         # Метрики
         end_time = datetime.now()
         self.metrics['calculation_time_ms'] = int((end_time - start_time).total_seconds() * 1000)
@@ -319,7 +336,8 @@ class RealEstateAnalyzer:
                 'fair_price_analysis': fair_price,
                 'price_scenarios': scenarios,
                 'comparables': [c.model_dump() for c in self.filtered_comparables],
-                'market_statistics': market_stats
+                'market_statistics': market_stats,
+                'market_profile': self.market_profile
             })
             recommendations_objects = rec_engine.generate()
             recommendations = [rec.to_dict() for rec in recommendations_objects]
@@ -335,6 +353,7 @@ class RealEstateAnalyzer:
             self.property_log.attractiveness_index = attractiveness
             self.property_log.time_forecast = time_forecast
             self.property_log.price_sensitivity = price_sensitivity
+            self.property_log.price_confidence = confidence_interval
             self._log_event(EventType.ANALYSIS_COMPLETED,
                 f"Анализ завершён за {self.metrics['calculation_time_ms']} мс")
             self.tracker.complete_property(self.property_id, "completed")
@@ -344,6 +363,7 @@ class RealEstateAnalyzer:
             target_property=request.target_property,
             comparables=self.filtered_comparables,
             market_statistics=market_stats,
+            market_profile=self.market_profile,
             fair_price_analysis=fair_price,
             price_scenarios=scenarios,
             strengths_weaknesses=strengths_weaknesses,
@@ -354,6 +374,7 @@ class RealEstateAnalyzer:
             attractiveness_index=attractiveness,
             time_forecast=time_forecast,
             price_sensitivity=price_sensitivity,
+            confidence_interval=confidence_interval,
             # Рекомендации
             recommendations=recommendations
         )
@@ -885,6 +906,7 @@ class RealEstateAnalyzer:
         current_price = target.price or 0
         fair_price_data = self.calculate_fair_price()
         fair_price = fair_price_data.get('fair_price_total', current_price)
+        market_profile = self._build_market_profile()
 
         # ИСПРАВЛЕНО: Реалистичные сценарии с адекватным торгом (3-5%)
         scenarios_config = [
@@ -892,18 +914,18 @@ class RealEstateAnalyzer:
                 'name': 'Быстрая продажа',
                 'type': 'fast',
                 'description': 'Небольшой запас на торг для быстрой реализации (1-2 месяца)',
-                'start_price': fair_price * 1.02,  # +2% запас на торг
-                'expected_final_price': fair_price * 0.98,  # -2% после торга (итого 4% торг)
+                'start_price_pct': 1.02,
+                'expected_final_pct': 0.98,
                 'time_months': 2,
                 'base_probability': 85,
-                'reduction_rate': 0.008  # небольшое снижение цены
+                'reduction_rate': 0.008
             },
             {
                 'name': 'Оптимальная продажа',
                 'type': 'optimal',
                 'description': 'Рекомендуемая стратегия с балансом цены и времени (3-4 месяца)',
-                'start_price': fair_price * 1.06,  # +6% запас на торг
-                'expected_final_price': fair_price * 1.02,  # +2% после торга (итого 4% торг)
+                'start_price_pct': 1.06,
+                'expected_final_pct': 1.02,
                 'time_months': 4,
                 'base_probability': 75,
                 'reduction_rate': 0.010
@@ -912,8 +934,8 @@ class RealEstateAnalyzer:
                 'name': 'Стандартная продажа',
                 'type': 'standard',
                 'description': 'Средние сроки с умеренным торгом (5-6 месяцев)',
-                'start_price': fair_price * 1.08,  # +8% запас на торг
-                'expected_final_price': fair_price * 1.01,  # +1% после торга (итого 7% торг)
+                'start_price_pct': 1.08,
+                'expected_final_pct': 1.01,
                 'time_months': 6,
                 'base_probability': 65,
                 'reduction_rate': 0.012
@@ -922,17 +944,43 @@ class RealEstateAnalyzer:
                 'name': 'Попытка максимума',
                 'type': 'maximum',
                 'description': 'Ставка на максимальную цену (9-12 месяцев, высокий риск)',
-                'start_price': fair_price * 1.15,  # +15% попытка максимума
-                'expected_final_price': fair_price * 0.97,  # -3% после долгого торга (итого 18% торг)
+                'start_price_pct': 1.15,
+                'expected_final_pct': 0.97,
                 'time_months': 10,
                 'base_probability': 30,
                 'reduction_rate': 0.020
             }
         ]
 
+        price_multiplier = market_profile.get('pricing_bias', 1.0)
+        probability_multiplier = market_profile.get('probability_multiplier', 1.0)
+        time_multiplier = market_profile.get('time_multiplier', 1.0)
+        reduction_multiplier = market_profile.get('price_pressure_multiplier', 1.0)
+        segment_label = market_profile.get('segment_label')
+
         scenarios = []
         for config in scenarios_config:
-            scenario = PriceScenario(**config)
+            adaptive_config = config.copy()
+            start_price = fair_price * adaptive_config.pop('start_price_pct') * price_multiplier
+            expected_price = fair_price * adaptive_config.pop('expected_final_pct') * price_multiplier
+            time_months = max(1, round(adaptive_config['time_months'] * time_multiplier))
+            base_probability = max(5, min(95, adaptive_config['base_probability'] * probability_multiplier))
+            reduction_rate = max(0.004, adaptive_config['reduction_rate'] * reduction_multiplier)
+
+            adaptive_config.update({
+                'start_price': start_price,
+                'expected_final_price': expected_price,
+                'time_months': time_months,
+                'base_probability': round(base_probability, 1),
+                'reduction_rate': reduction_rate
+            })
+
+            if segment_label:
+                adaptive_config['description'] = (
+                    f"{adaptive_config['description']} — сегмент: {segment_label}."
+                )
+
+            scenario = PriceScenario(**adaptive_config)
 
             # Траектория цен
             scenario.price_trajectory = self._calculate_price_trajectory(
@@ -954,10 +1002,19 @@ class RealEstateAnalyzer:
             )
 
             # Финансовый расчет с вероятностью
+            tax_context = self._get_tax_context(scenario.expected_final_price)
+            opportunity_context = self._get_opportunity_context(scenario.time_months)
             scenario.financials = self._calculate_financials(
                 scenario.expected_final_price,
                 scenario.time_months,
-                base_probability=scenario.base_probability
+                base_probability=scenario.base_probability,
+                tax_rate=tax_context['tax_rate'],
+                tax_base=tax_context['tax_base'],
+                tax_note=tax_context['note'],
+                tax_holding_years=tax_context['holding_years'],
+                opportunity_rate=opportunity_context['rate'],
+                opportunity_note=opportunity_context['note'],
+                opportunity_metadata=opportunity_context['metadata']
             )
 
             scenarios.append(scenario)
@@ -996,6 +1053,34 @@ class RealEstateAnalyzer:
 
         return scenarios
 
+    def _build_market_profile(self) -> Dict[str, Any]:
+        """Строит профиль ликвидности и кеширует его для анализа."""
+        if self.market_profile:
+            return self.market_profile
+
+        try:
+            profile = build_liquidity_profile(self.request.target_property, self.filtered_comparables)
+        except Exception as exc:  # pragma: no cover - защитный код
+            logger.warning("Не удалось построить профиль ликвидности: %s", exc)
+            profile = {
+                'segment': 'unknown',
+                'segment_label': 'неопределённый сегмент',
+                'liquidity_score': 1.0,
+                'probability_multiplier': 1.0,
+                'time_multiplier': 1.0,
+                'pricing_bias': 1.0,
+                'price_pressure_multiplier': 1.0,
+                'expected_dom_months': 4,
+                'notes': []
+            }
+
+        self.market_profile = profile
+
+        if self.enable_tracking and self.property_log:
+            self.property_log.market_profile = profile
+
+        return profile
+
     def _calculate_price_trajectory(self, start_price: float, reduction_rate: float, months: int = 14) -> List[Dict]:
         """Расчет траектории цены"""
         trajectory = []
@@ -1008,19 +1093,28 @@ class RealEstateAnalyzer:
         return trajectory
 
     def _calculate_monthly_probability(self, scenario_type: str, fair_price: float, start_price: float) -> List[float]:
-        """Расчет месячной вероятности продажи"""
+        """Расчет месячной вероятности продажи с учетом эмпирических кривых."""
         price_ratio = start_price / fair_price if fair_price > 0 else 1.0
+        market_profile = self._build_market_profile()
+        empirical_curve = market_profile.get('empirical_monthly_curve') or []
 
-        if scenario_type == 'fast':
-            base_prob = [0.45, 0.70, 0.75, 0.75, 0.73, 0.70, 0.68, 0.65, 0.62, 0.60, 0.58, 0.55, 0.53, 0.50]
-        elif scenario_type == 'optimal':
-            base_prob = [0.40, 0.65, 0.70, 0.72, 0.70, 0.68, 0.65, 0.62, 0.60, 0.57, 0.55, 0.52, 0.50, 0.48]
-        elif scenario_type == 'standard':
-            base_prob = [0.35, 0.55, 0.60, 0.65, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42, 0.40, 0.38]
-        elif scenario_type == 'maximum':
-            base_prob = [0.15, 0.20, 0.20, 0.18, 0.15, 0.12, 0.10, 0.08, 0.07, 0.06, 0.05, 0.05, 0.04, 0.04]
-        else:
-            base_prob = [0.50] * 14
+        base_curves = {
+            'fast': [0.45, 0.70, 0.75, 0.75, 0.73, 0.70, 0.68, 0.65, 0.62, 0.60, 0.58, 0.55, 0.53, 0.50],
+            'optimal': [0.40, 0.65, 0.70, 0.72, 0.70, 0.68, 0.65, 0.62, 0.60, 0.57, 0.55, 0.52, 0.50, 0.48],
+            'standard': [0.35, 0.55, 0.60, 0.65, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42, 0.40, 0.38],
+            'maximum': [0.15, 0.20, 0.20, 0.18, 0.15, 0.12, 0.10, 0.08, 0.07, 0.06, 0.05, 0.05, 0.04, 0.04],
+        }
+        base_prob = base_curves.get(scenario_type, [0.50] * 14)
+
+        if empirical_curve:
+            weight_map = {
+                'fast': 0.7,
+                'optimal': 0.65,
+                'standard': 0.6,
+                'maximum': 0.55,
+            }
+            weight = weight_map.get(scenario_type, 0.6)
+            base_prob = self._blend_probability_curves(base_prob, empirical_curve, weight)
 
         # Корректировка по отклонению цены
         if price_ratio > 1.1:
@@ -1032,7 +1126,34 @@ class RealEstateAnalyzer:
         else:
             adjustment = 1.0
 
-        return [min(p * adjustment, 0.98) for p in base_prob]
+        seasonality = market_profile.get('seasonality', {})
+        seasonal_multiplier = seasonality.get('probability_multiplier', 1.0)
+        adjustment *= seasonal_multiplier
+
+        return [min(0.98, max(0.01, p * adjustment)) for p in base_prob]
+
+    def _blend_probability_curves(self, template: List[float], empirical: List[float], weight: float) -> List[float]:
+        """Смешивает базовую кривую и эмпирические данные по DOM."""
+        weight = max(0.0, min(weight, 1.0))
+        horizon = max(len(template), len(empirical), 14)
+        template_curve = self._extend_curve(template, horizon)
+        empirical_curve = self._extend_curve(empirical, horizon)
+
+        blended = []
+        for t, e in zip(template_curve, empirical_curve):
+            blended.append(t * (1 - weight) + e * weight)
+        return blended[:14]
+
+    @staticmethod
+    def _extend_curve(curve: List[float], horizon: int) -> List[float]:
+        if len(curve) >= horizon:
+            return curve[:horizon]
+        extended = curve[:]
+        last_value = curve[-1] if curve else 0.05
+        while len(extended) < horizon:
+            last_value = max(last_value * 0.95, 0.02)
+            extended.append(last_value)
+        return extended
 
     def _calculate_cumulative_probability(self, monthly_probabilities: List[float]) -> List[float]:
         """Расчет кумулятивной вероятности"""
@@ -1046,6 +1167,142 @@ class RealEstateAnalyzer:
 
         return cumulative
 
+    def _get_opportunity_context(self, months_waited: int) -> Dict[str, Any]:
+        """Получить ставку упущенной выгоды и пояснение из рыночных данных."""
+        default_rate = 0.08
+        base_note = (
+            f'Упущенная выгода {default_rate * 100:.1f}% годовых за {months_waited} мес '
+            f'(фиксированное допущение).'
+        )
+        metadata = {
+            'source': 'internal_default',
+            'updated_at': None,
+            'key_rate_percent': None,
+            'spread_percent': None,
+            'instrument': 'internal_default',
+            'deposit_rate_percent': None,
+            'ofz_yield_percent': None,
+            'sources': {},
+        }
+
+        if not self.market_rates_service:
+            return {'rate': default_rate, 'note': base_note, 'metadata': metadata}
+
+        market_info = self.market_rates_service.get_opportunity_rate(months_waited)
+        rate = market_info.get('rate', default_rate)
+        metadata.update(market_info.get('metadata') or {})
+
+        timestamp = metadata.get('updated_at') or market_info.get('timestamp')
+        if timestamp:
+            try:
+                updated_dt = datetime.fromisoformat(timestamp)
+                updated_text = updated_dt.strftime('%d.%m.%Y')
+            except ValueError:
+                updated_text = timestamp
+        else:
+            updated_text = 'ранее'
+
+        key_rate_percent = metadata.get('key_rate_percent')
+        deposit_rate_percent = metadata.get('deposit_rate_percent')
+        ofz_yield_percent = metadata.get('ofz_yield_percent')
+        instrument = metadata.get('instrument') or 'key_rate_spread'
+
+        instrument_labels = {
+            'top_deposits': 'средние ставки топ-банков по вкладам',
+            'ofz_long': 'длинные ОФЗ 26240',
+            'blended_curve': 'смешанный депозитно-облигационный бенчмарк',
+            'key_rate_spread': 'ключевая ставка ЦБ + рыночный спред',
+            'internal_default': 'фиксированная ставка 8% годовых',
+        }
+
+        components = []
+        if deposit_rate_percent:
+            components.append(f"депозиты {deposit_rate_percent:.2f}%")
+        if ofz_yield_percent:
+            components.append(f"ОФЗ {ofz_yield_percent:.2f}%")
+        if key_rate_percent:
+            components.append(f"ключевая {key_rate_percent:.2f}%")
+
+        if components:
+            components_text = ", ".join(components)
+            note = (
+                f"Ставка упущенной выгоды ({rate * 100:.2f}% годовых) построена как "
+                f"{instrument_labels.get(instrument, instrument)}. "
+                f"Использованы источники: {components_text}. "
+                f"Данные обновлены {updated_text}, горизонт ожидания {months_waited} мес."
+            )
+        else:
+            note = base_note
+
+        return {'rate': rate, 'note': note, 'metadata': metadata}
+
+    def _get_tax_context(self, sale_price: float) -> Dict[str, Any]:
+        """Определить ставку и базу НДФЛ исходя из срока владения и цены покупки."""
+        target = getattr(self.request, 'target_property', None)
+        default_context = {
+            'tax_rate': 0.0,
+            'tax_base': 0.0,
+            'note': 'Нет данных о покупке — налог не удержан.',
+            'holding_years': None
+        }
+
+        if not target:
+            return default_context
+
+        purchase_date = getattr(target, 'purchase_date', None)
+        purchase_price = getattr(target, 'purchase_price', None)
+        owner_residency = (getattr(target, 'owner_residency', 'resident') or 'resident').lower()
+        primary_residence = bool(getattr(target, 'primary_residence', False))
+
+        if not purchase_date:
+            return default_context
+
+        holding_years = (datetime.now() - purchase_date).days / 365.25
+        min_period = 3 if primary_residence else 5
+
+        if holding_years >= min_period:
+            return {
+                'tax_rate': 0.0,
+                'tax_base': 0.0,
+                'note': (
+                    f'Владение {holding_years:.1f} лет ≥ {min_period} лет — налоговая льгота, '
+                    'НДФЛ не удерживается.'
+                ),
+                'holding_years': holding_years
+            }
+
+        tax_rate = 0.30 if owner_residency == 'non_resident' else 0.13
+        fallback_purchase = sale_price * 0.7
+        effective_purchase_price = purchase_price or fallback_purchase
+        profit_base = max(sale_price - effective_purchase_price, 0)
+
+        if profit_base <= 0:
+            note = (
+                f'Срок владения {holding_years:.1f} года, но прибыли нет — налог не удержан.'
+            )
+            return {
+                'tax_rate': 0.0,
+                'tax_base': 0.0,
+                'note': note,
+                'holding_years': holding_years
+            }
+
+        note_parts = [
+            f'Срок владения {holding_years:.1f} года (< {min_period} лет).',
+            f"Ставка НДФЛ {'30' if owner_residency == 'non_resident' else '13'}%."
+        ]
+        if not purchase_price:
+            note_parts.append('Нет цены покупки — использовано 70% от цены продажи (кадастровый минимум).')
+
+        note = ' '.join(note_parts)
+
+        return {
+            'tax_rate': tax_rate,
+            'tax_base': profit_base,
+            'note': note,
+            'holding_years': holding_years
+        }
+
     def _calculate_financials(
         self,
         sale_price: float,
@@ -1053,8 +1310,13 @@ class RealEstateAnalyzer:
         base_probability: float = 0.0,  # НОВОЕ: вероятность продажи для расчета expected value
         commission_rate: float = 0.02,
         tax_rate: float = 0.00,  # ИСПРАВЛЕНО: По умолчанию 0% (предполагаем владение > 5 лет)
+        tax_base: float = None,
+        tax_note: str = 'Налог 0% при владении > 5 лет или единственное жилье',
+        tax_holding_years: float = None,
         other_expenses: float = 0.001,  # ИСПРАВЛЕНО: 0.1% вместо 1% (реалистичные расходы ~150 тыс)
-        opportunity_rate: float = 0.08
+        opportunity_rate: float = 0.08,
+        opportunity_note: str = None,
+        opportunity_metadata: Dict[str, Any] = None
     ) -> Dict:
         """
         Финансовый расчет с корректными налогами и расходами
@@ -1069,7 +1331,8 @@ class RealEstateAnalyzer:
         - Только с прибыли (продажа - покупка), а не со всей суммы!
         """
         commission = sale_price * commission_rate
-        taxes = sale_price * tax_rate  # 0% по умолчанию
+        tax_base_amount = sale_price if tax_base is None else max(tax_base, 0)
+        taxes = tax_base_amount * tax_rate  # 0% по умолчанию или считанный профит
         other = sale_price * other_expenses  # 0.1% (~150 тыс)
         opportunity_cost = sale_price * opportunity_rate * (months_waited / 12)
 
@@ -1088,11 +1351,17 @@ class RealEstateAnalyzer:
             'commission_rate_percent': commission_rate * 100,
             'taxes': taxes,
             'tax_rate_percent': tax_rate * 100,
-            'tax_note': 'Налог 0% при владении > 5 лет или единственное жилье',
+            'tax_base': tax_base_amount,
+            'tax_note': tax_note,
+            'tax_holding_years': tax_holding_years,
             'other_expenses': other,
             'other_expenses_note': 'Юрист, регистрация, оценка (~150 тыс ₽)',
             'opportunity_cost': opportunity_cost,
-            'opportunity_note': f'Упущенная выгода {opportunity_rate*100:.0f}% годовых за {months_waited} мес',
+            'opportunity_note': opportunity_note or (
+                f'Упущенная выгода {opportunity_rate*100:.0f}% годовых за {months_waited} мес'
+            ),
+            'opportunity_metadata': opportunity_metadata or {},
+            'opportunity_rate': opportunity_rate,
             'opportunity_explanation': (
                 f'Упущенная выгода — это деньги, которые вы могли бы заработать, '
                 f'инвестируя {sale_price:,.0f} ₽ под {opportunity_rate*100:.0f}% годовых '
