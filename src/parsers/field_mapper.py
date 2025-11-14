@@ -442,6 +442,96 @@ def create_domclick_mapper() -> FieldMapper:
 _mappers_cache: Dict[str, FieldMapper] = {}
 
 
+def create_avito_mapper() -> FieldMapper:
+    """
+    Создать маппер для Avito
+
+    Avito имеет свою структуру (мобильное API)
+    """
+    mapper = FieldMapper('avito')
+
+    # Основные поля из мобильного API
+    mapper.add_mapping('title', 'title')
+    mapper.add_mapping('description', 'description')
+
+    # Цена
+    mapper.add_mapping('price.value', 'price', transformer=lambda x: float(x) if x else None)
+    mapper.add_mapping('price.currency', 'currency', default='RUB')
+
+    # Площадь
+    mapper.add_mapping('params.square', 'total_area', transformer=normalize_area)
+
+    # Комнаты
+    mapper.add_mapping('params.rooms', 'rooms', transformer=normalize_rooms)
+
+    # Этаж
+    mapper.add_mapping('params.floor', 'floor', transformer=lambda x: int(x) if x else None)
+    mapper.add_mapping('params.floors_total', 'floor_total', transformer=lambda x: int(x) if x else None)
+
+    # Адрес
+    mapper.add_mapping('location.address', 'address')
+
+    # Изображения
+    mapper.add_mapping('images', 'images', transformer=lambda imgs: [img.get('url', '') for img in imgs] if isinstance(imgs, list) else [])
+
+    return mapper
+
+
+def create_yandex_mapper() -> FieldMapper:
+    """
+    Создать маппер для Yandex Realty
+
+    Yandex использует GraphQL, структура хорошо организована
+    """
+    mapper = FieldMapper('yandex')
+
+    # Основные поля
+    mapper.add_mapping('title', 'title')
+    mapper.add_mapping('description', 'description')
+
+    # Цена
+    mapper.add_mapping('price.value', 'price', transformer=lambda x: float(x) if x else None)
+    mapper.add_mapping('price.currency', 'currency', default='RUB')
+
+    # Площадь
+    mapper.add_mapping('area.value', 'total_area', transformer=lambda x: float(x) if x else None)
+
+    # Комнаты
+    mapper.add_mapping('rooms', 'rooms', transformer=lambda x: int(x) if x and x != 'студия' else x)
+
+    # Этаж
+    mapper.add_mapping('floor', 'floor', transformer=lambda x: int(x) if x else None)
+    mapper.add_mapping('floorsTotal', 'floor_total', transformer=lambda x: int(x) if x else None)
+
+    # Адрес
+    mapper.add_mapping('address.fullAddress', 'address')
+
+    # Координаты
+    mapper.add_mapping('location.latitude', 'latitude')
+    mapper.add_mapping('location.longitude', 'longitude')
+
+    # Изображения
+    mapper.add_mapping('images', 'images', transformer=lambda imgs: [img.get('url', '') for img in imgs] if isinstance(imgs, list) else [])
+
+    # Характеристики
+    def parse_characteristics(chars):
+        """Парсинг характеристик Yandex"""
+        if not chars or not isinstance(chars, list):
+            return {}
+        result = {}
+        for char in chars:
+            if isinstance(char, dict):
+                key = char.get('key', '')
+                value = char.get('value', '')
+                if key and value:
+                    result[key] = value
+        return result
+
+    mapper.add_mapping('characteristics', 'characteristics', transformer=parse_characteristics)
+
+    return mapper
+
+
 def get_field_mapper(source_name: str) -> FieldMapper:
     """
     Получить маппер для источника (с кэшированием)
@@ -457,6 +547,10 @@ def get_field_mapper(source_name: str) -> FieldMapper:
             _mappers_cache[source_name] = create_cian_mapper()
         elif source_name == 'domclick':
             _mappers_cache[source_name] = create_domclick_mapper()
+        elif source_name == 'avito':
+            _mappers_cache[source_name] = create_avito_mapper()
+        elif source_name == 'yandex':
+            _mappers_cache[source_name] = create_yandex_mapper()
         else:
             logger.warning(f"Неизвестный источник {source_name}, используем базовый маппер")
             _mappers_cache[source_name] = FieldMapper(source_name)
