@@ -70,6 +70,10 @@ class PropertyBase(BaseModel):
 class TargetProperty(PropertyBase):
     """Целевой объект для анализа"""
     price_per_sqm: Optional[float] = None
+    purchase_price: Optional[float] = Field(None, gt=0)
+    purchase_date: Optional[datetime] = None
+    owner_residency: Optional[str] = "resident"  # resident | non_resident
+    primary_residence: bool = False
 
     # ═══════════════════════════════════════════════════════════════════════
     # КЛАСТЕР 1: ОТДЕЛКА И СОСТОЯНИЕ
@@ -193,6 +197,10 @@ class TargetProperty(PropertyBase):
             # НОВЫЕ ПОЛЯ (2025-01-12)
             'качество материалов': 'material_quality',
             'статус собственности': 'ownership_status',
+            'стоимость покупки': 'purchase_price',
+            'дата покупки': 'purchase_date',
+            'резидентство собственника': 'owner_residency',
+            'единственное жилье': 'primary_residence',
 
             # Обратная совместимость (deprecated)
             'дизайнерская отделка': 'has_design',
@@ -308,6 +316,7 @@ class AnalysisResult(BaseModel):
 
     # Рыночная статистика
     market_statistics: Dict[str, Any]
+    market_profile: Dict[str, Any] = {}
 
     # Справедливая цена
     fair_price_analysis: Dict[str, Any]
