@@ -238,6 +238,19 @@ def create_domclick_mapper() -> FieldMapper:
 
     mapper.add_mapping('building.type', 'house_type', transformer=parse_house_type)
 
+    # Высота потолков
+    def parse_ceiling_height(height_data):
+        """Парсинг высоты потолков"""
+        if isinstance(height_data, dict):
+            return float(height_data.get('value', 0)) if height_data.get('value') else None
+        try:
+            return float(height_data) if height_data else None
+        except (ValueError, TypeError):
+            return None
+
+    mapper.add_mapping('ceilingHeight', 'ceiling_height', transformer=parse_ceiling_height)
+    mapper.add_mapping('building.ceilingHeight', 'ceiling_height', transformer=parse_ceiling_height)
+
     # Описание
     mapper.add_mapping('description', 'description')
 
