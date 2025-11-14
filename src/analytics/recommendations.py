@@ -8,7 +8,7 @@
 - Информационные (стратегия)
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 
 
@@ -68,7 +68,7 @@ class RecommendationEngine:
     # Константы для расчетов
     DESIGN_COST = 500_000  # Средняя стоимость дизайн-ремонта
     PHOTO_SESSION_COST = 15_000  # Профессиональная фотосессия
-    OPPORTUNITY_RATE = 0.08  # Годовая ставка упущенной выгоды
+    OPPORTUNITY_RATE = 0.08  # Годовая ставка упущенной выгоды (дефолт)
 
     def __init__(self, analysis_result: Dict):
         """
@@ -81,6 +81,12 @@ class RecommendationEngine:
         self.scenarios = analysis_result.get('price_scenarios', [])
         self.comparables = analysis_result.get('comparables', [])
         self.market_stats = analysis_result.get('market_statistics', {})
+        self.market_profile = analysis_result.get('market_profile', {}) or {}
+        (
+            self.opportunity_rate,
+            self.opportunity_rate_note,
+            self.opportunity_metadata,
+        ) = self._resolve_opportunity_rate()
 
     def generate(self) -> List[Recommendation]:
         """
@@ -139,6 +145,9 @@ class RecommendationEngine:
                     'with_action': 'Продано за 4 месяца',
                     'time_saved_months': 8,
                     'opportunity_cost_saved': savings,
+                    'opportunity_rate_percent': self.opportunity_rate * 100,
+                    'opportunity_rate_note': self.opportunity_rate_note,
+                    'opportunity_rate_source': (self.opportunity_metadata or {}).get('source'),
                     'recommendation': f'Снизить на {abs(overpricing):.1f}%'
                 }
             ))
@@ -446,7 +455,81 @@ class RecommendationEngine:
                     }
                 ))
 
+        liquidity_score = self.market_profile.get('liquidity_score')
+        if liquidity_score:
+            expected_dom = self.market_profile.get('expected_dom_months')
+            segment_label = self.market_profile.get('segment_label')
+            notes = self.market_profile.get('notes', [])
+
+            if liquidity_score < 0.9:
+                recs.append(Recommendation(
+                    priority=self.INFO,
+                    icon='🐢',
+                    title='Низкая ликвидность сегмента',
+                    message=(
+                        f'{segment_label or "Сегмент"} показывает пониженную ликвидность '
+                        f'(индекс {liquidity_score:.2f}). Стоит закладывать больший срок экспозиции '
+                        f'и работать с ценой активнее.'
+                    ),
+                    action='Запланировать переговорный дисконт и дополнительные активности продаж',
+                    expected_result=(
+                        f'Срок продажи ~{expected_dom or "?"} мес. при текущем спросе. '
+                        'Готовность к дисконту снижает риск зависания.'
+                    ),
+                    category='strategy',
+                    financial_impact={
+                        'expected_dom_months': expected_dom,
+                        'liquidity_index': liquidity_score,
+                        'context_notes': notes[:2]
+                    }
+                ))
+            elif liquidity_score > 1.1:
+                recs.append(Recommendation(
+                    priority=self.INFO,
+                    icon='🚀',
+                    title='Высокая ликвидность — можно ускориться',
+                    message=(
+                        f'{segment_label or "Сегмент"} сейчас в спросе (индекс {liquidity_score:.2f}). '
+                        'Агрессивный торг не требуется — есть шанс продать быстрее средних сроков.'
+                    ),
+                    action='Фиксировать цену ближе к справедливой и ставить дедлайны по торгу',
+                    expected_result=(
+                        f'Планируемый срок экспозиции ~{expected_dom or "?"} мес., '
+                        'что на 20-30% быстрее типового рынка.'
+                    ),
+                    category='strategy',
+                    financial_impact={
+                        'expected_dom_months': expected_dom,
+                        'liquidity_index': liquidity_score,
+                        'context_notes': notes[:2]
+                    }
+                ))
+
         return recs
+
+    def _resolve_opportunity_rate(self) -> Tuple[float, Optional[str], Dict[str, Any]]:
+        """Извлекает актуальную ставку упущенной выгоды из сценариев."""
+
+        if not self.scenarios:
+            return self.OPPORTUNITY_RATE, None, {}
+
+        for scenario in self.scenarios:
+            financials = getattr(scenario, 'financials', None)
+            if financials is None and isinstance(scenario, dict):
+                financials = scenario.get('financials')
+
+            if not financials:
+                continue
+
+            rate = financials.get('opportunity_rate')
+            if rate:
+                return (
+                    rate,
+                    financials.get('opportunity_note'),
+                    financials.get('opportunity_metadata') or {},
+                )
+
+        return self.OPPORTUNITY_RATE, None, {}
 
     def _calc_opportunity_cost(self, price: float, months: int) -> float:
         """
@@ -459,7 +542,8 @@ class RecommendationEngine:
         Returns:
             Упущенная выгода в рублях
         """
-        return price * self.OPPORTUNITY_RATE * (months / 12)
+        rate = self.opportunity_rate or self.OPPORTUNITY_RATE
+        return price * rate * (months / 12)
 
     def _analyze_adjustments_context(self) -> List[Recommendation]:
         """
