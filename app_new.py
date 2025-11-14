@@ -146,7 +146,9 @@ ALLOWED_DOMAINS = [
     'www.cian.ru',
     'cian.ru',
     'spb.cian.ru',
-    'moscow.cian.ru'
+    'moscow.cian.ru',
+    'www.domclick.ru',
+    'domclick.ru'
 ]
 
 def validate_url(url: str) -> None:
