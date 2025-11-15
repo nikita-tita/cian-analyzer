@@ -650,40 +650,72 @@ const screen3 = {
 
     displayAnalysis(analysis) {
         console.log('📊 Отображение анализа:', analysis);
-        document.getElementById('analysis-results').style.display = 'block';
 
-        // Сводная информация
-        this.renderSummary(analysis);
+        try {
+            // Валидация структуры данных
+            if (!analysis) {
+                throw new Error('Данные анализа отсутствуют');
+            }
 
-        // Справедливая цена
-        this.renderFairPrice(analysis.fair_price_analysis);
+            if (!analysis.market_statistics || !analysis.market_statistics.all) {
+                throw new Error('Отсутствуют данные рыночной статистики');
+            }
 
-        // Новые метрики (если есть)
-        if (analysis.price_range) {
-            this.renderPriceRange(analysis.price_range);
+            if (!analysis.fair_price_analysis) {
+                throw new Error('Отсутствуют данные о справедливой цене');
+            }
+
+            document.getElementById('analysis-results').style.display = 'block';
+
+            // Сводная информация
+            this.renderSummary(analysis);
+
+            // Справедливая цена
+            this.renderFairPrice(analysis.fair_price_analysis);
+
+            // Новые метрики (если есть)
+            if (analysis.price_range) {
+                this.renderPriceRange(analysis.price_range);
+            }
+
+            if (analysis.attractiveness_index) {
+                this.renderAttractiveness(analysis.attractiveness_index);
+            }
+
+            if (analysis.time_forecast) {
+                this.renderTimeForecast(analysis.time_forecast);
+            }
+
+            // Сценарии
+            this.renderScenarios(analysis.price_scenarios);
+
+            // Сильные/слабые стороны
+            this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+
+            // Рекомендации (если есть)
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                this.renderRecommendations(analysis.recommendations);
+            }
+
+            // График
+            this.renderChart(analysis.comparison_chart_data);
+        } catch (error) {
+            console.error('Ошибка отображения анализа:', error);
+            utils.showToast(`Ошибка отображения результатов: ${error.message}`, 'error');
+
+            // Показываем хотя бы частичные данные, если они есть
+            document.getElementById('analysis-results').style.display = 'block';
+            const summaryInfo = document.getElementById('summary-info');
+            if (summaryInfo) {
+                summaryInfo.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h5>Ошибка отображения результатов</h5>
+                        <p>${error.message}</p>
+                        <p>Пожалуйста, проверьте данные и попробуйте снова.</p>
+                    </div>
+                `;
+            }
         }
-
-        if (analysis.attractiveness_index) {
-            this.renderAttractiveness(analysis.attractiveness_index);
-        }
-
-        if (analysis.time_forecast) {
-            this.renderTimeForecast(analysis.time_forecast);
-        }
-
-        // Сценарии
-        this.renderScenarios(analysis.price_scenarios);
-
-        // Сильные/слабые стороны
-        this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
-
-        // Рекомендации (если есть)
-        if (analysis.recommendations && analysis.recommendations.length > 0) {
-            this.renderRecommendations(analysis.recommendations);
-        }
-
-        // График
-        this.renderChart(analysis.comparison_chart_data);
     },
 
     renderSummary(analysis) {

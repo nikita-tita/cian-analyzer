@@ -982,6 +982,8 @@ const screen3 = {
         pixelLoader.show('analyzing');
 
         try {
+            console.log('🔄 Запуск анализа для сессии:', state.sessionId);
+
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: utils.getCsrfHeaders(),
@@ -992,18 +994,28 @@ const screen3 = {
                 })
             });
 
+            console.log('📡 Получен ответ от сервера, статус:', response.status);
+
             const result = await response.json();
+            console.log('📦 Данные ответа:', result);
 
             if (result.status === 'success') {
+                console.log('✅ Анализ успешен, данные:', result.analysis);
                 state.analysis = result.analysis;
                 this.displayAnalysis(result.analysis);
                 utils.showToast('Анализ завершен!', 'success');
             } else {
+                console.error('❌ Ошибка анализа:', result);
                 const errorData = getErrorMessage(result.message || 'analysis_failed');
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+
+                // Показываем техническую информацию для диагностики
+                if (result.technical_details) {
+                    console.error('Технические детали:', result.technical_details);
+                }
             }
         } catch (error) {
-            console.error('Analysis error:', error);
+            console.error('❌ Критическая ошибка анализа:', error);
             const errorData = getErrorMessage('network_error');
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
@@ -1012,30 +1024,65 @@ const screen3 = {
     },
 
     displayAnalysis(analysis) {
-        document.getElementById('analysis-results').style.display = 'block';
+        console.log('📊 Отображение анализа:', analysis);
 
-        // Сводная информация
-        this.renderSummary(analysis);
+        try {
+            // Валидация структуры данных
+            if (!analysis) {
+                throw new Error('Данные анализа отсутствуют');
+            }
 
-        // Справедливая цена
-        this.renderFairPrice(analysis.fair_price_analysis);
+            if (!analysis.market_statistics || !analysis.market_statistics.all) {
+                throw new Error('Отсутствуют данные рыночной статистики');
+            }
 
-        // Сценарии
-        this.renderScenarios(analysis.price_scenarios);
+            if (!analysis.fair_price_analysis) {
+                throw new Error('Отсутствуют данные о справедливой цене');
+            }
 
-        // Сильные/слабые стороны
-        this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+            document.getElementById('analysis-results').style.display = 'block';
 
-        // График
-        this.renderChart(analysis.comparison_chart_data);
+            // Сводная информация
+            this.renderSummary(analysis);
 
-        // Рекомендации (показываем всегда, даже если пустые)
-        const recommendations = analysis.recommendations || [];
-        this.renderRecommendations(recommendations);
+            // Справедливая цена
+            this.renderFairPrice(analysis.fair_price_analysis);
 
-        // Персонализированный оффер Housler
-        if (analysis.housler_offer) {
-            this.renderHouslerOffer(analysis.housler_offer);
+            // Сценарии
+            this.renderScenarios(analysis.price_scenarios);
+
+            // Сильные/слабые стороны
+            this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+
+            // График
+            this.renderChart(analysis.comparison_chart_data);
+
+            // Рекомендации (показываем всегда, даже если пустые)
+            const recommendations = analysis.recommendations || [];
+            this.renderRecommendations(recommendations);
+
+            // Персонализированный оффер Housler
+            if (analysis.housler_offer) {
+                this.renderHouslerOffer(analysis.housler_offer);
+            }
+        } catch (error) {
+            console.error('❌ Ошибка отображения анализа:', error);
+            utils.showToast(`Ошибка отображения результатов: ${error.message}`, 'error');
+
+            // Показываем хотя бы частичные данные, если они есть
+            document.getElementById('analysis-results').style.display = 'block';
+            const summaryInfo = document.getElementById('summary-info');
+            if (summaryInfo) {
+                summaryInfo.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h5>⚠️ Ошибка отображения результатов</h5>
+                        <p><strong>Причина:</strong> ${error.message}</p>
+                        <p>Пожалуйста, проверьте данные и попробуйте снова, или обратитесь в поддержку.</p>
+                        <hr>
+                        <p class="mb-0"><small>Для диагностики откройте консоль браузера (F12) и проверьте логи.</small></p>
+                    </div>
+                `;
+            }
         }
     },
 
