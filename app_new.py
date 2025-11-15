@@ -88,6 +88,7 @@ from src.models.property import (
 )
 from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
+from src.utils.duplicate_detector import DuplicateDetector
 
 app = Flask(__name__)
 
@@ -153,6 +154,19 @@ if PARSER_REGISTRY_AVAILABLE:
     logger.info(f"  Доступные источники: {', '.join(parser_registry.get_all_sources())}")
 else:
     logger.warning("⚠️ Parser Registry недоступен - используется fallback")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DUPLICATE DETECTOR INITIALIZATION
+# Детекция дубликатов при поиске аналогов из разных источников
+# ═══════════════════════════════════════════════════════════════════════════
+duplicate_detector = DuplicateDetector(
+    strict_price_tolerance=0.02,      # ±2% для строгого совпадения
+    probable_price_tolerance=0.10,    # ±10% для вероятного дубликата
+    possible_price_tolerance=0.15,    # ±15% для возможного дубликата
+    area_tolerance=0.5,               # ±0.5 м² для строгого совпадения
+    possible_area_tolerance=1.0       # ±1 м² для возможного дубликата
+)
+logger.info("✓ Duplicate Detector инициализирован")
 
 
 def get_parser_for_url(url: str, region: str = 'spb'):
@@ -1067,9 +1081,41 @@ def find_similar():
                 logger.error(f"❌ Parallel parsing failed, using basic data: {e}", exc_info=True)
 
         # ═══════════════════════════════════════════════════════════════════════════
+        # ДЕТЕКЦИЯ И УДАЛЕНИЕ ДУБЛИКАТОВ
+        # При поиске по множественным источникам одна квартира может быть размещена
+        # на ЦИАН, Авито, Яндекс.Недвижимость с разными ценами
+        # ═══════════════════════════════════════════════════════════════════════════
+        if len(similar) > 0:
+            logger.info(f"🔍 Checking for duplicates among {len(similar)} comparables...")
+            unique_comparables, removed_duplicates = duplicate_detector.deduplicate_list(
+                similar,
+                keep_best_price=True  # Оставляем вариант с лучшей ценой
+            )
+
+            if removed_duplicates:
+                logger.info(f"✓ Removed {len(removed_duplicates)} strict duplicates")
+                for dup in removed_duplicates:
+                    logger.debug(f"  - Removed: {dup.get('address', 'Unknown')} ({dup.get('price', 0):,.0f} ₽)")
+
+                # Обновляем список
+                similar = unique_comparables
+            else:
+                logger.info("✓ No strict duplicates found")
+
+        # ═══════════════════════════════════════════════════════════════════════════
         # ДОРАБОТКА #4: ПРОВЕРКА КАЧЕСТВА ПОДОБРАННЫХ АНАЛОГОВ
         # ═══════════════════════════════════════════════════════════════════════════
         warnings = []
+
+        # Предупреждения о дубликатах
+        duplicate_warnings_count = sum(1 for c in similar if c.get('possible_duplicate'))
+        if duplicate_warnings_count > 0:
+            warnings.append({
+                'type': 'warning',
+                'title': 'Обнаружены возможные дубликаты',
+                'message': f'Найдено {duplicate_warnings_count} объект(ов), которые могут быть дубликатами (похожие адреса и параметры). '
+                           'Они помечены специальным значком. Рекомендуем проверить и удалить неподходящие.'
+            })
 
         # PATCH 4: Добавляем предупреждения о проблемах парсинга (если были)
         if urls_to_parse and 'parse_quality' in locals():
@@ -1289,8 +1335,38 @@ def add_comparable():
                 'details': 'Не удалось получить полные данные объекта (цена или площадь отсутствует). Попробуйте другой объект.'
             }), 400
 
-        # Добавляем в список
+        # Проверка на дубликаты
         session_data = session_storage.get(session_id)
+        existing_comparables = session_data.get('comparables', [])
+
+        if existing_comparables:
+            logger.info(f"🔍 Checking if new comparable is duplicate of {len(existing_comparables)} existing ones...")
+            duplicates = duplicate_detector.find_duplicates(comparable_data, existing_comparables)
+
+            if duplicates:
+                # Находим самый уверенный дубликат
+                best_match = max(duplicates, key=lambda d: d.confidence)
+
+                if best_match.duplicate_type == 'strict':
+                    # Строгий дубликат - отклоняем
+                    logger.warning(f"❌ Strict duplicate detected: {best_match.confidence:.0f}% match")
+                    existing_obj = existing_comparables[best_match.index]
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'duplicate_object',
+                        'details': f'Этот объект уже добавлен в список аналогов. '
+                                   f'Адрес: {existing_obj.get("address", "Unknown")}, '
+                                   f'цена: {existing_obj.get("price", 0):,.0f} ₽. '
+                                   f'Совпадение: {best_match.confidence:.0f}%.'
+                    }), 400
+                elif best_match.duplicate_type in ['probable', 'possible']:
+                    # Вероятный/возможный дубликат - помечаем флагом
+                    logger.info(f"⚠️ {best_match.duplicate_type.title()} duplicate: {best_match.confidence:.0f}% match")
+                    comparable_data['possible_duplicate'] = True
+                    comparable_data['duplicate_confidence'] = best_match.confidence
+                    comparable_data['duplicate_type'] = best_match.duplicate_type
+
+        # Добавляем в список
         session_data['comparables'].append(comparable_data)
         session_storage.set(session_id, session_data)
 
