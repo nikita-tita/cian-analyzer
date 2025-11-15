@@ -979,6 +979,7 @@ const screen3 = {
     },
 
     async runAnalysis() {
+        console.log('🔄 Запуск анализа...');
         pixelLoader.show('analyzing');
 
         try {
@@ -992,18 +993,22 @@ const screen3 = {
                 })
             });
 
+            console.log('📡 Получен ответ от сервера, статус:', response.status);
             const result = await response.json();
+            console.log('📊 Результат анализа:', result);
 
             if (result.status === 'success') {
+                console.log('✅ Анализ успешен, данные:', result.analysis);
                 state.analysis = result.analysis;
                 this.displayAnalysis(result.analysis);
                 utils.showToast('Анализ завершен!', 'success');
             } else {
+                console.error('❌ Анализ failed:', result.message);
                 const errorData = getErrorMessage(result.message || 'analysis_failed');
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
-            console.error('Analysis error:', error);
+            console.error('❌ Ошибка при выполнении анализа:', error);
             const errorData = getErrorMessage('network_error');
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
@@ -1012,30 +1017,70 @@ const screen3 = {
     },
 
     displayAnalysis(analysis) {
-        document.getElementById('analysis-results').style.display = 'block';
+        try {
+            console.log('🔄 Отображение результатов анализа...');
 
-        // Сводная информация
-        this.renderSummary(analysis);
+            // Валидация данных
+            if (!analysis) {
+                throw new Error('Данные анализа отсутствуют');
+            }
+            if (!analysis.market_statistics || !analysis.market_statistics.all) {
+                throw new Error('Отсутствуют данные рыночной статистики');
+            }
+            if (!analysis.fair_price_analysis) {
+                throw new Error('Отсутствуют данные о справедливой цене');
+            }
 
-        // Справедливая цена
-        this.renderFairPrice(analysis.fair_price_analysis);
+            document.getElementById('analysis-results').style.display = 'block';
 
-        // Сценарии
-        this.renderScenarios(analysis.price_scenarios);
+            // Сводная информация
+            this.renderSummary(analysis);
 
-        // Сильные/слабые стороны
-        this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
+            // Справедливая цена
+            this.renderFairPrice(analysis.fair_price_analysis);
 
-        // График
-        this.renderChart(analysis.comparison_chart_data);
+            // Сценарии
+            this.renderScenarios(analysis.price_scenarios);
 
-        // Рекомендации (показываем всегда, даже если пустые)
-        const recommendations = analysis.recommendations || [];
-        this.renderRecommendations(recommendations);
+            // Сильные/слабые стороны
+            this.renderStrengthsWeaknesses(analysis.strengths_weaknesses);
 
-        // Персонализированный оффер Housler
-        if (analysis.housler_offer) {
-            this.renderHouslerOffer(analysis.housler_offer);
+            // График
+            this.renderChart(analysis.comparison_chart_data);
+
+            // Рекомендации (показываем всегда, даже если пустые)
+            const recommendations = analysis.recommendations || [];
+            this.renderRecommendations(recommendations);
+
+            // Персонализированный оффер Housler
+            if (analysis.housler_offer) {
+                this.renderHouslerOffer(analysis.housler_offer);
+            }
+
+            console.log('✅ Анализ успешно отображен');
+        } catch (error) {
+            console.error('❌ Ошибка отображения анализа:', error);
+            console.error('📊 Данные анализа:', analysis);
+
+            // Показываем понятное сообщение пользователю
+            const errorMessage = `
+                <div class="alert alert-danger" role="alert">
+                    <h5>❌ Ошибка отображения результатов</h5>
+                    <p><strong>Причина:</strong> ${error.message}</p>
+                    <hr>
+                    <p class="mb-0">
+                        <strong>Что делать:</strong><br>
+                        1. Откройте консоль браузера (F12) для подробной диагностики<br>
+                        2. Проверьте что все аналоги добавлены корректно<br>
+                        3. Попробуйте перезапустить анализ<br>
+                        4. Если проблема повторяется - обратитесь в поддержку
+                    </p>
+                </div>
+            `;
+            document.getElementById('analysis-results').innerHTML = errorMessage;
+            document.getElementById('analysis-results').style.display = 'block';
+
+            utils.showToast(`Ошибка: ${error.message}`, 'error');
         }
     },
 
