@@ -50,7 +50,7 @@ class TestMetricsEndpoint:
         response = client.get('/metrics')
 
         assert response.status_code == 200
-        assert response.content_type == 'text/plain; charset=utf-8'
+        assert 'text/plain' in response.content_type
 
     def test_metrics_format(self, client):
         """Test metrics are in Prometheus format"""

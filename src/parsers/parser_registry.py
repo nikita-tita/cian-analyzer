@@ -49,7 +49,7 @@ class ParserRegistry:
         parser_class: Type[BaseRealEstateParser],
         url_patterns: List[str]
     ):
-        """
+        r"""
         Регистрация парсера в реестре
 
         Args:
@@ -195,7 +195,7 @@ def get_global_registry(cache=None, delay: float = 2.0) -> ParserRegistry:
 
 
 def register_parser(source_name: str, url_patterns: List[str]):
-    """
+    r"""
     Декоратор для автоматической регистрации парсера в глобальном реестре
 
     Args:
