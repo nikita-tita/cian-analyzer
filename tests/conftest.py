@@ -118,11 +118,21 @@ def mock_playwright_parser(monkeypatch):
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset singleton instances between tests"""
-    yield
+    # Clean up BEFORE test to ensure fresh state
+    from src.utils import session_storage
+    import app_new
 
     # Reset session storage singleton
-    from src.utils import session_storage
     session_storage._storage = None
+
+    # Force app to use new session storage instance
+    app_new.session_storage = session_storage.get_session_storage()
+
+    yield
+
+    # Also clean up AFTER test
+    session_storage._storage = None
+    app_new.session_storage = session_storage.get_session_storage()
 
     # Reset browser pool if exists
     try:

@@ -79,6 +79,14 @@ except ImportError as e:
         def detect_region_from_url(url):
             return 'spb'
 
+# Check if Playwright is available for PDF generation
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    logger.warning("Playwright недоступен - PDF экспорт будет заменен на Markdown")
+
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.analytics.offer_generator import generate_housler_offer
 from src.models.property import (
@@ -867,7 +875,7 @@ def create_manual():
             'view_type': validated.view_type,
             'manual_input': True,
             'title': f"{validated.rooms}-комн. квартира, {validated.total_area} м²",
-            'url': None,  # Нет URL при ручном вводе
+            'url': 'manual-input',  # Плейсхолдер для ручного ввода
             'metro': [],
             'residential_complex': None,
             'characteristics': {}
