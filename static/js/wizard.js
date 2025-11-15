@@ -718,8 +718,18 @@ const screen2 = {
                     utils.showToast(`Найдено ${result.count} похожих объектов`, 'success');
                 }
             } else {
-                const errorData = getErrorMessage(result.message || 'no_comparables');
-                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+                // Show detailed error message
+                let errorMessage = result.message || 'no_comparables';
+                let errorDetails = result.details || '';
+
+                console.error('Find similar failed:', errorMessage, errorDetails);
+
+                const errorData = getErrorMessage(errorMessage);
+                const fullMessage = errorDetails ?
+                    `${errorData.title}: ${errorDetails}` :
+                    `${errorData.title}: ${errorData.message}`;
+
+                utils.showToast(fullMessage, 'error');
             }
         } catch (error) {
             console.error('Find similar error:', error);
@@ -764,8 +774,18 @@ const screen2 = {
                 document.getElementById('add-comparable-input').value = '';
                 utils.showToast('Объект добавлен', 'success');
             } else {
-                const errorData = getErrorMessage(result.message || 'parsing_error');
-                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+                // Show detailed error message
+                let errorMessage = result.message || 'parsing_error';
+                let errorDetails = result.details || '';
+
+                console.error('Add comparable failed:', errorMessage, errorDetails);
+
+                const errorData = getErrorMessage(errorMessage);
+                const fullMessage = errorDetails ?
+                    `${errorData.title}: ${errorDetails}` :
+                    `${errorData.title}: ${errorData.message}`;
+
+                utils.showToast(fullMessage, 'error');
             }
         } catch (error) {
             console.error('Add comparable error:', error);
