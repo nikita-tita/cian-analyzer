@@ -16,35 +16,68 @@ from flask_wtf.csrf import CSRFProtect
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TODO: Подключить ParserRegistry для поддержки множественных источников
-# Сейчас используется только PlaywrightParser (работает только с ЦИАН)
-# Доступные парсеры в src/parsers/:
-#   - CianParser (ЦИАН) - СПб и Москва ✅
-#   - YandexParser (Яндекс.Недвижимость) - вся Россия
-#   - DomClickParser (ДомКлик) - Сбербанк
-#   - AvitoParser (Авито) - вся Россия
-#
-# Для подключения нужно:
-#   1. from src.parsers.parser_registry import get_global_registry
-#   2. registry = get_global_registry(cache=property_cache)
-#   3. parser = registry.get_parser(url=user_url)
-#
-# См. документацию в src/parsers/parser_registry.py
+# ═══════════════════════════════════════════════════════════════════════════
+# MULTI-SOURCE PARSER REGISTRY
+# Поддержка множественных источников недвижимости
+# ═══════════════════════════════════════════════════════════════════════════
+# Доступные парсеры:
+#   ✅ CianParser (ЦИАН) - СПб и Москва
+#   ⏳ YandexParser (Яндекс.Недвижимость) - вся Россия [в разработке]
+#   ⏳ DomClickParser (ДомКлик/Сбербанк) [в разработке]
+#   ⏳ AvitoParser (Авито) - вся Россия [в разработке]
+# ═══════════════════════════════════════════════════════════════════════════
+
 try:
-    from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url
+    # Импортируем registry
+    from src.parsers import get_global_registry
+    from src.parsers.playwright_parser import detect_region_from_url
     from src.parsers.browser_pool import BrowserPool
-    Parser = PlaywrightParser
-    PLAYWRIGHT_AVAILABLE = True
-    logger.info("Using PlaywrightParser (только ЦИАН)")
-except Exception as e:
-    logger.warning(f"Playwright not available, using SimpleParser: {e}")
-    from src.parsers.simple_parser import SimpleParser
-    Parser = SimpleParser
-    PLAYWRIGHT_AVAILABLE = False
-    BrowserPool = None
-    # Fallback для detect_region
-    def detect_region_from_url(url):
-        return 'spb'
+
+    # Пытаемся импортировать все доступные парсеры
+    parsers_loaded = []
+
+    try:
+        from src.parsers import CianParser
+        parsers_loaded.append('ЦИАН')
+    except ImportError as e:
+        logger.warning(f"CianParser недоступен: {e}")
+
+    try:
+        from src.parsers.yandex_realty_parser import YandexParser
+        parsers_loaded.append('Яндекс.Недвижимость')
+    except ImportError as e:
+        logger.warning(f"YandexParser недоступен: {e}")
+
+    try:
+        from src.parsers.domclick_parser import DomClickParser
+        parsers_loaded.append('ДомКлик')
+    except ImportError as e:
+        logger.warning(f"DomClickParser недоступен: {e}")
+
+    try:
+        from src.parsers.avito_parser import AvitoParser
+        parsers_loaded.append('Авито')
+    except ImportError as e:
+        logger.warning(f"AvitoParser недоступен: {e}")
+
+    PARSER_REGISTRY_AVAILABLE = True
+    logger.info(f"✓ Parser Registry: {', '.join(parsers_loaded) if parsers_loaded else 'нет парсеров'}")
+
+except ImportError as e:
+    logger.error(f"Failed to import ParserRegistry: {e}")
+    # Fallback на старый PlaywrightParser
+    try:
+        from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url
+        from src.parsers.browser_pool import BrowserPool
+        PARSER_REGISTRY_AVAILABLE = False
+        logger.warning("⚠️ Fallback: Using legacy PlaywrightParser (только ЦИАН)")
+    except Exception as e2:
+        logger.error(f"Playwright also not available: {e2}")
+        from src.parsers.simple_parser import SimpleParser
+        PARSER_REGISTRY_AVAILABLE = False
+        BrowserPool = None
+        def detect_region_from_url(url):
+            return 'spb'
 
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.analytics.offer_generator import generate_housler_offer
@@ -96,7 +129,7 @@ session_storage = get_session_storage()
 browser_pool = None
 # Отключаем browser pool для локальной разработки (конфликт с Flask debug mode)
 use_browser_pool = os.getenv('USE_BROWSER_POOL', 'false').lower() == 'true'
-if PLAYWRIGHT_AVAILABLE and use_browser_pool:
+if PARSER_REGISTRY_AVAILABLE and use_browser_pool:
     max_browsers = int(os.getenv('MAX_BROWSERS', '3'))  # Production: 3-5 браузеров
     browser_pool = BrowserPool(
         max_browsers=max_browsers,
@@ -107,7 +140,81 @@ if PLAYWRIGHT_AVAILABLE and use_browser_pool:
     browser_pool.start()
     logger.info(f"Browser pool initialized with max_browsers={max_browsers}")
 else:
-    logger.info("Browser pool disabled (for local dev or Playwright not available)")
+    logger.info("Browser pool disabled (for local dev or parsers not available)")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PARSER REGISTRY INITIALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
+# Глобальный реестр парсеров с кэшем
+parser_registry = None
+if PARSER_REGISTRY_AVAILABLE:
+    parser_registry = get_global_registry(cache=property_cache, delay=1.0)
+    logger.info(f"✓ Parser Registry готов к использованию")
+    logger.info(f"  Доступные источники: {', '.join(parser_registry.get_all_sources())}")
+else:
+    logger.warning("⚠️ Parser Registry недоступен - используется fallback")
+
+
+def get_parser_for_url(url: str, region: str = 'spb'):
+    """
+    Получить парсер для заданного URL
+
+    Гибридный подход:
+    - Для ЦИАН: используем PlaywrightParser с region и browser_pool (совместимость)
+    - Для остальных: используем parser_registry (новая функциональность)
+
+    Args:
+        url: URL объявления
+        region: Регион (только для ЦИАН)
+
+    Returns:
+        Парсер с методами parse_detail_page() и search_similar()
+    """
+    if not PARSER_REGISTRY_AVAILABLE:
+        # Fallback: используем старый PlaywrightParser
+        from src.parsers.playwright_parser import PlaywrightParser
+        return PlaywrightParser(
+            headless=True,
+            delay=1.0,
+            cache=property_cache,
+            region=region,
+            browser_pool=browser_pool
+        )
+
+    # Определяем источник
+    source = parser_registry.detect_source(url) if parser_registry else None
+
+    if source == 'cian':
+        # Для ЦИАН используем старый PlaywrightParser с полной поддержкой
+        from src.parsers.playwright_parser import PlaywrightParser
+        return PlaywrightParser(
+            headless=True,
+            delay=1.0,
+            cache=property_cache,
+            region=region,
+            browser_pool=browser_pool
+        )
+    elif source:
+        # Для остальных источников используем registry
+        parser = parser_registry.get_parser(url=url)
+        if parser:
+            logger.info(f"✓ Используется парсер для источника: {source}")
+            return parser
+        else:
+            logger.error(f"❌ Парсер для источника {source} не найден")
+            raise ValueError(f"Парсер для {source} не найден")
+    else:
+        # Источник не определен - пробуем ЦИАН как fallback
+        logger.warning(f"⚠️ Источник не определен для URL: {url}, используем ЦИАН")
+        from src.parsers.playwright_parser import PlaywrightParser
+        return PlaywrightParser(
+            headless=True,
+            delay=1.0,
+            cache=property_cache,
+            region=region,
+            browser_pool=browser_pool
+        )
+
 
 # Rate limiting configuration
 # SECURITY: Комбинированный ключ для защиты от обхода через прокси
@@ -620,7 +727,7 @@ def parse_url():
         # SECURITY: Парсинг с timeout (защита от DoS)
         try:
             with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
-                with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
+                with get_parser_for_url(url, region=region) as parser:
                     parsed_data = parser.parse_detail_page(url)
         except TimeoutError as e:
             logger.error(f"Parsing timeout for {url}: {e}")
@@ -884,7 +991,9 @@ def find_similar():
         # Поиск аналогов с кэшем и регионом
         try:
             logger.info(f"🔍 Starting search (type: {search_type}, limit: {limit})")
-            with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
+            # Используем целевой URL для определения источника (или fallback на ЦИАН)
+            search_url = target_url if target_url else 'https://www.cian.ru/'
+            with get_parser_for_url(search_url, region=region) as parser:
                 if search_type == 'building':
                     # Поиск в том же ЖК
                     logger.info(f"🏢 Searching in building: {target.get('residential_complex', 'Unknown')}")
@@ -1153,7 +1262,7 @@ def add_comparable():
         try:
             logger.info(f"🔍 Parsing comparable URL: {url}")
             with timeout_context(120, 'Парсинг занял слишком много времени (>120s)'):
-                with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
+                with get_parser_for_url(url, region=region) as parser:
                     comparable_data = parser.parse_detail_page(url)
                     logger.info(f"✅ Successfully parsed comparable: {comparable_data.get('title', 'Unknown')}")
         except TimeoutError as e:
