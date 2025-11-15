@@ -868,15 +868,28 @@ def find_similar():
         logger.info(f"🔍 Searching for similar properties (session: {session_id}, type: {search_type}, region: {region}, limit: {limit})")
 
         # Поиск аналогов с кэшем и регионом
-        with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
-            if search_type == 'building':
-                # Поиск в том же ЖК
-                similar = parser.search_similar_in_building(target, limit=limit)
-                residential_complex = target.get('residential_complex', 'Неизвестно')
-            else:
-                # Широкий поиск по городу
-                similar = parser.search_similar(target, limit=limit)
-                residential_complex = None
+        try:
+            logger.info(f"🔍 Starting search (type: {search_type}, limit: {limit})")
+            with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
+                if search_type == 'building':
+                    # Поиск в том же ЖК
+                    logger.info(f"🏢 Searching in building: {target.get('residential_complex', 'Unknown')}")
+                    similar = parser.search_similar_in_building(target, limit=limit)
+                    residential_complex = target.get('residential_complex', 'Неизвестно')
+                    logger.info(f"✅ Found {len(similar)} comparables in building")
+                else:
+                    # Широкий поиск по городу
+                    logger.info(f"🌆 Searching in city: {region}")
+                    similar = parser.search_similar(target, limit=limit)
+                    residential_complex = None
+                    logger.info(f"✅ Found {len(similar)} comparables in city")
+        except Exception as search_error:
+            logger.error(f"❌ Search failed: {search_error}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'message': 'search_failed',
+                'details': f'Не удалось выполнить поиск: {str(search_error)}'
+            }), 500
 
         # Если найдено много аналогов с URL, парсим их параллельно
         # Парсим детально объекты без полных данных (price, total_area, price_per_sqm)
@@ -1124,20 +1137,41 @@ def add_comparable():
 
         # SECURITY: Парсим с timeout (защита от DoS)
         try:
-            with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
+            logger.info(f"🔍 Parsing comparable URL: {url}")
+            with timeout_context(120, 'Парсинг занял слишком много времени (>120s)'):
                 with Parser(headless=True, delay=1.0, cache=property_cache, region=region, browser_pool=browser_pool) as parser:
                     comparable_data = parser.parse_detail_page(url)
+                    logger.info(f"✅ Successfully parsed comparable: {comparable_data.get('title', 'Unknown')}")
         except TimeoutError as e:
-            logger.error(f"Parsing timeout for {url}: {e}")
+            logger.error(f"❌ Parsing timeout for {url}: {e}")
             return jsonify({
                 'status': 'error',
-                'message': 'Время ожидания истекло. Попробуйте позже.'
+                'message': 'parsing_timeout',
+                'details': 'Время загрузки страницы превысило 2 минуты. Попробуйте другой объект.'
             }), 408
+        except Exception as parse_error:
+            logger.error(f"❌ Failed to parse {url}: {parse_error}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'message': 'parsing_error',
+                'details': str(parse_error)
+            }), 500
+
+        # Проверяем что получили валидные данные
+        if not comparable_data or not comparable_data.get('price') or not comparable_data.get('total_area'):
+            logger.warning(f"⚠️ Parsed data incomplete: {comparable_data}")
+            return jsonify({
+                'status': 'error',
+                'message': 'parsing_incomplete',
+                'details': 'Не удалось получить полные данные объекта (цена или площадь отсутствует). Попробуйте другой объект.'
+            }), 400
 
         # Добавляем в список
         session_data = session_storage.get(session_id)
         session_data['comparables'].append(comparable_data)
         session_storage.set(session_id, session_data)
+
+        logger.info(f"✅ Comparable added to session {session_id}, total: {len(session_data['comparables'])}")
 
         return jsonify({
             'status': 'success',
