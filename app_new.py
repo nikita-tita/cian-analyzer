@@ -16,12 +16,26 @@ from flask_wtf.csrf import CSRFProtect
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# TODO: Подключить ParserRegistry для поддержки множественных источников
+# Сейчас используется только PlaywrightParser (работает только с ЦИАН)
+# Доступные парсеры в src/parsers/:
+#   - CianParser (ЦИАН) - СПб и Москва ✅
+#   - YandexParser (Яндекс.Недвижимость) - вся Россия
+#   - DomClickParser (ДомКлик) - Сбербанк
+#   - AvitoParser (Авито) - вся Россия
+#
+# Для подключения нужно:
+#   1. from src.parsers.parser_registry import get_global_registry
+#   2. registry = get_global_registry(cache=property_cache)
+#   3. parser = registry.get_parser(url=user_url)
+#
+# См. документацию в src/parsers/parser_registry.py
 try:
     from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url
     from src.parsers.browser_pool import BrowserPool
     Parser = PlaywrightParser
     PLAYWRIGHT_AVAILABLE = True
-    logger.info("Using PlaywrightParser")
+    logger.info("Using PlaywrightParser (только ЦИАН)")
 except Exception as e:
     logger.warning(f"Playwright not available, using SimpleParser: {e}")
     from src.parsers.simple_parser import SimpleParser
