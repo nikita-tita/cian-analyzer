@@ -984,7 +984,8 @@ class RealEstateAnalyzer:
             scenario.monthly_probability = self._calculate_monthly_probability(
                 scenario.type,
                 fair_price,
-                scenario.start_price
+                scenario.start_price,
+                scenario.base_probability
             )
 
             # Кумулятивная вероятность
@@ -1083,22 +1084,64 @@ class RealEstateAnalyzer:
             })
         return trajectory
 
-    def _calculate_monthly_probability(self, scenario_type: str, fair_price: float, start_price: float) -> List[float]:
-        """Расчет месячной вероятности продажи"""
+    def _calculate_monthly_probability(
+        self,
+        scenario_type: str,
+        fair_price: float,
+        start_price: float,
+        base_probability: float,
+        months: int = 14
+    ) -> List[float]:
+        """Строит кривую вероятностей с учетом профиля рынка и сценария."""
+
+        profile = self.market_profile or self._build_market_profile()
+        expected_dom = max(1, int(profile.get('expected_dom_months') or 4))
+        probability_multiplier = profile.get('probability_multiplier', 1.0) or 1.0
+
+        base_curve = self._get_base_probability_curve(scenario_type, months)
         price_ratio = start_price / fair_price if fair_price > 0 else 1.0
+        price_adjusted_curve = self._apply_price_adjustment(base_curve, price_ratio)
 
-        if scenario_type == 'fast':
-            base_prob = [0.45, 0.70, 0.75, 0.75, 0.73, 0.70, 0.68, 0.65, 0.62, 0.60, 0.58, 0.55, 0.53, 0.50]
-        elif scenario_type == 'optimal':
-            base_prob = [0.40, 0.65, 0.70, 0.72, 0.70, 0.68, 0.65, 0.62, 0.60, 0.57, 0.55, 0.52, 0.50, 0.48]
-        elif scenario_type == 'standard':
-            base_prob = [0.35, 0.55, 0.60, 0.65, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42, 0.40, 0.38]
-        elif scenario_type == 'maximum':
-            base_prob = [0.15, 0.20, 0.20, 0.18, 0.15, 0.12, 0.10, 0.08, 0.07, 0.06, 0.05, 0.05, 0.04, 0.04]
-        else:
-            base_prob = [0.50] * 14
+        empirical_curve = self._build_empirical_curve(expected_dom, months)
+        blended_curve = self._blend_probability_curves(
+            price_adjusted_curve,
+            empirical_curve,
+            scenario_type,
+            probability_multiplier
+        )
 
-        # Корректировка по отклонению цены
+        # Анализ формы до варпа
+        median_month, total_probability = self._describe_probability_curve(blended_curve)
+        target_median = self._resolve_target_median(expected_dom, scenario_type, months)
+
+        if median_month and target_median:
+            warp_factor = target_median / median_month if median_month > 0 else 1.0
+            blended_curve = self._apply_time_warp(blended_curve, warp_factor)
+
+        amplitude_factor = max(0.2, probability_multiplier)
+        blended_curve = self._apply_amplitude_warp(blended_curve, amplitude_factor)
+
+        target_total = min(0.98, max(0.0, (base_probability or 0.0) / 100.0))
+        normalized_curve = self._normalize_hazard_curve(blended_curve, target_total)
+
+        return normalized_curve
+
+    @staticmethod
+    def _get_base_probability_curve(scenario_type: str, months: int) -> List[float]:
+        base_curves = {
+            'fast': [0.45, 0.70, 0.75, 0.75, 0.73, 0.70, 0.68, 0.65, 0.62, 0.60, 0.58, 0.55, 0.53, 0.50],
+            'optimal': [0.40, 0.65, 0.70, 0.72, 0.70, 0.68, 0.65, 0.62, 0.60, 0.57, 0.55, 0.52, 0.50, 0.48],
+            'standard': [0.35, 0.55, 0.60, 0.65, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42, 0.40, 0.38],
+            'maximum': [0.15, 0.20, 0.20, 0.18, 0.15, 0.12, 0.10, 0.08, 0.07, 0.06, 0.05, 0.05, 0.04, 0.04]
+        }
+
+        curve = base_curves.get(scenario_type, [0.35] * months)
+        if len(curve) >= months:
+            return curve[:months]
+        return (curve + [curve[-1]] * months)[:months]
+
+    @staticmethod
+    def _apply_price_adjustment(curve: List[float], price_ratio: float) -> List[float]:
         if price_ratio > 1.1:
             adjustment = 0.7
         elif price_ratio > 1.05:
@@ -1108,7 +1151,184 @@ class RealEstateAnalyzer:
         else:
             adjustment = 1.0
 
-        return [min(p * adjustment, 0.98) for p in base_prob]
+        return [min(0.98, max(0.0, value * adjustment)) for value in curve]
+
+    def _build_empirical_curve(self, expected_dom: int, months: int) -> List[float]:
+        base_lambda = min(0.65, 1.0 / max(expected_dom, 1))
+        curve: List[float] = []
+
+        for month in range(months):
+            month_index = month + 1
+            freshness_boost = 1.35 if month_index == 1 else (1.15 if month_index <= 3 else 1.0)
+            decay = math.exp(-0.18 * max(month_index - 1, 0))
+            hazard = base_lambda * freshness_boost * decay
+            curve.append(min(0.95, max(0.01, hazard)))
+
+        smoothed: List[float] = []
+        for idx, value in enumerate(curve):
+            neighbors = curve[max(0, idx - 1):min(months, idx + 2)]
+            smoothed.append(sum(neighbors) / len(neighbors))
+
+        return smoothed
+
+    def _blend_probability_curves(
+        self,
+        base_curve: List[float],
+        empirical_curve: List[float],
+        scenario_type: str,
+        probability_multiplier: float
+    ) -> List[float]:
+        months = min(len(base_curve), len(empirical_curve))
+        weight_map = {
+            'fast': 0.65,
+            'optimal': 0.60,
+            'standard': 0.55,
+            'maximum': 0.50
+        }
+        base_weight = weight_map.get(scenario_type, 0.60)
+        base_weight += (probability_multiplier - 1.0) * 0.1
+        base_weight = self._clamp(base_weight, 0.35, 0.8)
+
+        blended = []
+        for idx in range(months):
+            blended.append(base_curve[idx] * base_weight + empirical_curve[idx] * (1 - base_weight))
+
+        return blended
+
+    def _describe_probability_curve(self, curve: List[float]) -> Tuple[float, float]:
+        cumulative = self._calculate_cumulative_probability(curve)
+        if not cumulative:
+            return 0.0, 0.0
+
+        total = cumulative[-1]
+        if total <= 0:
+            return 0.0, 0.0
+
+        target = total / 2
+        for idx, value in enumerate(cumulative, start=1):
+            if value >= target:
+                return idx, total
+
+        return float(len(curve)), total
+
+    @staticmethod
+    def _resolve_target_median(expected_dom: int, scenario_type: str, months: int) -> float:
+        anchor_map = {
+            'fast': 2,
+            'optimal': 4,
+            'standard': 6,
+            'maximum': 10
+        }
+        base_anchor = 4
+        scenario_anchor = anchor_map.get(scenario_type, base_anchor)
+        factor = scenario_anchor / base_anchor
+        target = expected_dom * factor
+        return max(1.0, min(float(months), target))
+
+    def _apply_time_warp(self, curve: List[float], warp_factor: float) -> List[float]:
+        if not curve or warp_factor <= 0:
+            return curve
+        if abs(warp_factor - 1.0) < 1e-3:
+            return curve
+
+        cumulative = self._calculate_cumulative_probability(curve)
+        if not cumulative:
+            return curve
+
+        months = len(curve)
+
+        def interpolate(position: float) -> float:
+            if position <= 1:
+                return cumulative[0]
+            if position >= months:
+                return cumulative[-1]
+            lower = int(math.floor(position))
+            upper = int(math.ceil(position))
+            fraction = position - lower
+            lower_val = cumulative[lower - 1]
+            upper_val = cumulative[upper - 1]
+            return lower_val * (1 - fraction) + upper_val * fraction
+
+        warped_cumulative: List[float] = []
+        for idx in range(1, months + 1):
+            source = idx / warp_factor
+            source = max(1.0, min(float(months), source))
+            warped_value = interpolate(source)
+            if warped_cumulative and warped_value < warped_cumulative[-1]:
+                warped_value = warped_cumulative[-1]
+            warped_cumulative.append(self._clamp(warped_value, 0.0, 0.98))
+
+        hazards: List[float] = []
+        prev = 0.0
+        for value in warped_cumulative:
+            delta = max(0.0, value - prev)
+            remaining = max(1e-6, 1 - prev)
+            hazard = delta / remaining
+            hazards.append(self._clamp(hazard, 0.0, 0.98))
+            prev = value
+
+        return hazards
+
+    def _apply_amplitude_warp(self, curve: List[float], factor: float) -> List[float]:
+        if not curve or factor <= 0:
+            return curve
+        if abs(factor - 1.0) < 1e-3:
+            return curve
+
+        warped: List[float] = []
+        if factor > 1:
+            for value in curve:
+                bounded = self._clamp(value, 0.0, 0.98)
+                warped.append(1 - math.pow(1 - bounded, factor))
+        else:
+            for value in curve:
+                warped.append(self._clamp(value * factor, 0.0, 0.98))
+
+        return warped
+
+    def _normalize_hazard_curve(self, curve: List[float], target_total: float) -> List[float]:
+        if not curve:
+            return []
+        if target_total <= 0:
+            return [0.0 for _ in curve]
+
+        def scale_curve(factor: float) -> List[float]:
+            return [self._clamp(value * factor, 0.0, 0.95) for value in curve]
+
+        low, high = 0.0, 1.0
+
+        def final_total(values: List[float]) -> float:
+            cumulative = self._calculate_cumulative_probability(values)
+            return cumulative[-1] if cumulative else 0.0
+
+        scaled = scale_curve(high)
+        total = final_total(scaled)
+        while total < target_total and high < 100:
+            high *= 2
+            scaled = scale_curve(high)
+            total = final_total(scaled)
+
+        for _ in range(30):
+            mid = (low + high) / 2
+            scaled = scale_curve(mid)
+            total = final_total(scaled)
+            if total < target_total:
+                low = mid
+            else:
+                high = mid
+
+        result = scale_curve(high)
+        final = final_total(result)
+
+        if final > target_total and final > 0:
+            ratio = target_total / final
+            result = [self._clamp(value * ratio, 0.0, 0.95) for value in result]
+
+        return result
+
+    @staticmethod
+    def _clamp(value: float, lower: float, upper: float) -> float:
+        return max(lower, min(value, upper))
 
     def _calculate_cumulative_probability(self, monthly_probabilities: List[float]) -> List[float]:
         """Расчет кумулятивной вероятности"""
