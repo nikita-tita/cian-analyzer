@@ -283,7 +283,7 @@
             <h2 class="section-title">🎯 Главные выводы</h2>
 
             <div class="info-card">
-                {% if fair_price_analysis %}
+                {% if fair_price_analysis and fair_price_analysis.get('status') != 'insufficient_data' %}
                 <div class="info-row">
                     <span class="info-label">Статус цены</span>
                     <span class="info-value">
@@ -303,6 +303,11 @@
                 <div class="info-row">
                     <span class="info-label">Текущая цена</span>
                     <span class="info-value">{{ "{:,.0f}".format(property_info.price) }} ₽</span>
+                </div>
+                {% elif fair_price_analysis and fair_price_analysis.get('status') == 'insufficient_data' %}
+                <div class="alert alert-warning">
+                    <h5>⚠️ Недостаточно данных для расчета</h5>
+                    <p>{{ fair_price_analysis.detailed_report }}</p>
                 </div>
                 {% endif %}
 
