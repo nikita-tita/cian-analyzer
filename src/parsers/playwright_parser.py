@@ -1025,7 +1025,8 @@ class PlaywrightParser(BaseCianParser):
             return 0.40, 0.30, "эконом"  # ±40% цена, ±30% площадь (было 0.60/0.40)
 
     def _build_search_url(self, target_price: float, target_area: float, target_rooms: int,
-                          price_tolerance: float, area_tolerance: float, target_property: Dict = None) -> str:
+                          price_tolerance: float, area_tolerance: float, target_property: Dict = None,
+                          skip_extra_filters: bool = False) -> str:
         """
         Строит URL для поиска на Циан
 
@@ -1036,6 +1037,7 @@ class PlaywrightParser(BaseCianParser):
             price_tolerance: Допуск по цене (0.2 = ±20%)
             area_tolerance: Допуск по площади (0.15 = ±15%)
             target_property: Целевой объект (для определения типа)
+            skip_extra_filters: Пропустить доп. фильтры (год/класс/этажи/отделка) при 0 результатах
 
         Returns:
             str: URL для поиска
@@ -1063,120 +1065,111 @@ class PlaywrightParser(BaseCianParser):
             search_params['type'] = '1'  # 1 = вторичка в Cian API
             logger.info(f"   🏠 Целевой объект - ВТОРИЧКА, фильтруем поиск (type=1)")
 
-        # PATCH: Фильтр по этажам (не первый и не последний для средних этажей)
-        # Исключаем первый и последний этажи, если целевой объект - средний этаж
-        if target_property:
-            floor = target_property.get('floor')
-            total_floors = target_property.get('total_floors')
+        # PATCH: Дополнительные фильтры (можно пропустить если 0 результатов)
+        if not skip_extra_filters:
+            # Фильтр по этажам (не первый и не последний для средних этажей)
+            if target_property:
+                floor = target_property.get('floor')
+                total_floors = target_property.get('total_floors')
 
-            if floor and total_floors:
-                try:
-                    floor_num = int(floor)
-                    total_num = int(total_floors)
+                if floor and total_floors:
+                    try:
+                        floor_num = int(floor)
+                        total_num = int(total_floors)
 
-                    # Если средний этаж (не 1 и не последний)
-                    if floor_num > 1 and floor_num < total_num:
-                        search_params['not_first_floor'] = '1'  # Исключить первый
-                        search_params['not_last_floor'] = '1'   # Исключить последний
-                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО средние (не 1, не {total_num})")
-                    elif floor_num == 1:
-                        # Ищем только первые этажи
-                        search_params['foot'] = '1'
-                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО первые")
-                    elif floor_num == total_num:
-                        # Ищем только последние этажи
-                        search_params['max_foot'] = '1'
-                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО последние")
-                except (ValueError, TypeError):
-                    pass
+                        # Если средний этаж (не 1 и не последний)
+                        if floor_num > 1 and floor_num < total_num:
+                            search_params['not_first_floor'] = '1'  # Исключить первый
+                            search_params['not_last_floor'] = '1'   # Исключить последний
+                            logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО средние (не 1, не {total_num})")
+                        elif floor_num == 1:
+                            # Ищем только первые этажи
+                            search_params['foot'] = '1'
+                            logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО первые")
+                        elif floor_num == total_num:
+                            # Ищем только последние этажи
+                            search_params['max_foot'] = '1'
+                            logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО последние")
+                    except (ValueError, TypeError):
+                        pass
 
-        # PATCH: Фильтр по классу жилья для премиум-сегмента
-        # class=1 - эконом, class=2 - комфорт, class=3 - бизнес, class=4 - элит
-        if target_price >= 25_000_000 and is_new_building:
-            # Для премиум-сегмента ищем только комфорт+ (2,3,4)
-            search_params['class'] = '2'  # Комфорт как минимум
-            logger.info(f"   💎 Фильтр класса: комфорт+ (премиум сегмент)")
+            # Фильтр по классу жилья для премиум-сегмента
+            if target_price >= 25_000_000 and is_new_building:
+                search_params['class'] = '2'  # Комфорт как минимум
+                logger.info(f"   💎 Фильтр класса: комфорт+ (премиум сегмент)")
 
-        # PATCH: Фильтр по году сдачи (±1 год для новостроек)
-        if is_new_building and target_property:
-            build_year = target_property.get('build_year')
-            if build_year:
-                try:
-                    year = int(build_year)
-                    from datetime import datetime
-                    current_year = datetime.now().year
+            # Фильтр по году сдачи (±1 год для новостроек)
+            if is_new_building and target_property:
+                build_year = target_property.get('build_year')
+                if build_year:
+                    try:
+                        year = int(build_year)
+                        from datetime import datetime
+                        current_year = datetime.now().year
 
-                    # Для новостроек с годом сдачи в будущем
-                    if year >= current_year:
-                        # min_offer_date и max_offer_date в формате YYYY-Q (год-квартал)
-                        # Например: 2028-3 = 3 квартал 2028
-                        year_min = max(current_year, year - 1)
-                        year_max = year + 1
+                        if year >= current_year:
+                            year_min = max(current_year, year - 1)
+                            year_max = year + 1
+                            search_params['deadline_from'] = str(year_min)
+                            search_params['deadline_to'] = str(year_max)
+                            logger.info(f"   📅 Фильтр года сдачи: {year_min}-{year_max} (±1 год от {year})")
+                    except (ValueError, TypeError):
+                        pass
 
-                        # Циан использует формат: deadline_from=2027&deadline_to=2029
-                        search_params['deadline_from'] = str(year_min)
-                        search_params['deadline_to'] = str(year_max)
-                        logger.info(f"   📅 Фильтр года сдачи: {year_min}-{year_max} (±1 год от {year})")
-                except (ValueError, TypeError):
-                    pass
+            # Фильтр по отделке
+            if target_property:
+                repair_level = target_property.get('repair_level', '').lower()
 
-        # PATCH: Фильтр по отделке (с отделкой/без)
-        if target_property:
-            repair_level = target_property.get('repair_level', '').lower()
+                if 'без отделки' in repair_level or 'черновая' in repair_level:
+                    search_params['decoration'] = '1'
+                    logger.info(f"   🎨 Фильтр отделки: БЕЗ отделки")
+                elif 'отделк' in repair_level or 'ремонт' in repair_level:
+                    search_params['decoration'] = '2'
+                    logger.info(f"   🎨 Фильтр отделки: С отделкой")
 
-            if 'без отделки' in repair_level or 'черновая' in repair_level:
-                # Ищем объекты без отделки
-                # decoration=1 - без отделки, decoration=2 - с отделкой, decoration=3 - под ключ
-                search_params['decoration'] = '1'
-                logger.info(f"   🎨 Фильтр отделки: БЕЗ отделки")
-            elif 'отделк' in repair_level or 'ремонт' in repair_level:
-                # Ищем объекты с отделкой
-                search_params['decoration'] = '2'
-                logger.info(f"   🎨 Фильтр отделки: С отделкой")
+            # Фильтр по типу дома (для вторички)
+            if not is_new_building and target_property:
+                house_type = target_property.get('house_type', '').lower()
 
-        # PATCH: Фильтр по типу дома (для вторички)
-        # building_type: 1-кирпичный, 2-панельный, 3-блочный, 4-монолитный, 5-кирпично-монолитный
-        if not is_new_building and target_property:
-            house_type = target_property.get('house_type', '').lower()
+                if 'монолит' in house_type:
+                    if 'кирпич' in house_type:
+                        search_params['building_type'] = '5'
+                        logger.info(f"   🏗️ Фильтр типа дома: кирпично-монолитный")
+                    else:
+                        search_params['building_type'] = '4'
+                        logger.info(f"   🏗️ Фильтр типа дома: монолитный")
+                elif 'кирпич' in house_type:
+                    search_params['building_type'] = '1'
+                    logger.info(f"   🏗️ Фильтр типа дома: кирпичный")
+                elif 'панел' in house_type:
+                    search_params['building_type'] = '2'
+                    logger.info(f"   🏗️ Фильтр типа дома: панельный")
+                elif 'блочн' in house_type:
+                    search_params['building_type'] = '3'
+                    logger.info(f"   🏗️ Фильтр типа дома: блочный")
 
-            if 'монолит' in house_type:
-                if 'кирпич' in house_type:
-                    search_params['building_type'] = '5'  # Кирпично-монолитный
-                    logger.info(f"   🏗️ Фильтр типа дома: кирпично-монолитный")
-                else:
-                    search_params['building_type'] = '4'  # Монолитный
-                    logger.info(f"   🏗️ Фильтр типа дома: монолитный")
-            elif 'кирпич' in house_type:
-                search_params['building_type'] = '1'  # Кирпичный
-                logger.info(f"   🏗️ Фильтр типа дома: кирпичный")
-            elif 'панел' in house_type:
-                search_params['building_type'] = '2'  # Панельный
-                logger.info(f"   🏗️ Фильтр типа дома: панельный")
-            elif 'блочн' in house_type:
-                search_params['building_type'] = '3'  # Блочный
-                logger.info(f"   🏗️ Фильтр типа дома: блочный")
+            # Фильтр по году постройки (для вторички)
+            if not is_new_building and target_property:
+                build_year = target_property.get('build_year')
+                if build_year:
+                    try:
+                        year = int(build_year)
+                        from datetime import datetime
+                        current_year = datetime.now().year
 
-        # PATCH: Фильтр по году постройки (для вторички, ±10 лет)
-        if not is_new_building and target_property:
-            build_year = target_property.get('build_year')
-            if build_year:
-                try:
-                    year = int(build_year)
-                    from datetime import datetime
-                    current_year = datetime.now().year
+                        if year < current_year:
+                            year_min = year - 10
+                            year_max = year + 10
+                            search_params['min_year'] = str(year_min)
+                            search_params['max_year'] = str(year_max)
+                            logger.info(f"   📅 Фильтр года постройки: {year_min}-{year_max} (±10 лет от {year})")
+                    except (ValueError, TypeError):
+                        pass
+        else:
+            logger.warning("   ⚠️ Дополнительные фильтры ПРОПУЩЕНЫ (этажи/класс/год/отделка) для расширения поиска")
 
-                    # Только для вторички (не будущие года)
-                    if year < current_year:
-                        year_min = year - 10
-                        year_max = year + 10
-
-                        search_params['min_year'] = str(year_min)
-                        search_params['max_year'] = str(year_max)
-                        logger.info(f"   📅 Фильтр года постройки: {year_min}-{year_max} (±10 лет от {year})")
-                except (ValueError, TypeError):
-                    pass
-
-        # Комнаты (диапазон ±1)
+        # PATCH: Комнаты - СТРОГО то же количество (БЕЗ ±1)
+        # КРИТИЧЕСКИЙ БАГ: ±1 смешивает 1-комн и 2-комн! Нужно СТРОГОЕ совпадение
         # Обработка различных типов target_rooms
         if isinstance(target_rooms, str):
             if 'студия' in target_rooms.lower():
@@ -1189,10 +1182,9 @@ class PlaywrightParser(BaseCianParser):
         else:
             target_rooms_int = int(target_rooms) if target_rooms else 2
 
-        rooms_min = max(1, target_rooms_int - 1)
-        rooms_max = target_rooms_int + 1
-        for i in range(rooms_min, rooms_max + 1):
-            search_params[f'room{i}'] = '1'
+        # ИСПРАВЛЕНО: Ищем СТРОГО то же количество комнат (не ±1!)
+        search_params[f'room{target_rooms_int}'] = '1'
+        logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные (без смешивания!)")
 
         return f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
@@ -1344,6 +1336,15 @@ class PlaywrightParser(BaseCianParser):
         results_level1 = self.parse_search_page(url_level1)
         logger.info(f"   ✓ Найдено объявлений: {len(results_level1)}")
 
+        # PATCH: Если 0 результатов - пробуем БЕЗ дополнительных фильтров
+        if len(results_level1) == 0:
+            logger.warning("   ⚠️ Уровень 1 дал 0 результатов! Пробуем БЕЗ фильтров (год/класс/этажи/отделка)...")
+            url_level1_relaxed = self._build_search_url(target_price, target_area, target_rooms,
+                                                        price_tolerance, area_tolerance, target_property,
+                                                        skip_extra_filters=True)
+            results_level1 = self.parse_search_page(url_level1_relaxed)
+            logger.info(f"   ✓ После снятия доп. фильтров найдено: {len(results_level1)} объявлений")
+
         # Фильтруем по локации (строгий режим - только совпадение метро)
         if target_metro or target_address:
             filtered_level1 = self._filter_by_location(results_level1, target_property, strict=True)
@@ -1406,6 +1407,15 @@ class PlaywrightParser(BaseCianParser):
 
         results_level3 = self.parse_search_page(url_level3)
         logger.info(f"   ✓ Найдено объявлений: {len(results_level3)}")
+
+        # PATCH: Если 0 результатов - пробуем БЕЗ дополнительных фильтров
+        if len(results_level3) == 0:
+            logger.warning("   ⚠️ Уровень 3 дал 0 результатов! Пробуем БЕЗ фильтров (год/класс/этажи/отделка)...")
+            url_level3_relaxed = self._build_search_url(target_price, target_area, target_rooms,
+                                                        expanded_price_tolerance, expanded_area_tolerance, target_property,
+                                                        skip_extra_filters=True)
+            results_level3 = self.parse_search_page(url_level3_relaxed)
+            logger.info(f"   ✓ После снятия доп. фильтров найдено: {len(results_level3)} объявлений")
 
         validated_level3 = self._validate_and_prepare_results(results_level3, limit, target_property=target_property)
 
