@@ -913,6 +913,61 @@ class PlaywrightParser(BaseCianParser):
         # Валидация и подготовка
         return self._validate_and_prepare_results(filtered_results, limit, target_property=target_property)
 
+    def _is_new_building(self, target_property: Dict = None) -> bool:
+        """
+        Определяет, является ли объект новостройкой
+
+        Args:
+            target_property: Данные целевого объекта
+
+        Returns:
+            bool: True если новостройка, False если вторичка
+        """
+        if not target_property:
+            return False
+
+        # Метод 1: Проверка URL
+        url = target_property.get('url', '')
+        if '/newobject/' in url or 'newobject' in url:
+            logger.info(f"   🔍 Определен как новостройка (по URL)")
+            return True
+
+        # Метод 2: Проверка года сдачи (если в будущем или близко к настоящему)
+        from datetime import datetime
+        current_year = datetime.now().year
+
+        # Проверяем поле build_year
+        build_year = target_property.get('build_year')
+        if build_year:
+            try:
+                year = int(build_year)
+                if year >= current_year:  # Сдача в будущем = новостройка
+                    logger.info(f"   🔍 Определен как новостройка (год сдачи {year} >= {current_year})")
+                    return True
+                elif year >= current_year - 2:  # Сдан недавно (последние 2 года)
+                    logger.info(f"   🔍 Определен как новостройка (сдан недавно: {year})")
+                    return True
+            except (ValueError, TypeError):
+                pass
+
+        # Метод 3: Проверка статуса объекта
+        object_status = target_property.get('object_status', '').lower()
+        if 'новостр' in object_status or 'строит' in object_status:
+            logger.info(f"   🔍 Определен как новостройка (статус: {object_status})")
+            return True
+
+        # Метод 4: Эвристика - без отделки + высокая цена за м²
+        repair_level = target_property.get('repair_level', '').lower()
+        price_per_sqm = target_property.get('price_per_sqm', 0) or target_property.get('price', 0) / max(target_property.get('total_area', 1), 1)
+
+        if 'без отделки' in repair_level and price_per_sqm > 200_000:  # Премиум без отделки = скорее всего новостройка
+            logger.info(f"   🔍 Определен как новостройка (без отделки + цена {price_per_sqm:,.0f} ₽/м²)")
+            return True
+
+        # По умолчанию считаем вторичкой
+        logger.info(f"   🔍 Определен как вторичка (не найдено признаков новостройки)")
+        return False
+
     def _get_segment_tolerances(self, target_price: float):
         """
         Определяет допуски в зависимости от сегмента недвижимости
@@ -920,18 +975,20 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             tuple: (price_tolerance, area_tolerance, segment)
         """
-        # FIX ISSUE #1: Расширены допуски для премиум-сегмента
+        # FIX ISSUE #1: УЖЕСТОЧЕНЫ допуски для премиум-сегмента (новостройки дороже)
+        # Для премиум-сегмента нужны узкие диапазоны, т.к. разброс цен меньше
         if target_price >= 300_000_000:  # Элитная недвижимость (300+ млн)
-            return 0.30, 0.20, "элитная"  # ±30% цена, ±20% площадь (было 0.20/0.15)
+            return 0.15, 0.10, "элитная"  # ±15% цена, ±10% площадь (было 0.30/0.20)
         elif target_price >= 100_000_000:  # Премиум (100-300 млн)
-            return 0.40, 0.30, "премиум"  # ±40% цена, ±30% площадь (было 0.30/0.25)
-        elif target_price >= 25_000_000:   # Средний+ (25-100 млн) - СНИЖЕН ПОРОГ с 30М до 25М
-            return 0.50, 0.35, "средний+"  # ±50% цена, ±35% площадь (было 0.40/0.30)
+            return 0.20, 0.15, "премиум"  # ±20% цена, ±15% площадь (было 0.40/0.30)
+        elif target_price >= 25_000_000:   # Средний+ (25-100 млн) - УЖЕСТОЧЕНЫ ДОПУСКИ
+            return 0.25, 0.20, "средний+"  # ±25% цена, ±20% площадь (было 0.50/0.35)
+            # Для 31 млн: диапазон 23.25-38.75 млн вместо 15.5-46.5 млн
         else:  # Эконом (до 25 млн)
-            return 0.60, 0.40, "эконом"  # ±60% цена, ±40% площадь (было 0.50/0.40)
+            return 0.40, 0.30, "эконом"  # ±40% цена, ±30% площадь (было 0.60/0.40)
 
     def _build_search_url(self, target_price: float, target_area: float, target_rooms: int,
-                          price_tolerance: float, area_tolerance: float) -> str:
+                          price_tolerance: float, area_tolerance: float, target_property: Dict = None) -> str:
         """
         Строит URL для поиска на Циан
 
@@ -941,6 +998,7 @@ class PlaywrightParser(BaseCianParser):
             target_rooms: Количество комнат
             price_tolerance: Допуск по цене (0.2 = ±20%)
             area_tolerance: Допуск по площади (0.15 = ±15%)
+            target_property: Целевой объект (для определения типа)
 
         Returns:
             str: URL для поиска
@@ -955,6 +1013,52 @@ class PlaywrightParser(BaseCianParser):
             'maxArea': int(target_area * (1 + area_tolerance)),
             'region': self.region_code,
         }
+
+        # PATCH: Определяем тип объекта (новостройка vs вторичка)
+        is_new_building = self._is_new_building(target_property)
+
+        # КРИТИЧЕСКИ ВАЖНО: Правильный параметр Циан!
+        # type=4 - новостройки, type=1 - вторичка
+        if is_new_building:
+            search_params['type'] = '4'  # 4 = новостройка в Cian API
+            logger.info(f"   🏗️ Целевой объект - НОВОСТРОЙКА, фильтруем поиск (type=4)")
+        else:
+            search_params['type'] = '1'  # 1 = вторичка в Cian API
+            logger.info(f"   🏠 Целевой объект - ВТОРИЧКА, фильтруем поиск (type=1)")
+
+        # PATCH: Фильтр по этажам (не первый и не последний для средних этажей)
+        # Исключаем первый и последний этажи, если целевой объект - средний этаж
+        if target_property:
+            floor = target_property.get('floor')
+            total_floors = target_property.get('total_floors')
+
+            if floor and total_floors:
+                try:
+                    floor_num = int(floor)
+                    total_num = int(total_floors)
+
+                    # Если средний этаж (не 1 и не последний)
+                    if floor_num > 1 and floor_num < total_num:
+                        search_params['not_first_floor'] = '1'  # Исключить первый
+                        search_params['not_last_floor'] = '1'   # Исключить последний
+                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО средние (не 1, не {total_num})")
+                    elif floor_num == 1:
+                        # Ищем только первые этажи
+                        search_params['foot'] = '1'
+                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО первые")
+                    elif floor_num == total_num:
+                        # Ищем только последние этажи
+                        search_params['max_foot'] = '1'
+                        logger.info(f"   🏢 Фильтр этажей: ТОЛЬКО последние")
+                except (ValueError, TypeError):
+                    pass
+
+        # PATCH: Фильтр по классу жилья для премиум-сегмента
+        # class=1 - эконом, class=2 - комфорт, class=3 - бизнес, class=4 - элит
+        if target_price >= 25_000_000 and is_new_building:
+            # Для премиум-сегмента ищем только комфорт+ (2,3,4)
+            search_params['class'] = '2'  # Комфорт как минимум
+            logger.info(f"   💎 Фильтр класса: комфорт+ (премиум сегмент)")
 
         # Комнаты (диапазон ±1)
         # Обработка различных типов target_rooms
@@ -1118,7 +1222,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   Диапазон площади: {int(target_area * (1-area_tolerance))} - {int(target_area * (1+area_tolerance))} м²")
 
         url_level1 = self._build_search_url(target_price, target_area, target_rooms,
-                                            price_tolerance, area_tolerance)
+                                            price_tolerance, area_tolerance, target_property)
         logger.info(f"   URL: {url_level1[:100]}...")
 
         results_level1 = self.parse_search_page(url_level1)
@@ -1181,7 +1285,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   Диапазон площади: {int(target_area * (1-expanded_area_tolerance))} - {int(target_area * (1+expanded_area_tolerance))} м²")
 
         url_level3 = self._build_search_url(target_price, target_area, target_rooms,
-                                            expanded_price_tolerance, expanded_area_tolerance)
+                                            expanded_price_tolerance, expanded_area_tolerance, target_property)
         logger.info(f"   URL: {url_level3[:100]}...")
 
         results_level3 = self.parse_search_page(url_level3)
