@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 try:
     # Импортируем registry
     from src.parsers import get_global_registry
-    from src.parsers.playwright_parser import detect_region_from_url
+    from src.parsers.playwright_parser import detect_region_from_url, detect_region_from_address
     from src.parsers.browser_pool import BrowserPool
 
     # Пытаемся импортировать все доступные парсеры
@@ -67,7 +67,7 @@ except ImportError as e:
     logger.error(f"Failed to import ParserRegistry: {e}")
     # Fallback на старый PlaywrightParser
     try:
-        from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url
+        from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url, detect_region_from_address
         from src.parsers.browser_pool import BrowserPool
         PARSER_REGISTRY_AVAILABLE = False
         logger.warning("⚠️ Fallback: Using legacy PlaywrightParser (только ЦИАН)")
@@ -77,7 +77,9 @@ except ImportError as e:
         PARSER_REGISTRY_AVAILABLE = False
         BrowserPool = None
         def detect_region_from_url(url):
-            return 'spb'
+            return None
+        def detect_region_from_address(address):
+            return 'spb'  # fallback
 
 # Check if Playwright is available for PDF generation
 try:
@@ -745,14 +747,15 @@ def parse_url():
             logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
             return jsonify({'status': 'error', 'message': str(e)}), 400
 
-        # Автоопределение региона
+        # Автоопределение региона по URL
         region = detect_region_from_url(url)
-        logger.info(f"Парсинг URL: {url} (регион: {region})")
+        logger.info(f"Парсинг URL: {url} (предварительный регион: {region})")
 
         # SECURITY: Парсинг с timeout (защита от DoS)
+        # Используем fallback регион для парсинга, если не удалось определить
         try:
             with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
-                with get_parser_for_url(url, region=region) as parser:
+                with get_parser_for_url(url, region=region or 'spb') as parser:
                     parsed_data = parser.parse_detail_page(url)
         except TimeoutError as e:
             logger.error(f"Parsing timeout for {url}: {e}")
@@ -760,6 +763,22 @@ def parse_url():
                 'status': 'error',
                 'message': 'Время ожидания истекло. Попробуйте позже или другой объект.'
             }), 408  # Request Timeout
+
+        # КРИТИЧНО: Определяем регион по адресу объекта после парсинга
+        if not region:
+            address = parsed_data.get('address', '')
+            region = detect_region_from_address(address)
+            if region:
+                logger.info(f"✓ Регион определен по адресу: {region} (адрес: {address})")
+                # Сохраняем регион в данные объекта
+                parsed_data['region'] = region
+            else:
+                logger.warning(f"⚠️ Не удалось определить регион ни по URL, ни по адресу: {address}")
+                # Fallback на СПб
+                region = 'spb'
+                parsed_data['region'] = region
+        else:
+            parsed_data['region'] = region
 
         # Определяем недостающие поля для анализа
         missing_fields = _identify_missing_fields(parsed_data)
@@ -1008,10 +1027,24 @@ def find_similar():
         session_data = session_storage.get(session_id)
         target = session_data['target_property']
 
-        # Определяем регион из URL целевого объекта
-        target_url = target.get('url', '')
-        region = detect_region_from_url(target_url)
+        # КРИТИЧНО: Используем регион, определенный при парсинге (не определяем заново!)
+        # Регион уже корректно определен по адресу в /api/parse
+        region = target.get('region')
+        if not region:
+            # Fallback: определяем по URL или адресу
+            target_url = target.get('url', '')
+            region = detect_region_from_url(target_url)
+            if not region:
+                address = target.get('address', '')
+                region = detect_region_from_address(address)
+                if not region:
+                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: spb")
+                    region = 'spb'
+
         logger.info(f"🔍 Searching for similar properties (session: {session_id}, type: {search_type}, region: {region}, limit: {limit})")
+
+        # Используем URL целевого объекта для создания парсера
+        target_url = target.get('url', '')
 
         # Поиск аналогов с кэшем и регионом
         try:
@@ -1311,9 +1344,14 @@ def add_comparable():
             logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
             return jsonify({'status': 'error', 'message': str(e)}), 400
 
-        # Определяем регион
+        # Получаем регион целевого объекта
+        session_data = session_storage.get(session_id)
+        target = session_data['target_property']
+        target_region = target.get('region', 'spb')
+
+        # Определяем регион добавляемого аналога по URL
         region = detect_region_from_url(url)
-        logger.info(f"Добавление аналога: {url} (регион: {region})")
+        logger.info(f"Добавление аналога: {url} (предварительный регион: {region}, целевой регион: {target_region})")
 
         # SECURITY: Парсим с timeout (защита от DoS)
         try:
@@ -1344,6 +1382,25 @@ def add_comparable():
                 'status': 'error',
                 'message': 'parsing_incomplete',
                 'details': 'Не удалось получить полные данные объекта (цена или площадь отсутствует). Попробуйте другой объект.'
+            }), 400
+
+        # КРИТИЧНО: Проверяем регион аналога
+        if not region:
+            address = comparable_data.get('address', '')
+            region = detect_region_from_address(address)
+            if region:
+                logger.info(f"✓ Регион аналога определен по адресу: {region}")
+            else:
+                logger.warning(f"⚠️ Не удалось определить регион аналога по адресу: {address}")
+                region = 'spb'  # fallback
+
+        # КРИТИЧНО: Предупреждаем о несоответствии региона
+        if region != target_region:
+            logger.warning(f"⚠️ ВНИМАНИЕ: Аналог из другого региона! Целевой: {target_region}, Аналог: {region}")
+            return jsonify({
+                'status': 'error',
+                'message': 'region_mismatch',
+                'details': f'Этот аналог находится в другом регионе ({region}), а целевой объект - в регионе {target_region}. Для корректного анализа используйте аналоги из того же города.'
             }), 400
 
         # Проверка на дубликаты
