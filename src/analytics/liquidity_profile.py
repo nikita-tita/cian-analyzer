@@ -35,7 +35,9 @@ def build_liquidity_profile(
 
     usable_comps = [c for c in comparables if not getattr(c, "excluded", False)]
     comp_ppsm = [c.price_per_sqm for c in usable_comps if c.price_per_sqm]
-    median_ppsm = statistics.median(comp_ppsm) if comp_ppsm else None
+
+    # УЛУЧШЕНИЕ: Взвешенная медиана с бонусом для аналогов из того же ЖК
+    median_ppsm = _calculate_weighted_median(target, usable_comps, comp_ppsm) if comp_ppsm else None
 
     target_ppsm = _resolve_price_per_sqm(target)
     price_ratio = _safe_ratio(target_ppsm, median_ppsm)
@@ -114,6 +116,128 @@ def build_liquidity_profile(
     }
 
     return profile
+
+
+def _calculate_weighted_median(
+    target: "TargetProperty",
+    comparables: Sequence["ComparableProperty"],
+    prices_per_sqm: List[float]
+) -> Optional[float]:
+    """
+    Вычисляет взвешенную медиану цены за м² с бонусом для аналогов из того же ЖК.
+
+    Аналоги из того же здания/ЖК получают вес 2.0 (двойной приоритет),
+    остальные аналоги получают вес 1.0.
+
+    Args:
+        target: Целевой объект
+        comparables: Список аналогов
+        prices_per_sqm: Список цен за м² аналогов
+
+    Returns:
+        Взвешенная медиана или None
+    """
+    if not prices_per_sqm or not comparables:
+        return None
+
+    # Проверяем, что длины совпадают
+    if len(comparables) != len(prices_per_sqm):
+        # Fallback на обычную медиану если что-то не так
+        return statistics.median(prices_per_sqm)
+
+    # Извлекаем название ЖК из адреса целевого объекта
+    target_address = getattr(target, 'address', '') or ''
+    target_rc = _extract_residential_complex(target_address)
+
+    # Если не удалось извлечь ЖК, используем обычную медиану
+    if not target_rc:
+        return statistics.median(prices_per_sqm)
+
+    # Подготавливаем данные для взвешенной медианы
+    weighted_data = []
+    same_building_count = 0
+
+    for comp, price in zip(comparables, prices_per_sqm):
+        comp_address = getattr(comp, 'address', '') or ''
+        comp_rc = _extract_residential_complex(comp_address)
+
+        # Определяем вес: 2.0 для того же ЖК, 1.0 для остальных
+        if comp_rc and comp_rc == target_rc:
+            weight = 2.0
+            same_building_count += 1
+        else:
+            weight = 1.0
+
+        weighted_data.append((price, weight))
+
+    # Вычисляем взвешенную медиану
+    weighted_median = _compute_weighted_median(weighted_data)
+
+    # Логируем если нашли аналоги из того же ЖК
+    if same_building_count > 0:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"📍 Найдено {same_building_count} аналогов из того же ЖК '{target_rc}' "
+            f"(вес × 2.0 в расчете медианы)"
+        )
+
+    return weighted_median
+
+
+def _extract_residential_complex(address: str) -> Optional[str]:
+    """
+    Извлекает название ЖК из адреса.
+
+    Примеры:
+    - "ЖК «Галерея ЗИЛ», Автозаводская ул., 23К7" -> "галерея зил"
+    - "ЖК Комфорт Таун, Москва" -> "комфорт таун"
+    """
+    if not address:
+        return None
+
+    import re
+
+    # Паттерн для ЖК с кавычками
+    match = re.search(r'ЖК\s*[«"](.*?)[»"]', address, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().lower()
+
+    # Паттерн для ЖК без кавычек (до запятой)
+    match = re.search(r'ЖК\s+([А-Яа-яёЁ\s\-\d]+?)(?:,|$)', address, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().lower()
+
+    return None
+
+
+def _compute_weighted_median(weighted_data: List[Tuple[float, float]]) -> float:
+    """
+    Вычисляет взвешенную медиану.
+
+    Args:
+        weighted_data: Список кортежей (значение, вес)
+
+    Returns:
+        Взвешенная медиана
+    """
+    # Сортируем по значению
+    sorted_data = sorted(weighted_data, key=lambda x: x[0])
+
+    # Вычисляем общий вес
+    total_weight = sum(weight for _, weight in sorted_data)
+
+    # Находим медиану
+    cumulative_weight = 0
+    half_weight = total_weight / 2.0
+
+    for value, weight in sorted_data:
+        cumulative_weight += weight
+        if cumulative_weight >= half_weight:
+            return value
+
+    # Fallback (не должно произойти)
+    return sorted_data[-1][0]
 
 
 def _default_profile() -> Dict[str, Any]:
