@@ -370,6 +370,36 @@ class RealEstateAnalyzer:
             recommendations=recommendations
         )
 
+    def _get_empty_fair_price_result(self) -> Dict:
+        """
+        Возвращает валидную структуру справедливой цены с нулевыми значениями
+        Используется когда невозможно рассчитать справедливую цену
+        """
+        current_price = self.request.target_property.price if self.request else 0
+        return {
+            'base_price_per_sqm': 0,
+            'fair_price_per_sqm': 0,
+            'fair_price_total': 0,
+            'current_price': current_price,
+            'price_diff_amount': 0,
+            'price_diff_percent': 0,
+            'is_overpriced': False,
+            'is_underpriced': False,
+            'is_fair': False,
+            'overpricing_amount': 0,
+            'overpricing_percent': 0,
+            'status': 'insufficient_data',
+            'method': 'none',
+            'adjustments': {},
+            'confidence': {
+                'score': 0,
+                'level': 'Нет данных',
+                'description': 'Недостаточно данных для расчета справедливой цены'
+            },
+            'detailed_report': 'Недостаточно данных для расчета справедливой цены. Требуется минимум 1 аналог с корректными данными.',
+            'summary_report': 'Расчет невозможен'
+        }
+
     def _filter_outliers(self, comparables: List[ComparableProperty]) -> List[ComparableProperty]:
         """
         Фильтрация выбросов по правилу ±3σ
@@ -474,7 +504,33 @@ class RealEstateAnalyzer:
         filtered = self.filtered_comparables
 
         if not filtered:
-            return {}
+            # PATCH: Возвращаем валидную структуру с нулевыми значениями вместо пустого словаря
+            return {
+                'all': {
+                    'mean': 0,
+                    'median': 0,
+                    'min': 0,
+                    'max': 0,
+                    'stdev': 0,
+                    'count': 0,
+                    'filtered_out': self.metrics.get('comparables_filtered', 0),
+                    'confidence_interval_95': {
+                        'lower': 0,
+                        'upper': 0,
+                        'margin': 0
+                    }
+                },
+                'with_design': {
+                    'mean': 0,
+                    'median': 0,
+                    'count': 0
+                },
+                'without_design': {
+                    'mean': 0,
+                    'median': 0,
+                    'count': 0
+                }
+            }
 
         prices_per_sqm = [c.price_per_sqm for c in filtered if c.price_per_sqm]
 
@@ -542,7 +598,8 @@ class RealEstateAnalyzer:
         market_stats = self.calculate_market_statistics()
 
         if not market_stats or not self.request:
-            return {}
+            logger.warning("Невозможно рассчитать справедливую цену - отсутствуют данные")
+            return self._get_empty_fair_price_result()
 
         target = self.request.target_property
 
@@ -553,6 +610,12 @@ class RealEstateAnalyzer:
         else:
             base_price_per_sqm = market_stats['all']['mean']
             method = 'mean'
+
+        # PATCH: Если базовая цена нулевая (нет аналогов или все отфильтрованы)
+        if base_price_per_sqm == 0 or len(self.filtered_comparables) == 0:
+            logger.warning(f"Недостаточно данных для расчета справедливой цены: "
+                         f"base_price={base_price_per_sqm}, comparables={len(self.filtered_comparables)}")
+            return self._get_empty_fair_price_result()
 
         # НОВЫЙ ПОДХОД: используем функцию с медианами
         result = calculate_fair_price_with_medians(

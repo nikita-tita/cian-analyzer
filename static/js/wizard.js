@@ -1090,6 +1090,16 @@ const screen3 = {
                 throw new Error('Отсутствуют данные о справедливой цене');
             }
 
+            // PATCH: Проверяем достаточность данных
+            if (analysis.market_statistics.all.count === 0) {
+                throw new Error('Недостаточно аналогов для анализа. После фильтрации не осталось подходящих объектов.');
+            }
+
+            if (analysis.fair_price_analysis.status === 'insufficient_data') {
+                console.warn('⚠️ Недостаточно данных для расчета справедливой цены');
+                // Продолжаем показ результатов, но с предупреждением
+            }
+
             document.getElementById('analysis-results').style.display = 'block';
 
             // Сводная информация
@@ -1167,6 +1177,18 @@ const screen3 = {
 
     renderFairPrice(fairPrice) {
         const container = document.getElementById('fair-price-details');
+
+        // PATCH: Проверяем статус данных
+        if (fairPrice.status === 'insufficient_data') {
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <h5>⚠️ Недостаточно данных для расчета</h5>
+                    <p>${fairPrice.detailed_report || 'Недостаточно аналогов для расчета справедливой цены'}</p>
+                </div>
+            `;
+            return;
+        }
+
         const overpricing = fairPrice.overpricing_percent || 0;
 
         const overpricingClass = overpricing > 10 ? 'danger' : overpricing > 5 ? 'warning' : 'success';
