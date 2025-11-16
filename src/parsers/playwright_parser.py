@@ -39,15 +39,45 @@ def detect_region_from_url(url: str) -> str:
         'msk' или 'spb'
     """
     # Парсим URL для поиска региона
+    url_lower = url.lower()
 
-    # Ищем упоминание городов
-    if 'moskva' in url.lower() or 'moscow' in url.lower():
+    # Ищем упоминание городов в URL
+    # Москва: moskva, moscow, msk
+    if any(word in url_lower for word in ['moskva', 'moscow', '/msk/', 'moscow-city']):
         return 'msk'
-    elif 'sankt-peterburg' in url.lower() or 'spb' in url.lower():
+    # Санкт-Петербург: sankt-peterburg, spb, piter
+    elif any(word in url_lower for word in ['sankt-peterburg', 'saint-petersburg', '/spb/', 'piter']):
         return 'spb'
 
-    # По умолчанию - СПб
-    return 'spb'
+    # КРИТИЧНО: По умолчанию возвращаем None вместо 'spb'
+    # Регион должен определяться по адресу после парсинга
+    logger.warning(f"⚠️ Не удалось определить регион по URL: {url}, требуется определение по адресу")
+    return None
+
+
+def detect_region_from_address(address: str) -> str:
+    """
+    Определение региона по адресу объекта
+
+    Args:
+        address: Адрес объявления
+
+    Returns:
+        'msk' или 'spb' или None
+    """
+    if not address:
+        return None
+
+    address_lower = address.lower()
+
+    # Москва: ищем "Москва", "г. Москва", "Moscow"
+    if any(word in address_lower for word in ['москва', 'moscow', 'г москва', 'г.москва']):
+        return 'msk'
+    # Санкт-Петербург: ищем "Санкт-Петербург", "СПб", "Питер"
+    elif any(word in address_lower for word in ['санкт-петербург', 'спб', 'с-петербург', 'с.петербург', 'питер']):
+        return 'spb'
+
+    return None
 
 
 def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0):
@@ -569,23 +599,35 @@ class PlaywrightParser(BaseCianParser):
                 result['rooms'] = int(result['rooms'])
 
         # ═══════════════════════════════════════════════════════════════════════════
-        # ДОРАБОТКА #1: ФИЛЬТРАЦИЯ ПО РЕГИОНУ
+        # ДОРАБОТКА #1: ФИЛЬТРАЦИЯ ПО РЕГИОНУ (КРИТИЧНО: по адресу, не только по URL!)
         # ═══════════════════════════════════════════════════════════════════════════
         region_filtered = []
         region_excluded = 0
         for result in results:
             result_url = result.get('url', '')
-            result_region = detect_region_from_url(result_url)
+            result_address = result.get('address', '')
 
-            if result_region == self.region:
-                region_filtered.append(result)
+            # ПРИОРИТЕТ 1: Определяем регион по адресу
+            result_region = detect_region_from_address(result_address)
+
+            # ПРИОРИТЕТ 2: Если не удалось по адресу - пробуем по URL
+            if not result_region:
+                result_region = detect_region_from_url(result_url)
+
+            # Если удалось определить регион - проверяем совпадение
+            if result_region:
+                if result_region == self.region:
+                    region_filtered.append(result)
+                else:
+                    region_excluded += 1
+                    logger.warning(
+                        f"⚠️ Исключен аналог из другого региона: "
+                        f"{result_region} (ожидался {self.region}), "
+                        f"адрес: {result_address[:80] if result_address else 'не указан'}"
+                    )
             else:
-                region_excluded += 1
-                logger.warning(
-                    f"⚠️ Исключен аналог из другого региона: "
-                    f"{result_region} (ожидался {self.region}), "
-                    f"URL: {result_url[:80]}..."
-                )
+                # Не удалось определить регион - оставляем (возможно тот же регион)
+                region_filtered.append(result)
 
         if region_excluded > 0:
             logger.info(f"📊 Фильтрация по региону: {len(results)} → {len(region_filtered)} (исключено {region_excluded} из других регионов)")
@@ -1123,7 +1165,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
         logger.info("")
 
-        # Итоговый результат
+        # Итоговый результат (фильтрация по региону уже выполнена в _validate_and_prepare_results)
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
         logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
