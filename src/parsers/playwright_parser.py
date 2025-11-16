@@ -890,11 +890,9 @@ class PlaywrightParser(BaseCianParser):
                 target_rooms_int = int(target_rooms) if target_rooms else 0
 
             if target_rooms_int > 0:
-                rooms_min = max(1, target_rooms_int - 1)
-                rooms_max = target_rooms_int + 1
-                for i in range(rooms_min, rooms_max + 1):
-                    search_params[f'room{i}'] = '1'
-                logger.info(f"   Фильтр комнат: {rooms_min}-{rooms_max}")
+                # СТРОГИЙ фильтр комнат (без смешивания!)
+                search_params[f'room{target_rooms_int}'] = '1'
+                logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
 
         url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
@@ -1189,10 +1187,11 @@ class PlaywrightParser(BaseCianParser):
         else:
             target_rooms_int = int(target_rooms) if target_rooms else 2
 
-        rooms_min = max(1, target_rooms_int - 1)
-        rooms_max = target_rooms_int + 1
-        for i in range(rooms_min, rooms_max + 1):
-            search_params[f'room{i}'] = '1'
+        # КРИТИЧЕСКИЙ ФИКС: СТРОГИЙ фильтр комнат (без смешивания!)
+        # БЫЛО: rooms_min=1, rooms_max=2 → room1=1 И room2=1 (искало 1-комн И 2-комн!)
+        # СЕЙЧАС: ТОЛЬКО room{target}=1 (ищем СТРОГО указанное количество комнат)
+        search_params[f'room{target_rooms_int}'] = '1'
+        logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные (без смешивания!)")
 
         return f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
@@ -1344,6 +1343,56 @@ class PlaywrightParser(BaseCianParser):
         results_level1 = self.parse_search_page(url_level1)
         logger.info(f"   ✓ Найдено объявлений: {len(results_level1)}")
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # КРИТИЧЕСКИЙ ФИКС БАГ #2: PROGRESSIVE FILTER RELAXATION
+        # Если 0 результатов → убираем доп. фильтры (год/класс/этажи/отделка)
+        # ═══════════════════════════════════════════════════════════════════════════
+        if len(results_level1) == 0:
+            logger.warning("⚠️ Уровень 1 дал 0 результатов!")
+            logger.warning("⚠️ Пробуем БЕЗ фильтров (год/класс/этажи/отделка)...")
+
+            # Строим URL ТОЛЬКО с критическими фильтрами
+            search_params_relaxed = {
+                'deal_type': 'sale',
+                'offer_type': 'flat',
+                'engine_version': '2',
+                'price_min': int(target_price * (1 - price_tolerance)),
+                'price_max': int(target_price * (1 + price_tolerance)),
+                'minArea': int(target_area * (1 - area_tolerance)),
+                'maxArea': int(target_area * (1 + area_tolerance)),
+                'region': self.region_code,
+            }
+
+            # КРИТИЧНО: Тип объекта (новостройка/вторичка)
+            is_new_building = self._is_new_building(target_property)
+            if is_new_building:
+                search_params_relaxed['type'] = '4'
+                logger.info(f"   🏗️ Тип: НОВОСТРОЙКА (type=4)")
+            else:
+                search_params_relaxed['type'] = '1'
+                logger.info(f"   🏠 Тип: ВТОРИЧКА (type=1)")
+
+            # КРИТИЧНО: Комнаты (СТРОГО указанное количество)
+            if isinstance(target_rooms, str):
+                if 'студия' in target_rooms.lower():
+                    target_rooms_int = 1
+                else:
+                    import re
+                    match = re.search(r'\d+', target_rooms)
+                    target_rooms_int = int(match.group()) if match else 2
+            else:
+                target_rooms_int = int(target_rooms) if target_rooms else 2
+
+            search_params_relaxed[f'room{target_rooms_int}'] = '1'
+            logger.info(f"   🏠 Комнаты: СТРОГО {target_rooms_int}-комнатные")
+
+            # НЕ добавляем: deadline_from/to, class, not_first/last_floor, decoration, building_type
+            url_relaxed = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_relaxed.items()])
+            logger.info(f"   🔄 Relaxed URL: {url_relaxed[:100]}...")
+
+            results_level1 = self.parse_search_page(url_relaxed)
+            logger.info(f"   ✅ После снятия доп. фильтров найдено: {len(results_level1)} объявлений")
+
         # Фильтруем по локации (строгий режим - только совпадение метро)
         if target_metro or target_address:
             filtered_level1 = self._filter_by_location(results_level1, target_property, strict=True)
@@ -1453,10 +1502,9 @@ class PlaywrightParser(BaseCianParser):
             else:
                 target_rooms_int = int(target_rooms) if target_rooms else 2
 
-            rooms_min = max(1, target_rooms_int - 1)
-            rooms_max = target_rooms_int + 1
-            for i in range(rooms_min, rooms_max + 1):
-                search_params_fallback[f'room{i}'] = '1'
+            # СТРОГИЙ фильтр комнат (без смешивания!)
+            search_params_fallback[f'room{target_rooms_int}'] = '1'
+            logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
 
             url_fallback = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_fallback.items()])
             logger.info(f"   URL: {url_fallback[:100]}...")
