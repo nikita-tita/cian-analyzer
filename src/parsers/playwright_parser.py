@@ -920,14 +920,15 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             tuple: (price_tolerance, area_tolerance, segment)
         """
+        # FIX ISSUE #1: Расширены допуски для премиум-сегмента
         if target_price >= 300_000_000:  # Элитная недвижимость (300+ млн)
-            return 0.20, 0.15, "элитная"  # ±20% цена, ±15% площадь
+            return 0.30, 0.20, "элитная"  # ±30% цена, ±20% площадь (было 0.20/0.15)
         elif target_price >= 100_000_000:  # Премиум (100-300 млн)
-            return 0.30, 0.25, "премиум"  # ±30% цена, ±25% площадь
-        elif target_price >= 30_000_000:   # Средний+ (30-100 млн)
-            return 0.40, 0.30, "средний+"  # ±40% цена, ±30% площадь
-        else:  # Эконом (до 30 млн)
-            return 0.50, 0.40, "эконом"  # ±50% цена, ±40% площадь
+            return 0.40, 0.30, "премиум"  # ±40% цена, ±30% площадь (было 0.30/0.25)
+        elif target_price >= 25_000_000:   # Средний+ (25-100 млн) - СНИЖЕН ПОРОГ с 30М до 25М
+            return 0.50, 0.35, "средний+"  # ±50% цена, ±35% площадь (было 0.40/0.30)
+        else:  # Эконом (до 25 млн)
+            return 0.60, 0.40, "эконом"  # ±60% цена, ±40% площадь (было 0.50/0.40)
 
     def _build_search_url(self, target_price: float, target_area: float, target_rooms: int,
                           price_tolerance: float, area_tolerance: float) -> str:
@@ -1196,12 +1197,78 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
         logger.info("")
 
+        # Проверяем снова
+        if len(final_results) >= 5:
+            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info("=" * 80)
+            return final_results[:limit]
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 4: FALLBACK ДЛЯ ПРЕМИУМ-СЕГМЕНТА (только район, без фильтра цены)
+        # FIX ISSUE #1: Добавлен fallback для премиум-сегмента
+        # ═══════════════════════════════════════════════════════════════════════════
+        if target_price >= 25_000_000:  # Только для премиум/средний+
+            logger.info(f"🆘 УРОВЕНЬ 4: FALLBACK для премиум-сегмента")
+            logger.info(f"   (текущее количество: {len(final_results)}, критический минимум: 5)")
+            logger.info(f"   Ищем ТОЛЬКО по району, БЕЗ фильтра цены (максимально широкий поиск)")
+
+            # Убираем фильтр цены, оставляем только площадь и комнаты
+            search_params_fallback = {
+                'deal_type': 'sale',
+                'offer_type': 'flat',
+                'engine_version': '2',
+                'minArea': int(target_area * 0.5),  # Еще шире: ±50% площадь
+                'maxArea': int(target_area * 1.5),
+                'region': self.region_code,
+            }
+
+            # Комнаты (±1)
+            if isinstance(target_rooms, str):
+                if 'студия' in target_rooms.lower():
+                    target_rooms_int = 1
+                else:
+                    import re
+                    match = re.search(r'\d+', target_rooms)
+                    target_rooms_int = int(match.group()) if match else 2
+            else:
+                target_rooms_int = int(target_rooms) if target_rooms else 2
+
+            rooms_min = max(1, target_rooms_int - 1)
+            rooms_max = target_rooms_int + 1
+            for i in range(rooms_min, rooms_max + 1):
+                search_params_fallback[f'room{i}'] = '1'
+
+            url_fallback = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_fallback.items()])
+            logger.info(f"   URL: {url_fallback[:100]}...")
+
+            results_fallback = self.parse_search_page(url_fallback)
+            logger.info(f"   ✓ Найдено объявлений: {len(results_fallback)}")
+
+            # Фильтруем по локации (нестрогий режим)
+            if target_metro or target_address:
+                filtered_fallback = self._filter_by_location(results_fallback, target_property, strict=False)
+                logger.info(f"   ✓ После фильтрации по локации (нестрогий режим): {len(filtered_fallback)} объявлений")
+            else:
+                filtered_fallback = results_fallback
+
+            validated_fallback = self._validate_and_prepare_results(filtered_fallback, limit, target_property=target_property)
+
+            # Добавляем только новые
+            existing_urls = {r.get('url') for r in final_results}
+            new_results_fallback = [r for r in validated_fallback if r.get('url') not in existing_urls]
+
+            final_results.extend(new_results_fallback)
+            logger.info(f"   ✅ УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
+            logger.info("")
+
         # Итоговый результат (фильтрация по региону уже выполнена в _validate_and_prepare_results)
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
         logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
         logger.info(f"   - Уровень 2 (город): +{len(new_results_level2)} шт.")
         logger.info(f"   - Уровень 3 (расширенный): +{len(new_results_level3)} шт.")
+        if target_price >= 25_000_000 and 'new_results_fallback' in locals():
+            logger.info(f"   - Уровень 4 (fallback для премиум): +{len(new_results_fallback)} шт.")
         logger.info("=" * 80)
 
         return final_results[:limit]
