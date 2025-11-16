@@ -1330,6 +1330,36 @@ class PlaywrightParser(BaseCianParser):
         new_results_level3 = []
 
         # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 0: ДЛЯ НОВОСТРОЕК - ПРИОРИТЕТ ПОИСКА ПО ЖК
+        # КРИТИЧЕСКИЙ ФИКС: Для новостроек сначала пробуем найти в том же ЖК
+        # ═══════════════════════════════════════════════════════════════════════════
+        is_new_building = self._is_new_building(target_property)
+        residential_complex = target_property.get('residential_complex', '')
+
+        if is_new_building and residential_complex:
+            logger.info(f"🏗️ УРОВЕНЬ 0: Новостройка - пробуем поиск по ЖК '{residential_complex}'")
+            try:
+                results_level0 = self.search_similar_in_building(target_property, limit=limit)
+                if len(results_level0) >= 5:
+                    logger.info(f"   ✅ УРОВЕНЬ 0: Нашли достаточно аналогов в ЖК ({len(results_level0)} шт.)")
+                    validated_level0 = self._validate_and_prepare_results(results_level0, limit, target_property=target_property)
+                    final_results.extend(validated_level0)
+                    logger.info(f"   ✅ УРОВЕНЬ 0 ЗАВЕРШЁН: {len(validated_level0)} аналогов из того же ЖК")
+                    logger.info("=" * 80)
+                    return final_results[:limit]
+                else:
+                    logger.warning(f"   ⚠️ УРОВЕНЬ 0: В ЖК найдено мало аналогов ({len(results_level0)} шт.), переходим к широкому поиску")
+                    # Добавляем то что нашли, и продолжаем
+                    if results_level0:
+                        validated_level0 = self._validate_and_prepare_results(results_level0, limit, target_property=target_property)
+                        final_results.extend(validated_level0)
+                        logger.info(f"   ✓ Добавлено {len(validated_level0)} аналогов из ЖК")
+            except Exception as e:
+                logger.warning(f"   ⚠️ УРОВЕНЬ 0: Ошибка поиска по ЖК - {e}")
+                logger.info(f"   → Переходим к широкому поиску")
+            logger.info("")
+
+        # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 1: Поиск в том же районе/у того же метро
         # ═══════════════════════════════════════════════════════════════════════════
         logger.info("🎯 УРОВЕНЬ 1: Поиск аналогов в том же районе/у метро")

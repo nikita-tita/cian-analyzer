@@ -1058,6 +1058,13 @@ def find_similar():
                     similar = parser.search_similar_in_building(target, limit=limit)
                     residential_complex = target.get('residential_complex', 'Неизвестно')
                     logger.info(f"✅ Found {len(similar)} comparables in building")
+
+                    # КРИТИЧЕСКИЙ ФИКС: Fallback если building search вернул 0
+                    if len(similar) == 0:
+                        logger.warning("⚠️ Building search returned 0 results! Trying citywide search as fallback...")
+                        similar = parser.search_similar(target, limit=limit)
+                        residential_complex = None  # Т.к. теперь поиск по городу
+                        logger.info(f"✅ Fallback citywide search found {len(similar)} comparables")
                 else:
                     # Широкий поиск по городу
                     logger.info(f"🌆 Searching in city: {region}")
