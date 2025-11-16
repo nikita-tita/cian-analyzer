@@ -11,8 +11,8 @@ if TYPE_CHECKING:  # pragma: no cover - только для аннотаций
 
 SEGMENT_THRESHOLDS = (
     ("mass", 160_000),
-    ("comfort", 260_000),
-    ("business", 400_000),
+    ("comfort", 400_000),  # Extended from 260K to match current market (160K-400K)
+    ("business", 600_000),  # Business class now 400K-600K (was 260K-400K)
     ("premium", math.inf),
 )
 
