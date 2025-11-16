@@ -79,6 +79,14 @@ except ImportError as e:
         def detect_region_from_url(url):
             return 'spb'
 
+# Check if Playwright is available for PDF generation
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    logger.warning("Playwright недоступен - PDF экспорт будет заменен на Markdown")
+
 from src.analytics.analyzer import RealEstateAnalyzer
 from src.analytics.offer_generator import generate_housler_offer
 from src.models.property import (
@@ -609,12 +617,15 @@ def health_check():
             'type': parser_name
         }
     except Exception as e:
+        # Parser недоступен - это не критично, есть fallback
         health_status['components']['parser'] = {
-            'status': 'unhealthy',
-            'error': str(e)
+            'status': 'degraded',
+            'error': str(e),
+            'fallback': 'SimpleParser available'
         }
-        all_healthy = False
-        health_status['status'] = 'unhealthy'
+        # НЕ устанавливаем all_healthy = False, парсер не критичен
+        if health_status['status'] == 'healthy':
+            health_status['status'] = 'degraded'
 
     # Проверка browser pool
     if browser_pool:
@@ -864,7 +875,7 @@ def create_manual():
             'view_type': validated.view_type,
             'manual_input': True,
             'title': f"{validated.rooms}-комн. квартира, {validated.total_area} м²",
-            'url': None,  # Нет URL при ручном вводе
+            'url': 'manual-input',  # Плейсхолдер для ручного ввода
             'metro': [],
             'residential_complex': None,
             'characteristics': {}
@@ -1536,12 +1547,9 @@ def analyze():
             }), 400
 
         # Анализ
-        logger.info(f"🔧 DEBUG: Создаю analyzer...")
         analyzer = RealEstateAnalyzer()
         try:
-            logger.info(f"🔧 DEBUG: Запускаю analyzer.analyze()...")
             result = analyzer.analyze(request_model)
-            logger.info(f"🔧 DEBUG: ✓ Анализ завершён, тип результата: {type(result)}")
         except ValueError as ve:
             # PATCH 4: Специфичные ошибки валидации с детальными сообщениями
             error_str = str(ve).lower()
@@ -1595,9 +1603,7 @@ def analyze():
 
         # Конвертируем в JSON
         try:
-            logger.info(f"🔧 DEBUG: Конвертирую result в dict...")
             result_dict = result.dict()
-            logger.info(f"🔧 DEBUG: ✓ Конвертация успешна, размер: {len(str(result_dict))} символов")
         except Exception as dict_error:
             logger.error(f"Ошибка конвертации результата в dict: {dict_error}", exc_info=True)
             return jsonify({
@@ -1607,7 +1613,6 @@ def analyze():
             }), 500
 
         # Валидация результата перед отправкой
-        logger.info(f"🔧 DEBUG: Валидирую required_fields...")
         required_fields = ['market_statistics', 'fair_price_analysis', 'price_scenarios',
                           'strengths_weaknesses', 'target_property']
         missing_fields = [field for field in required_fields if not result_dict.get(field)]
@@ -1623,17 +1628,14 @@ def analyze():
 
         # Метрики
         try:
-            logger.info(f"🔧 DEBUG: Получаю метрики...")
             metrics = analyzer.get_metrics()
             result_dict['metrics'] = metrics
-            logger.info(f"🔧 DEBUG: ✓ Метрики получены")
         except Exception as metrics_error:
             logger.warning(f"Ошибка получения метрик: {metrics_error}")
             result_dict['metrics'] = {}
 
         # Генерируем персонализированный оффер Housler
         try:
-            logger.info(f"🔧 DEBUG: Генерирую персонализированный оффер...")
             housler_offer = generate_housler_offer(
                 analysis=result_dict,
                 property_info=session_data.get('target_property', {}),
@@ -1641,7 +1643,6 @@ def analyze():
             )
             if housler_offer:
                 result_dict['housler_offer'] = housler_offer
-                logger.info(f"🔧 DEBUG: ✓ Оффер сгенерирован")
             else:
                 result_dict['housler_offer'] = None
                 logger.warning("Оффер не сгенерирован (нет данных)")
@@ -1650,13 +1651,10 @@ def analyze():
             result_dict['housler_offer'] = None
 
         # Сохраняем в сессию
-        logger.info(f"🔧 DEBUG: Сохраняю результат в сессию {session_id}...")
         session_data['analysis'] = result_dict
         session_data['step'] = 3
         session_storage.set(session_id, session_data)
-        logger.info(f"🔧 DEBUG: ✓ Результат сохранён в сессию")
 
-        logger.info(f"🔧 DEBUG: Формирую JSON ответ...")
         return jsonify({
             'status': 'success',
             'analysis': result_dict

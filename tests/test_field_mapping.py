@@ -4,12 +4,20 @@
 """
 import pytest
 from unittest.mock import Mock, patch
-from src.parsers.playwright_parser import PlaywrightParser
+
+# Try to import PlaywrightParser, skip tests if not available
+try:
+    from src.parsers.playwright_parser import PlaywrightParser
+    PLAYWRIGHT_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    PLAYWRIGHT_AVAILABLE = False
+    PlaywrightParser = None
 
 
 class TestFieldMapping:
     """Тесты для проверки маппинга полей в парсере"""
 
+    @pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason="Playwright not available")
     @patch.object(PlaywrightParser, 'parse_search_page')
     def test_search_similar_maps_fields_correctly(self, mock_parse):
         """
@@ -65,6 +73,7 @@ class TestFieldMapping:
             assert isinstance(result['rooms'], int), \
                 f"rooms должен быть int, получен {type(result['rooms'])}"
 
+    @pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason="Playwright not available")
     @patch.object(PlaywrightParser, 'parse_search_page')
     def test_search_similar_in_building_maps_fields_correctly(self, mock_parse):
         """
