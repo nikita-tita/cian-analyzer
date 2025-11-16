@@ -1351,7 +1351,7 @@ const screen3 = {
 
                     // ROI если есть
                     if (roi != null && roi > 0) {
-                        html += `<p class="card-text"><strong>ROI:</strong> <span class="badge bg-success">${roi.toFixed(1)}x</span></p>`;
+                        html += `<p class="card-text"><strong>ROI:</strong> <span class="badge bg-success">${roi.toFixed(1)}%</span></p>`;
                     }
 
                     // Финансовый эффект если есть
