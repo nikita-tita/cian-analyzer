@@ -899,24 +899,24 @@ class RealEstateAnalyzer:
         fair_price = fair_price_data.get('fair_price_total', current_price)
         market_profile = self._build_market_profile()
 
-        # ИСПРАВЛЕНО: Реалистичные сценарии с адекватным торгом (3-5%)
+        # ИСПРАВЛЕНО: Реалистичные сценарии - быстрая продажа ДЕШЕВЛЕ медленной!
         scenarios_config = [
             {
                 'name': 'Быстрая продажа',
                 'type': 'fast',
-                'description': 'Небольшой запас на торг для быстрой реализации (1-2 месяца)',
-                'start_price_pct': 1.02,
-                'expected_final_pct': 0.98,
+                'description': 'Агрессивная скидка для быстрой реализации (1-2 месяца)',
+                'start_price_pct': 1.00,  # Начинаем со справедливой цены
+                'expected_final_pct': 0.95,  # Продаем на 5% дешевле для скорости
                 'time_months': 2,
                 'base_probability': 85,
-                'reduction_rate': 0.008
+                'reduction_rate': 0.015  # Быстрое снижение
             },
             {
                 'name': 'Оптимальная продажа',
                 'type': 'optimal',
                 'description': 'Рекомендуемая стратегия с балансом цены и времени (3-4 месяца)',
-                'start_price_pct': 1.06,
-                'expected_final_pct': 1.02,
+                'start_price_pct': 1.03,  # Небольшой запас на торг
+                'expected_final_pct': 0.98,  # Небольшая скидка
                 'time_months': 4,
                 'base_probability': 75,
                 'reduction_rate': 0.010
@@ -925,8 +925,8 @@ class RealEstateAnalyzer:
                 'name': 'Стандартная продажа',
                 'type': 'standard',
                 'description': 'Средние сроки с умеренным торгом (5-6 месяцев)',
-                'start_price_pct': 1.08,
-                'expected_final_pct': 1.01,
+                'start_price_pct': 1.05,  # Запас на торг
+                'expected_final_pct': 1.00,  # Продаем по справедливой цене
                 'time_months': 6,
                 'base_probability': 65,
                 'reduction_rate': 0.012
@@ -935,11 +935,11 @@ class RealEstateAnalyzer:
                 'name': 'Попытка максимума',
                 'type': 'maximum',
                 'description': 'Ставка на максимальную цену (9-12 месяцев, высокий риск)',
-                'start_price_pct': 1.15,
-                'expected_final_pct': 0.97,
+                'start_price_pct': 1.10,  # Высокая стартовая
+                'expected_final_pct': 1.02,  # Продаем выше справедливой на 2%
                 'time_months': 10,
-                'base_probability': 30,
-                'reduction_rate': 0.020
+                'base_probability': 30,  # Низкая вероятность
+                'reduction_rate': 0.020  # Медленное снижение
             }
         ]
 
