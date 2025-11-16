@@ -224,29 +224,58 @@ class RecommendationEngine:
 
         # Дизайн-ремонт
         if not self.target.get('has_design', False):
-            cost = self.DESIGN_COST
             area = self.target.get('total_area', 0)
-            base_price_per_sqm = self.fair_price_analysis.get('base_price_per_sqm', 0)
+            current_price = self.target.get('price', 0)
 
-            # Расчет прироста стоимости от дизайна (+8%)
-            gain = area * base_price_per_sqm * 0.08
+            # ИСПРАВЛЕНО: Реалистичная стоимость ремонта зависит от площади
+            # Средняя стоимость: 30-50 тыс/м² для дизайн-ремонта
+            cost_per_sqm = 40_000  # ₽/м²
+            cost = area * cost_per_sqm if area > 0 else self.DESIGN_COST
+
+            # ИСПРАВЛЕНО: Реалистичный прирост стоимости от премиум-ремонта: 5-10%
+            # (не 8% к цене/м², а 5-10% к общей стоимости)
+            realistic_premium = 0.08  # 8% прирост к стоимости
+            gain = current_price * realistic_premium if current_price > 0 else 0
+
+            # ROI = (прирост - затраты) / затраты * 100%
             roi = ((gain - cost) / cost * 100) if cost > 0 else 0
 
-            if roi > 50:  # Окупается
+            # Только если ROI положительный (окупается)
+            if roi > 0:
                 recs.append(Recommendation(
-                    priority=self.HIGH,
+                    priority=self.HIGH if roi > 20 else self.MEDIUM,
                     icon='🎨',
-                    title='Дизайн-ремонт окупится',
-                    message=f'Инвестируя {cost:,.0f} ₽ в дизайнерскую отделку, получите +{gain:,.0f} ₽ к стоимости.',
+                    title='Дизайн-ремонт может окупиться' if roi > 20 else 'Дизайн-ремонт повысит привлекательность',
+                    message=f'Инвестируя {cost:,.0f} ₽ в дизайнерскую отделку (~{cost_per_sqm:,.0f} ₽/м²), получите +{gain:,.0f} ₽ к стоимости.',
                     action='Заказать дизайн-проект и ремонт',
-                    expected_result=f'ROI: {roi:.0f}%. Срок окупаемости: немедленно при продаже.',
+                    expected_result=f'ROI: {roi:.0f}%. Прирост стоимости: {realistic_premium*100:.0f}%.',
+                    roi=roi,
+                    category='improvement',
+                    financial_impact={
+                        'investment': cost,
+                        'cost_per_sqm': cost_per_sqm,
+                        'return': gain,
+                        'net_profit': gain - cost,
+                        'payback_period': 'При продаже',
+                        'note': 'Премиум-ремонт обычно добавляет 5-10% к стоимости'
+                    }
+                ))
+            else:
+                # ROI отрицательный - не окупится
+                recs.append(Recommendation(
+                    priority=self.MEDIUM,
+                    icon='🎨',
+                    title='Дизайн-ремонт не окупится',
+                    message=f'Инвестиция {cost:,.0f} ₽ даст прирост всего {gain:,.0f} ₽. ROI: {roi:.0f}% (убыток {abs(gain - cost):,.0f} ₽).',
+                    action='Продавать как есть или сделать косметический ремонт',
+                    expected_result='Экономия средств на ремонте',
                     roi=roi,
                     category='improvement',
                     financial_impact={
                         'investment': cost,
                         'return': gain,
-                        'net_profit': gain - cost,
-                        'payback_period': 'При продаже'
+                        'net_loss': cost - gain,
+                        'recommendation': 'Не делать дорогой ремонт перед продажей'
                     }
                 ))
 
@@ -304,25 +333,35 @@ class RecommendationEngine:
             views_increase = 40  # %
             conversion_increase = 15  # %
 
-            # Примерный ROI (1 фотосессия vs потеря покупателей)
+            # ИСПРАВЛЕНО: Фотосессия НЕ увеличивает стоимость, а УСКОРЯЕТ продажу
+            # ROI = экономия времени (меньше упущенной выгоды) минус стоимость фотосессии
             current_price = self.target.get('price', 0)
-            opportunity_cost_1m = self._calc_opportunity_cost(current_price, 1)
-            roi = ((opportunity_cost_1m - cost) / cost * 100) if cost > 0 else 0
+
+            # Без фото: продажа затягивается на 1-2 месяца дольше
+            # С фото: экономим 1.5 месяца упущенной выгоды
+            time_saved_months = 1.5
+            opportunity_cost_saved = self._calc_opportunity_cost(current_price, time_saved_months)
+
+            # ROI фотосессии = (сэкономленная упущенная выгода - стоимость) / стоимость
+            roi = ((opportunity_cost_saved - cost) / cost * 100) if cost > 0 else 0
 
             recs.append(Recommendation(
                 priority=self.MEDIUM,
                 icon='📸',
                 title='Улучшить фотографии',
-                message=f'{"Рендеры снижают доверие на 3%." if renders_only else f"Только {images_count} фото - недостаточно."} Качественные фото увеличивают просмотры на {views_increase}%.',
+                message=f'{"Рендеры снижают доверие на 3%." if renders_only else f"Только {images_count} фото - недостаточно."} Качественные фото увеличивают просмотры на {views_increase}% и ускоряют продажу на {time_saved_months:.1f} месяца.',
                 action=f'Заказать профессиональную фотосессию (~{cost:,.0f} ₽)',
-                expected_result=f'Увеличение просмотров на {views_increase}%, конверсии на {conversion_increase}%',
+                expected_result=f'Увеличение просмотров на {views_increase}%, конверсии на {conversion_increase}%. Экономия {opportunity_cost_saved:,.0f} ₽ упущенной выгоды.',
                 roi=roi,
                 category='presentation',
                 financial_impact={
                     'investment': cost,
                     'views_increase_percent': views_increase,
                     'conversion_boost_percent': conversion_increase,
-                    'estimated_time_reduction': '1-2 месяца'
+                    'time_saved_months': time_saved_months,
+                    'opportunity_cost_saved': opportunity_cost_saved,
+                    'net_benefit': opportunity_cost_saved - cost,
+                    'note': 'Фотосессия ускоряет продажу, а не увеличивает стоимость'
                 }
             ))
 
