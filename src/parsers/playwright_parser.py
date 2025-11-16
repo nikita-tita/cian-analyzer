@@ -287,58 +287,95 @@ class PlaywrightParser(BaseCianParser):
         else:
             logger.info("Браузер закрыт")
 
-    @retry_with_exponential_backoff(max_retries=3, base_delay=2.0, max_delay=10.0)
-    def _get_page_content(self, url: str) -> Optional[str]:
+    def _get_page_content(self, url: str, max_retries: int = 3) -> Optional[str]:
         """
-        Получить HTML контент через Playwright
+        Получить HTML контент через Playwright с retry логикой
 
         Args:
             url: URL для загрузки
+            max_retries: Максимальное количество попыток
 
         Returns:
             HTML контент или None
 
         Raises:
-            Exception: После 3 неудачных попыток загрузки
+            Exception: После max_retries неудачных попыток загрузки
         """
         if not self.context:
             raise RuntimeError("Браузер не запущен. Используйте with context или вызовите .start()")
 
-        page: Page = self.context.new_page()
+        last_error = None
 
-        try:
-            logger.info(f"Загрузка страницы: {url}")
-
-            # Загружаем страницу
-            page.goto(url, wait_until='domcontentloaded', timeout=30000)
-
-            # Ждем появления контента
+        for attempt in range(1, max_retries + 1):
+            page: Page = None
             try:
-                page.wait_for_selector(
-                    'h1, [data-mark="OfferTitle"], script[type="application/ld+json"]',
-                    timeout=10000
-                )
+                # PATCH: Rate limiting - случайная задержка между запросами
+                if attempt > 1:
+                    import random
+                    delay = random.uniform(2, 5)  # 2-5 секунд между попытками
+                    logger.info(f"   ⏳ Задержка {delay:.1f}с перед попыткой #{attempt}")
+                    time.sleep(delay)
+
+                page = self.context.new_page()
+
+                # PATCH: Добавляем случайный User-Agent (защита от блокировок)
+                import random
+                user_agents = [
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ]
+                page.set_extra_http_headers({
+                    'User-Agent': random.choice(user_agents)
+                })
+
+                logger.info(f"Загрузка страницы (попытка {attempt}/{max_retries}): {url}")
+
+                # Загружаем страницу
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
+
+                # Ждем появления контента
+                try:
+                    page.wait_for_selector(
+                        'h1, [data-mark="OfferTitle"], script[type="application/ld+json"]',
+                        timeout=10000
+                    )
+                except Exception as e:
+                    logger.warning(f"Селекторы не найдены, но продолжаем: {e}")
+
+                # Дополнительное ожидание для динамического контента
+                time.sleep(1)
+
+                html = page.content()
+
+                if not html or len(html) < 1000:
+                    raise ValueError(f"Получен пустой или слишком короткий HTML ({len(html) if html else 0} символов)")
+
+                logger.info(f"✓ Страница загружена ({len(html)} символов)")
+                return html
+
             except Exception as e:
-                logger.warning(f"Селекторы не найдены, но продолжаем: {e}")
+                last_error = e
+                logger.warning(f"⚠️ Попытка {attempt}/{max_retries} не удалась: {e}")
 
-            # Дополнительное ожидание для динамического контента
-            time.sleep(1)
+                # Если это капча или блокировка - увеличиваем задержку
+                if 'captcha' in str(e).lower() or '403' in str(e) or '429' in str(e):
+                    logger.warning(f"   🚫 Обнаружена блокировка/капча, увеличиваем задержку")
+                    if attempt < max_retries:
+                        time.sleep(10)  # Ждем 10 секунд перед повтором
 
-            html = page.content()
+                if attempt == max_retries:
+                    logger.error(f"❌ Все {max_retries} попытки исчерпаны для {url}")
+                    raise last_error
 
-            if not html or len(html) < 1000:
-                raise ValueError(f"Получен пустой или слишком короткий HTML ({len(html) if html else 0} символов)")
+            finally:
+                if page:
+                    page.close()
 
-            logger.info(f"✓ Страница загружена ({len(html)} символов)")
-            return html
-
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке {url}: {e}")
-            raise  # Пробрасываем для retry-механизма
-
-        finally:
-            page.close()
-            time.sleep(self.delay)
+        # На случай если что-то пошло не так
+        if last_error:
+            raise last_error
+        return None
 
     def parse_search_page(self, url: str) -> List[Dict]:
         """
@@ -1059,6 +1096,85 @@ class PlaywrightParser(BaseCianParser):
             # Для премиум-сегмента ищем только комфорт+ (2,3,4)
             search_params['class'] = '2'  # Комфорт как минимум
             logger.info(f"   💎 Фильтр класса: комфорт+ (премиум сегмент)")
+
+        # PATCH: Фильтр по году сдачи (±1 год для новостроек)
+        if is_new_building and target_property:
+            build_year = target_property.get('build_year')
+            if build_year:
+                try:
+                    year = int(build_year)
+                    from datetime import datetime
+                    current_year = datetime.now().year
+
+                    # Для новостроек с годом сдачи в будущем
+                    if year >= current_year:
+                        # min_offer_date и max_offer_date в формате YYYY-Q (год-квартал)
+                        # Например: 2028-3 = 3 квартал 2028
+                        year_min = max(current_year, year - 1)
+                        year_max = year + 1
+
+                        # Циан использует формат: deadline_from=2027&deadline_to=2029
+                        search_params['deadline_from'] = str(year_min)
+                        search_params['deadline_to'] = str(year_max)
+                        logger.info(f"   📅 Фильтр года сдачи: {year_min}-{year_max} (±1 год от {year})")
+                except (ValueError, TypeError):
+                    pass
+
+        # PATCH: Фильтр по отделке (с отделкой/без)
+        if target_property:
+            repair_level = target_property.get('repair_level', '').lower()
+
+            if 'без отделки' in repair_level or 'черновая' in repair_level:
+                # Ищем объекты без отделки
+                # decoration=1 - без отделки, decoration=2 - с отделкой, decoration=3 - под ключ
+                search_params['decoration'] = '1'
+                logger.info(f"   🎨 Фильтр отделки: БЕЗ отделки")
+            elif 'отделк' in repair_level or 'ремонт' in repair_level:
+                # Ищем объекты с отделкой
+                search_params['decoration'] = '2'
+                logger.info(f"   🎨 Фильтр отделки: С отделкой")
+
+        # PATCH: Фильтр по типу дома (для вторички)
+        # building_type: 1-кирпичный, 2-панельный, 3-блочный, 4-монолитный, 5-кирпично-монолитный
+        if not is_new_building and target_property:
+            house_type = target_property.get('house_type', '').lower()
+
+            if 'монолит' in house_type:
+                if 'кирпич' in house_type:
+                    search_params['building_type'] = '5'  # Кирпично-монолитный
+                    logger.info(f"   🏗️ Фильтр типа дома: кирпично-монолитный")
+                else:
+                    search_params['building_type'] = '4'  # Монолитный
+                    logger.info(f"   🏗️ Фильтр типа дома: монолитный")
+            elif 'кирпич' in house_type:
+                search_params['building_type'] = '1'  # Кирпичный
+                logger.info(f"   🏗️ Фильтр типа дома: кирпичный")
+            elif 'панел' in house_type:
+                search_params['building_type'] = '2'  # Панельный
+                logger.info(f"   🏗️ Фильтр типа дома: панельный")
+            elif 'блочн' in house_type:
+                search_params['building_type'] = '3'  # Блочный
+                logger.info(f"   🏗️ Фильтр типа дома: блочный")
+
+        # PATCH: Фильтр по году постройки (для вторички, ±10 лет)
+        if not is_new_building and target_property:
+            build_year = target_property.get('build_year')
+            if build_year:
+                try:
+                    year = int(build_year)
+                    from datetime import datetime
+                    current_year = datetime.now().year
+
+                    # Только для вторички (не будущие года)
+                    if year < current_year:
+                        year_min = year - 10
+                        year_max = year + 10
+
+                        search_params['min_year'] = str(year_min)
+                        search_params['max_year'] = str(year_max)
+                        logger.info(f"   📅 Фильтр года постройки: {year_min}-{year_max} (±10 лет от {year})")
+                except (ValueError, TypeError):
+                    pass
 
         # Комнаты (диапазон ±1)
         # Обработка различных типов target_rooms
