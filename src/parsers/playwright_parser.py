@@ -819,7 +819,11 @@ class PlaywrightParser(BaseCianParser):
         search_query = f"ЖК {residential_complex}"
         encoded_query = urllib.parse.quote(search_query)
 
-        # Строим URL поиска с текстовым запросом
+        # ИСПРАВЛЕНИЕ: Добавляем фильтры по площади и комнатам для более точного подбора
+        target_area = target_property.get('total_area', 0)
+        target_rooms = target_property.get('rooms', 0)
+
+        # Строим URL поиска с текстовым запросом и фильтрами
         search_params = {
             'deal_type': 'sale',
             'offer_type': 'flat',
@@ -827,6 +831,33 @@ class PlaywrightParser(BaseCianParser):
             'region': self.region_code,
             'text': encoded_query,
         }
+
+        # Добавляем фильтр по площади (±30% для поиска в том же ЖК)
+        if target_area > 0:
+            area_tolerance = 0.30  # Более мягкий допуск для поиска в ЖК
+            search_params['minArea'] = int(target_area * (1 - area_tolerance))
+            search_params['maxArea'] = int(target_area * (1 + area_tolerance))
+            logger.info(f"   Фильтр площади: {search_params['minArea']}-{search_params['maxArea']} м²")
+
+        # Добавляем фильтр по комнатам (±1 комната)
+        if target_rooms:
+            # Обработка различных типов target_rooms
+            if isinstance(target_rooms, str):
+                if 'студия' in target_rooms.lower():
+                    target_rooms_int = 1
+                else:
+                    import re
+                    match = re.search(r'\d+', target_rooms)
+                    target_rooms_int = int(match.group()) if match else 0
+            else:
+                target_rooms_int = int(target_rooms) if target_rooms else 0
+
+            if target_rooms_int > 0:
+                rooms_min = max(1, target_rooms_int - 1)
+                rooms_max = target_rooms_int + 1
+                for i in range(rooms_min, rooms_max + 1):
+                    search_params[f'room{i}'] = '1'
+                logger.info(f"   Фильтр комнат: {rooms_min}-{rooms_max}")
 
         url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
