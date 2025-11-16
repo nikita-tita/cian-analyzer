@@ -701,8 +701,20 @@ const screen2 = {
                 console.log('🔍 DEBUG: Received comparables from API:', result.comparables.length);
                 console.log('🔍 DEBUG: API reported count:', result.count);
 
-                state.comparables = result.comparables;
-                console.log('🔍 DEBUG: State comparables set to:', state.comparables.length);
+                // FIX ISSUE #2: Normalize data format for frontend compatibility
+                state.comparables = result.comparables.map(comp => ({
+                    ...comp,
+                    // Ensure 'area' field exists (backend returns 'total_area')
+                    area: comp.area || comp.total_area || null,
+                    // Ensure 'price' field exists (backend might return 'price_raw')
+                    price: comp.price || comp.price_raw || null,
+                    // Ensure 'title' field exists for display
+                    title: comp.title || comp.address || 'Объект недвижимости',
+                    // Ensure excluded flag exists
+                    excluded: comp.excluded || false
+                }));
+                console.log('🔍 DEBUG: State comparables normalized and set to:', state.comparables.length);
+                console.log('🔍 DEBUG: Sample comparable:', state.comparables[0]);
 
                 this.renderComparables();
 
@@ -797,33 +809,71 @@ const screen2 = {
     },
 
     renderComparables() {
-        const container = document.getElementById('comparables-list');
+        try {
+            const container = document.getElementById('comparables-list');
 
-        if (state.comparables.length === 0) {
+            if (!container) {
+                console.error('❌ ERROR: comparables-list container not found in DOM');
+                return;
+            }
+
+            console.log('🔍 DEBUG: renderComparables called with', state.comparables.length, 'items');
+
+            if (state.comparables.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Нажмите кнопку "Автоматически найти" или добавьте объекты вручную
+                    </div>
+                `;
+                return;
+            }
+
+            // FIX ISSUE #2: Render comparables list with error handling
             container.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Нажмите кнопку "Автоматически найти" или добавьте объекты вручную
+                <div class="mb-3">
+                    <h5>Найдено аналогов: ${state.comparables.filter(c => !c.excluded).length} / ${state.comparables.length}</h5>
                 </div>
+                ${state.comparables.map((comp, index) => {
+                    try {
+                        return this.renderComparableCard(comp, index);
+                    } catch (err) {
+                        console.error('❌ ERROR rendering comparable card', index, ':', err, comp);
+                        return `<div class="alert alert-warning">Ошибка отображения объекта ${index + 1}</div>`;
+                    }
+                }).join('')}
             `;
-            return;
-        }
 
-        container.innerHTML = `
-            <div class="mb-3">
-                <h5>Найдено аналогов: ${state.comparables.filter(c => !c.excluded).length} / ${state.comparables.length}</h5>
-            </div>
-            ${state.comparables.map((comp, index) => this.renderComparableCard(comp, index)).join('')}
-        `;
+            console.log('✅ Successfully rendered', state.comparables.length, 'comparables');
+        } catch (error) {
+            console.error('❌ CRITICAL ERROR in renderComparables:', error);
+            console.error('State comparables:', state.comparables);
+        }
     },
 
     renderComparableCard(comp, index) {
         const excluded = comp.excluded || false;
 
+        // FIX ISSUE #2: Format price properly (handle both string and number)
+        let priceText = 'Цена не указана';
+        if (comp.price) {
+            priceText = typeof comp.price === 'number' ?
+                `${utils.formatNumber(comp.price)} ₽` :
+                comp.price;
+        }
+
         // Форматируем цену за кв.м
         let pricePerSqmText = '';
         if (comp.price_per_sqm) {
             pricePerSqmText = `<div class="detail-item" style="font-weight: 600; color: var(--black);"><i class="bi bi-cash-stack"></i> ${utils.formatNumber(comp.price_per_sqm)} ₽/м²</div>`;
+        }
+
+        // FIX ISSUE #2: Format area properly (handle both string and number)
+        let areaText = '';
+        if (comp.area) {
+            areaText = typeof comp.area === 'number' ?
+                `<div class="detail-item"><i class="bi bi-rulers"></i> ${comp.area.toFixed(1)} м²</div>` :
+                `<div class="detail-item"><i class="bi bi-rulers"></i> ${comp.area}</div>`;
         }
 
         // Форматируем ремонт
@@ -838,12 +888,12 @@ const screen2 = {
                     ${comp.title || 'Объект недвижимости'}
                 </div>
                 <div class="property-price">
-                    ${comp.price || 'Цена не указана'}
+                    ${priceText}
                 </div>
                 <div class="property-details">
                     ${pricePerSqmText}
                     ${comp.rooms ? `<div class="detail-item"><i class="bi bi-door-open"></i> ${comp.rooms} комн.</div>` : ''}
-                    ${comp.area ? `<div class="detail-item"><i class="bi bi-rulers"></i> ${comp.area}</div>` : ''}
+                    ${areaText}
                     ${comp.floor ? `<div class="detail-item"><i class="bi bi-building"></i> ${comp.floor}</div>` : ''}
                     ${renovationText}
                     ${comp.metro ? `<div class="detail-item"><i class="bi bi-train-front"></i> ${comp.metro}</div>` : ''}
