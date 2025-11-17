@@ -41,13 +41,19 @@ def detect_region_from_url(url: str) -> str:
     # Парсим URL для поиска региона
     url_lower = url.lower()
 
-    # Ищем упоминание городов в URL
-    # Москва: moskva, moscow, msk
+    # ПРИОРИТЕТ 1: Санкт-Петербург (проверяем первым, т.к. spb.cian.ru явно указывает регион)
+    if any(word in url_lower for word in ['spb.cian.ru', 'sankt-peterburg', 'saint-petersburg', '/spb/', 'piter']):
+        return 'spb'
+
+    # ПРИОРИТЕТ 2: Москва (явные указания)
     if any(word in url_lower for word in ['moskva', 'moscow', '/msk/', 'moscow-city']):
         return 'msk'
-    # Санкт-Петербург: sankt-peterburg, spb, piter
-    elif any(word in url_lower for word in ['sankt-peterburg', 'saint-petersburg', '/spb/', 'piter']):
-        return 'spb'
+
+    # ПРИОРИТЕТ 3: www.cian.ru (без региона) = Москва (дефолтный регион ЦИАН)
+    # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: www.cian.ru и cian.ru БЕЗ поддомена = Москва
+    if 'www.cian.ru' in url_lower or url_lower.startswith('https://cian.ru') or url_lower.startswith('http://cian.ru'):
+        logger.info(f"✓ URL www.cian.ru определен как МОСКВА (дефолтный регион)")
+        return 'msk'
 
     # КРИТИЧНО: По умолчанию возвращаем None вместо 'spb'
     # Регион должен определяться по адресу после парсинга

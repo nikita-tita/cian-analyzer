@@ -118,14 +118,34 @@ class ParserRegistry:
             logger.error(f"Парсер для источника '{source_name}' не зарегистрирован")
             return None
 
-        # Ленивая инициализация: создаем экземпляр только при первом запросе
-        if source_name not in self._parser_instances:
-            parser_class = self._parsers[source_name]
-            parser_instance = parser_class(delay=self.delay, cache=self.cache)
-            self._parser_instances[source_name] = parser_instance
-            logger.info(f"✓ Создан экземпляр парсера: {source_name}")
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Для ЦИАН определяем регион из URL
+        region = None
+        if source_name == 'cian' and url:
+            # Импортируем функцию определения региона
+            from .playwright_parser import detect_region_from_url
+            region = detect_region_from_url(url)
+            logger.info(f"✓ Регион определен из URL: {region or 'не определен'}")
 
-        return self._parser_instances[source_name]
+        # Формируем ключ кэша с учетом региона
+        # Для ЦИАН: 'cian_msk' или 'cian_spb'
+        # Для других парсеров: source_name
+        cache_key = f"{source_name}_{region}" if region else source_name
+
+        # Ленивая инициализация: создаем экземпляр только при первом запросе
+        if cache_key not in self._parser_instances:
+            parser_class = self._parsers[source_name]
+
+            # Для ЦИАН передаем регион при создании
+            if source_name == 'cian' and region:
+                parser_instance = parser_class(delay=self.delay, cache=self.cache, region=region)
+                logger.info(f"✓ Создан экземпляр парсера: {cache_key} (регион: {region})")
+            else:
+                parser_instance = parser_class(delay=self.delay, cache=self.cache)
+                logger.info(f"✓ Создан экземпляр парсера: {cache_key}")
+
+            self._parser_instances[cache_key] = parser_instance
+
+        return self._parser_instances[cache_key]
 
     def get_all_sources(self) -> List[str]:
         """
