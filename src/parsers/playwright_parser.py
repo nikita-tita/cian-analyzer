@@ -1579,6 +1579,10 @@ class PlaywrightParser(BaseCianParser):
         # ═══════════════════════════════════════════════════════════════════════════
         target_rc = target_property.get('residential_complex', '').lower().strip()
         if target_rc and len(final_results) > 0:
+            # Захватываем target_price и target_area для использования в замыкании
+            _target_price = target_price
+            _target_area = target_area
+
             def sort_key(result):
                 # Проверяем наличие ЖК в заголовке или адресе аналога
                 result_title = result.get('title', '').lower()
@@ -1590,7 +1594,7 @@ class PlaywrightParser(BaseCianParser):
                 result_area = result.get('total_area') or result.get('area_value') or 1
                 result_price_per_sqm = result_price / result_area if result_area > 0 else 0
 
-                target_price_per_sqm = target_price / target_area if target_area > 0 else 0
+                target_price_per_sqm = _target_price / _target_area if _target_area > 0 else 0
                 price_diff = abs(result_price_per_sqm - target_price_per_sqm) if target_price_per_sqm > 0 else float('inf')
 
                 # Сортируем: сначала из того же ЖК (False < True, инвертируем), затем по близости цены
