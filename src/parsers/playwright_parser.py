@@ -713,6 +713,21 @@ class PlaywrightParser(BaseCianParser):
                         )
                         continue
 
+                    # Проверка 3: НОВОЕ - Цена за м² не должна отличаться больше чем на ±30%
+                    # КРИТИЧНО для устранения разброса 76%
+                    target_price_per_sqm = target_price / target_area
+                    comp_price_per_sqm = comp_price / comp_area
+                    price_per_sqm_diff = abs(comp_price_per_sqm - target_price_per_sqm) / target_price_per_sqm
+
+                    if price_per_sqm_diff > 0.30:  # ±30%
+                        unreasonable_count += 1
+                        logger.warning(
+                            f"⚠️ Исключен по цене/м²: отличие {price_per_sqm_diff*100:.0f}% "
+                            f"(аналог {comp_price_per_sqm:,.0f} ₽/м² vs целевой {target_price_per_sqm:,.0f} ₽/м²), "
+                            f"адрес: {result.get('address', '')[:50]}"
+                        )
+                        continue
+
                     reasonable.append(result)
 
                 if unreasonable_count > 0:
@@ -1559,6 +1574,33 @@ class PlaywrightParser(BaseCianParser):
             logger.info(f"   ✅ УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
             logger.info("")
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # НОВОЕ: Приоритизация аналогов из того же ЖК
+        # ═══════════════════════════════════════════════════════════════════════════
+        target_rc = target_property.get('residential_complex', '').lower().strip()
+        if target_rc and len(final_results) > 0:
+            def sort_key(result):
+                # Проверяем наличие ЖК в заголовке или адресе аналога
+                result_title = result.get('title', '').lower()
+                result_address = result.get('address', '').lower()
+                same_rc = target_rc in result_title or target_rc in result_address
+
+                # Вычисляем разницу цены за м²
+                result_price = result.get('price') or result.get('price_raw') or 0
+                result_area = result.get('total_area') or result.get('area_value') or 1
+                result_price_per_sqm = result_price / result_area if result_area > 0 else 0
+
+                target_price_per_sqm = target_price / target_area if target_area > 0 else 0
+                price_diff = abs(result_price_per_sqm - target_price_per_sqm) if target_price_per_sqm > 0 else float('inf')
+
+                # Сортируем: сначала из того же ЖК (False < True, инвертируем), затем по близости цены
+                return (not same_rc, price_diff)
+
+            final_results.sort(key=sort_key)
+            same_rc_count = sum(1 for r in final_results if target_rc in r.get('title', '').lower() or target_rc in r.get('address', '').lower())
+            if same_rc_count > 0:
+                logger.info(f"🏘️ Приоритизация: {same_rc_count} аналогов из того же ЖК '{target_property.get('residential_complex')}' выше в списке")
+
         # Итоговый результат (фильтрация по региону уже выполнена в _validate_and_prepare_results)
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
@@ -1567,6 +1609,39 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   - Уровень 3 (расширенный): +{len(new_results_level3)} шт.")
         if target_price >= 25_000_000 and 'new_results_fallback' in locals():
             logger.info(f"   - Уровень 4 (fallback для премиум): +{len(new_results_fallback)} шт.")
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # НОВОЕ: Статистика качества подбора (разброс цен за м²)
+        # ═══════════════════════════════════════════════════════════════════════════
+        if len(final_results) > 0:
+            prices_per_sqm = []
+            for result in final_results:
+                price = result.get('price') or result.get('price_raw') or 0
+                area = result.get('total_area') or result.get('area_value') or 0
+                if price > 0 and area > 0:
+                    prices_per_sqm.append(price / area)
+
+            if len(prices_per_sqm) > 1:
+                min_price_sqm = min(prices_per_sqm)
+                max_price_sqm = max(prices_per_sqm)
+                avg_price_sqm = sum(prices_per_sqm) / len(prices_per_sqm)
+                spread = ((max_price_sqm - min_price_sqm) / min_price_sqm) * 100
+
+                logger.info("")
+                logger.info("📊 СТАТИСТИКА КАЧЕСТВА ПОДБОРА:")
+                logger.info(f"   - Мин цена/м²: {min_price_sqm:,.0f} ₽")
+                logger.info(f"   - Макс цена/м²: {max_price_sqm:,.0f} ₽")
+                logger.info(f"   - Средняя цена/м²: {avg_price_sqm:,.0f} ₽")
+                logger.info(f"   - Разброс: {spread:.0f}%")
+
+                if spread > 50:
+                    logger.warning(f"⚠️ ВНИМАНИЕ: Разброс цен {spread:.0f}% превышает 50%!")
+                    logger.warning(f"   Рекомендуется ручная проверка аналогов")
+                elif spread > 30:
+                    logger.warning(f"⚠️ Разброс цен {spread:.0f}% умеренно высокий")
+                else:
+                    logger.info(f"✓ Разброс цен {spread:.0f}% в допустимых пределах")
+
         logger.info("=" * 80)
 
         return final_results[:limit]
