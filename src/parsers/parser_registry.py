@@ -119,6 +119,29 @@ class ParserRegistry:
             return None
 
         # Ленивая инициализация: создаем экземпляр только при первом запросе
+        # КРИТИЧНО: Для ЦИАН создаем отдельные экземпляры для каждого региона!
+        if source_name == 'cian' and url:
+            # Определяем регион из URL
+            from .playwright_parser import detect_region_from_url
+            region = detect_region_from_url(url)
+
+            # Если регион не определён, используем дефолт (Москва)
+            if not region:
+                region = 'msk'
+                logger.warning(f"⚠️ Регион не определён из URL, используем дефолт: {region}")
+
+            # Создаем ключ с регионом для кэширования
+            parser_key = f"{source_name}_{region}"
+
+            if parser_key not in self._parser_instances:
+                parser_class = self._parsers[source_name]
+                parser_instance = parser_class(delay=self.delay, cache=self.cache, region=region)
+                self._parser_instances[parser_key] = parser_instance
+                logger.info(f"✓ Создан экземпляр парсера ЦИАН для региона: {region}")
+
+            return self._parser_instances[parser_key]
+
+        # Для других парсеров - стандартная логика
         if source_name not in self._parser_instances:
             parser_class = self._parsers[source_name]
             parser_instance = parser_class(delay=self.delay, cache=self.cache)
