@@ -44,6 +44,24 @@ except ImportError as e:
     logging.getLogger(__name__).warning(f"DomClickParser недоступен: {e}")
     DomClickParser = None
 
+# Пытаемся импортировать AvitoParser (требует curl_cffi и nodriver)
+try:
+    from .avito_parser import AvitoParser
+    __all__.append('AvitoParser')
+except ImportError as e:
+    import logging
+    logging.getLogger(__name__).warning(f"AvitoParser недоступен: {e}")
+    AvitoParser = None
+
+# Пытаемся импортировать YandexRealtyParser (требует httpx/curl_cffi)
+try:
+    from .yandex_realty_parser import YandexRealtyParser
+    __all__.append('YandexRealtyParser')
+except ImportError as e:
+    import logging
+    logging.getLogger(__name__).warning(f"YandexRealtyParser недоступен: {e}")
+    YandexRealtyParser = None
+
 # Пытаемся импортировать MultiSourceSearchStrategy
 try:
     from .multi_source_search import (
