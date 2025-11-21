@@ -192,6 +192,201 @@
             color: #666;
             font-size: 12px;
         }
+
+        /* Tooltip Styles */
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.1);
+            color: #666;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: help;
+            margin-left: 6px;
+            position: relative;
+        }
+
+        .info-icon:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #000;
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            width: 280px;
+            font-size: 12px;
+            line-height: 1.5;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-weight: normal;
+        }
+
+        .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #000;
+        }
+
+        .info-icon:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-formula {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        /* Help Button */
+        .help-button {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #000;
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .help-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #dc3545;
+            color: white;
+            transform: rotate(90deg);
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .metric-explanation {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-left: 4px solid #000;
+        }
+
+        .metric-explanation h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .metric-explanation p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .metric-explanation .formula {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin: 8px 0;
+        }
+
+        .metric-explanation .example {
+            background: rgba(255, 165, 0, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .expected-value-highlight {
+            background: rgba(0, 200, 0, 0.05);
+            border-left: 4px solid #00c800;
+            font-weight: 700;
+        }
+
+        @media print {
+            .help-button, .modal, .no-print {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -525,21 +720,65 @@
                 <p><em>{{ scenario.description }}</em></p>
 
                 <div class="info-row">
-                    <span class="info-label">Начальная цена</span>
+                    <span class="info-label">
+                        Начальная цена
+                        <span class="info-icon">i
+                            <span class="tooltip-text">Цена, с которой начинаем продажу. Включает небольшой запас для торга.</span>
+                        </span>
+                    </span>
                     <span class="info-value">{{ "{:,.0f}".format(scenario.start_price) }} ₽</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Ожидаемая финальная</span>
+                    <span class="info-label">
+                        Ожидаемая финальная
+                        <span class="info-icon">i
+                            <span class="tooltip-text">Реальная цена, по которой вероятнее всего продадите после торга.</span>
+                        </span>
+                    </span>
                     <span class="info-value">{{ "{:,.0f}".format(scenario.expected_final_price) }} ₽</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Время продажи</span>
+                    <span class="info-label">
+                        Время продажи
+                        <span class="info-icon">i
+                            <span class="tooltip-text">Сколько месяцев займёт продажа при данной стратегии.</span>
+                        </span>
+                    </span>
                     <span class="info-value">{{ scenario.time_months }} мес.</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">
+                        Вероятность
+                        <span class="info-icon">i
+                            <span class="tooltip-text">Шанс успешно продать по этой стратегии. Учитывает переоценку, срок и ликвидность рынка.</span>
+                        </span>
+                    </span>
+                    <span class="info-value">{{ "{:.0f}".format(scenario.base_probability) }}%</span>
                 </div>
                 {% if scenario.financials %}
                 <div class="info-row">
-                    <span class="info-label">Чистый доход</span>
+                    <span class="info-label">
+                        Чистый доход
+                        <span class="info-icon">i
+                            <span class="tooltip-text">
+                                Деньги "на руки" после вычета всех расходов и упущенной выгоды.
+                                <div class="tooltip-formula">Цена - Комиссия - Налоги - Расходы - Упущенная выгода</div>
+                            </span>
+                        </span>
+                    </span>
                     <span class="info-value">{{ "{:,.0f}".format(scenario.financials.net_after_opportunity) }} ₽</span>
+                </div>
+                <div class="info-row expected-value-highlight">
+                    <span class="info-label">
+                        🎯 Ожидаемый доход
+                        <span class="info-icon">i
+                            <span class="tooltip-text">
+                                <strong>САМАЯ ВАЖНАЯ МЕТРИКА!</strong> Чистый доход с учётом вероятности продажи. Показывает РЕАЛЬНУЮ выгоду.
+                                <div class="tooltip-formula">Чистый доход × Вероятность</div>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="info-value">{{ "{:,.0f}".format(scenario.financials.expected_value or 0) }} ₽</span>
                 </div>
                 {% endif %}
             </div>
@@ -676,5 +915,100 @@
             <p>© {{ date[:4] }} HOUSLER. Все права защищены.</p>
         </div>
     </div>
+
+    <!-- Help Button -->
+    <button class="help-button no-print" onclick="openHelpModal()" title="Справка по метрикам">?</button>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal no-print">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeHelpModal()">×</button>
+            <h2 class="modal-title">📚 Справка по метрикам</h2>
+
+            <div class="metric-explanation">
+                <h3>🎯 Ожидаемый доход (Expected Value)</h3>
+                <p><strong>Самая важная метрика!</strong> Показывает РЕАЛЬНУЮ выгоду с учётом риска не продать.</p>
+                <div class="formula">Ожидаемый доход = Чистый доход × (Вероятность продажи / 100)</div>
+                <div class="example">
+                    <strong>Пример:</strong><br>
+                    • Сценарий "Быстрая продажа": 9.4 млн чистыми × 85% = 7.99 млн ожидаемый доход<br>
+                    • Сценарий "Попытка максимума": 10 млн чистыми × 30% = 3 млн ожидаемый доход<br>
+                    <br>
+                    <strong>Вывод:</strong> Быстрая продажа выгоднее в 2.6 раза, хотя цена ниже!
+                </div>
+                <p><strong>Почему это важно?</strong> Часто быстрая продажа с небольшой скидкой даёт больше денег, чем долгое ожидание максимальной цены.</p>
+            </div>
+
+            <div class="metric-explanation">
+                <h3>💰 Чистый доход</h3>
+                <p>Деньги, которые вы получите "на руки" после вычета всех расходов и упущенной выгоды.</p>
+                <div class="formula">Чистый доход = Цена продажи - Комиссия (2%) - Налоги - Расходы (~150 тыс) - Упущенная выгода</div>
+                <div class="example">
+                    <strong>Пример расчёта для цены 10 млн за 6 месяцев:</strong><br>
+                    • Цена продажи: 10,000,000 ₽<br>
+                    • Комиссия 2%: -200,000 ₽<br>
+                    • Налоги (если владение >5 лет): 0 ₽<br>
+                    • Прочие расходы: -10,000 ₽<br>
+                    • Упущенная выгода (8% годовых × 6 мес): -400,000 ₽<br>
+                    = <strong>9,390,000 ₽ чистыми</strong>
+                </div>
+            </div>
+
+            <div class="metric-explanation">
+                <h3>⏳ Упущенная выгода</h3>
+                <p>Деньги, которые вы могли бы заработать, инвестируя эту сумму вместо ожидания продажи.</p>
+                <div class="formula">Упущенная выгода = Цена × Ставка доходности × (Месяцы ожидания / 12)</div>
+                <div class="example">
+                    <strong>Пример:</strong><br>
+                    Если вы ждёте продажи 6 месяцев вместо того, чтобы продать сейчас и вложить 10 млн под 8% годовых (депозит/облигации), вы теряете: 10,000,000 × 0.08 × 0.5 = 400,000 ₽
+                </div>
+                <p><strong>Почему это важно?</strong> Время = деньги! Чем дольше ждёте, тем больше теряете.</p>
+            </div>
+
+            <div class="metric-explanation">
+                <h3>📊 Вероятность продажи</h3>
+                <p>Шанс продать квартиру по данной цене за указанный срок. Рассчитывается на основе переоценки, срока экспозиции и рыночной ликвидности.</p>
+                <div class="example">
+                    <strong>Как это работает:</strong><br>
+                    • Цена = рынок, срок 2-4 мес → вероятность 85%<br>
+                    • Цена на 5% выше рынка, срок 4-6 мес → вероятность 75%<br>
+                    • Цена на 10% выше рынка, срок 10-12 мес → вероятность 30%
+                </div>
+            </div>
+
+            <div class="metric-explanation">
+                <h3>💡 Как принять решение?</h3>
+                <p><strong>Смотрите на ОЖИДАЕМЫЙ ДОХОД (🎯)</strong> - это ваш лучший индикатор!</p>
+                <p>Сценарий с наибольшим ожидаемым доходом даст вам больше денег в реальности, даже если чистый доход в нём ниже.</p>
+                <div class="example">
+                    <strong>Правило:</strong><br>
+                    Ожидаемый доход учитывает ДВА фактора одновременно:<br>
+                    1. Сколько денег получите<br>
+                    2. Какова вероятность это получить<br>
+                    <br>
+                    Это математически оптимальный выбор!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Help Modal Functions
+        function openHelpModal() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('helpModal').classList.remove('active');
+        }
+
+        // Close modal on outside click
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('helpModal');
+            if (e.target === modal) {
+                closeHelpModal();
+            }
+        });
+    </script>
 </body>
 </html>
