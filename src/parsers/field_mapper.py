@@ -87,6 +87,28 @@ class FieldMapper:
         if default is not None:
             self.defaults[target_field] = default
 
+    def _get_nested_value(self, data: Dict, path: str) -> Any:
+        """
+        Получить значение по вложенному пути (с поддержкой точечной нотации)
+
+        Args:
+            data: Словарь с данными
+            path: Путь к значению (например, 'location.address' или 'building.name')
+
+        Returns:
+            Значение или None если не найдено
+        """
+        keys = path.split('.')
+        current = data
+
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return None
+
+        return current
+
     def transform(self, source_data: Dict) -> Dict:
         """
         Преобразовать данные из источника в стандартный формат
@@ -101,9 +123,17 @@ class FieldMapper:
 
         # Применяем маппинги
         for source_field, target_field in self.mappings.items():
+            # Поддержка вложенных полей с точечной нотацией
+            value = None
+
+            # Сначала пробуем прямой поиск (для обратной совместимости)
             if source_field in source_data:
                 value = source_data[source_field]
+            # Если не найдено и есть точка - используем вложенный поиск
+            elif '.' in source_field:
+                value = self._get_nested_value(source_data, source_field)
 
+            if value is not None:
                 # Применяем трансформацию, если есть
                 if source_field in self.transformers:
                     try:
