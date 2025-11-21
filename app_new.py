@@ -1407,9 +1407,9 @@ def multi_source_search():
             # Фильтруем дубликаты
             from src.utils.duplicate_detector import DuplicateDetector
             detector = DuplicateDetector()
-            unique_results = detector.remove_duplicates(results)
+            unique_results, removed_info = detector.deduplicate_list(results, keep_best_price=True)
 
-            removed_duplicates = len(results) - len(unique_results)
+            removed_duplicates = len(removed_info) if removed_info else 0
             if removed_duplicates > 0:
                 logger.info(f"🗑️ Removed {removed_duplicates} duplicates, {len(unique_results)} unique results remain")
 
