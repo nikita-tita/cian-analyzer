@@ -250,11 +250,15 @@ class DomClickParser(BaseRealEstateParser):
         Returns:
             Данные или None
         """
-        # Примерные API endpoints Домклика (могут отличаться)
+        # Возможные API endpoints Домклика
+        # Обновлено: добавлены дополнительные варианты на основе реальной структуры сайта
         api_urls = [
             f"{self.api_base}/v1/offers/{offer_id}",
             f"{self.api_base}/offers/{offer_id}",
             f"{self.base_url}/api/cards/{offer_id}",
+            f"{self.api_base}/v1/cards/{offer_id}",
+            f"{self.api_base}/v2/offers/{offer_id}",
+            f"{self.base_url}/api/v1/offers/{offer_id}",
         ]
 
         for api_url in api_urls:
@@ -263,15 +267,19 @@ class DomClickParser(BaseRealEstateParser):
                 response = self.session.get(api_url, timeout=10)
 
                 if response.status_code == 200:
-                    data = response.json()
-                    logger.info(f"✓ Данные получены через API: {api_url}")
-                    return self._normalize_api_response(data)
+                    try:
+                        data = response.json()
+                        logger.info(f"✓ Данные получены через API: {api_url}")
+                        return self._normalize_api_response(data)
+                    except json.JSONDecodeError:
+                        logger.debug(f"API вернул не JSON: {api_url}")
+                        continue
 
             except Exception as e:
                 logger.debug(f"API {api_url} не сработал: {e}")
                 continue
 
-        logger.warning(f"Все API endpoints не сработали для {offer_id}")
+        logger.info(f"API endpoints не сработали для {offer_id}, используем HTML парсинг")
         return None
 
     def _normalize_api_response(self, api_data: Dict) -> Dict:
@@ -414,25 +422,93 @@ class DomClickParser(BaseRealEstateParser):
         return data
 
     def _parse_from_html(self, soup: BeautifulSoup) -> Dict:
-        """Fallback HTML парсинг"""
+        """
+        Fallback HTML парсинг
+
+        Используется когда API недоступен и не удалось извлечь __INITIAL_STATE__
+        """
         data = {}
 
-        # Заголовок
+        # Заголовок - пробуем разные варианты
         h1 = soup.find('h1')
         if h1:
             data['title'] = h1.get_text(strip=True)
 
-        # Цена
-        price_elem = soup.find(class_=re.compile(r'price', re.I))
+        # Альтернативные варианты заголовка
+        if not data.get('title'):
+            title_candidates = [
+                soup.find('div', class_=re.compile(r'title', re.I)),
+                soup.find('span', class_=re.compile(r'title', re.I)),
+                soup.find(attrs={'data-testid': 'title'}),
+            ]
+            for candidate in title_candidates:
+                if candidate:
+                    data['title'] = candidate.get_text(strip=True)
+                    break
+
+        # Цена - пробуем разные варианты
+        price_elem = (
+            soup.find(class_=re.compile(r'price', re.I)) or
+            soup.find(attrs={'data-testid': re.compile(r'price', re.I)}) or
+            soup.find('span', class_=re.compile(r'cost|amount', re.I))
+        )
         if price_elem:
             price_text = price_elem.get_text(strip=True)
             data['price'] = self._extract_number(price_text)
 
         # Описание
-        desc_elem = soup.find(class_=re.compile(r'description', re.I))
+        desc_elem = (
+            soup.find(class_=re.compile(r'description', re.I)) or
+            soup.find(attrs={'data-testid': 'description'}) or
+            soup.find('div', class_=re.compile(r'content|text', re.I))
+        )
         if desc_elem:
             data['description'] = desc_elem.get_text(strip=True)
 
+        # Параметры квартиры
+        # Ищем блоки с характеристиками
+        params_blocks = soup.find_all(['li', 'div', 'span'], class_=re.compile(r'param|property|characteristic', re.I))
+
+        for block in params_blocks:
+            text = block.get_text(strip=True).lower()
+
+            # Площадь
+            if 'площадь' in text or 'м²' in text or 'м2' in text:
+                # Общая площадь
+                if 'общая' in text:
+                    area_match = re.search(r'(\d+(?:[.,]\d+)?)\s*м', text)
+                    if area_match and not data.get('total_area'):
+                        data['total_area'] = float(area_match.group(1).replace(',', '.'))
+                # Жилая площадь
+                elif 'жилая' in text:
+                    area_match = re.search(r'(\d+(?:[.,]\d+)?)\s*м', text)
+                    if area_match and not data.get('living_area'):
+                        data['living_area'] = float(area_match.group(1).replace(',', '.'))
+                # Кухня
+                elif 'кухн' in text:
+                    area_match = re.search(r'(\d+(?:[.,]\d+)?)\s*м', text)
+                    if area_match and not data.get('kitchen_area'):
+                        data['kitchen_area'] = float(area_match.group(1).replace(',', '.'))
+
+            # Количество комнат
+            if 'комнат' in text or 'студ' in text:
+                if 'студ' in text:
+                    data['rooms'] = 'студия'
+                else:
+                    rooms_match = re.search(r'(\d+)[- ]?комн', text)
+                    if rooms_match and not data.get('rooms'):
+                        data['rooms'] = int(rooms_match.group(1))
+
+            # Этаж
+            if 'этаж' in text and 'этажность' not in text:
+                floor_match = re.search(r'(\d+)\s*(?:из|/)\s*(\d+)', text)
+                if floor_match:
+                    if not data.get('floor'):
+                        data['floor'] = int(floor_match.group(1))
+                    if not data.get('floor_total'):
+                        data['floor_total'] = int(floor_match.group(2))
+
+        logger.debug(f"HTML fallback парсинг извлек {len(data)} полей")
         return data
 
     def _extract_number(self, text: str) -> Optional[float]:
@@ -537,11 +613,15 @@ class DomClickParser(BaseRealEstateParser):
         Returns:
             Список результатов
         """
-        # Примерные API endpoints для поиска
+        # Возможные API endpoints для поиска
+        # Обновлено: добавлены дополнительные варианты
         search_urls = [
             f"{self.api_base}/v1/search/offers",
             f"{self.api_base}/search",
             f"{self.base_url}/api/search/v1/offers",
+            f"{self.api_base}/v1/offers/search",
+            f"{self.api_base}/v2/search/offers",
+            f"{self.base_url}/api/v1/search",
         ]
 
         params['limit'] = limit
@@ -553,18 +633,24 @@ class DomClickParser(BaseRealEstateParser):
                 response = self.session.get(search_url, params=params, timeout=30)
 
                 if response.status_code == 200:
-                    data = response.json()
-                    results = self._extract_search_results(data)
+                    try:
+                        data = response.json()
+                        results = self._extract_search_results(data)
 
-                    if results:
-                        logger.info(f"✓ Поиск успешен через {search_url}")
-                        return results[:limit]
+                        if results:
+                            logger.info(f"✓ Поиск успешен через {search_url} ({len(results)} результатов)")
+                            return results[:limit]
+                        else:
+                            logger.debug(f"API вернул пустые результаты: {search_url}")
+                    except json.JSONDecodeError:
+                        logger.debug(f"API вернул не JSON: {search_url}")
+                        continue
 
             except Exception as e:
                 logger.debug(f"API {search_url} не сработал: {e}")
                 continue
 
-        logger.warning("Все API endpoints поиска не сработали")
+        logger.warning("Все API endpoints поиска не сработали - поиск недоступен")
         return []
 
     def _extract_search_results(self, api_response: Dict) -> List[Dict]:

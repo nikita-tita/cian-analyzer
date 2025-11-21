@@ -1319,6 +1319,136 @@ def find_similar():
         }), 500
 
 
+@app.route('/api/multi-source-search', methods=['POST'])
+@limiter.limit("10 per minute")  # Expensive - мультиисточниковый поиск
+def multi_source_search():
+    """
+    API: Мультиисточниковый поиск аналогов (ЦИАН + ДомКлик одновременно)
+
+    Body:
+        {
+            "session_id": "uuid",
+            "sources": ["cian", "domclick"],  // Источники для поиска
+            "limit_per_source": 15,  // Лимит на каждый источник
+            "strategy": "citywide",  // "same_building", "same_area", "citywide"
+            "parallel": true  // Параллельный поиск
+        }
+
+    Returns:
+        {
+            "status": "success",
+            "comparables": [...],
+            "total": 30,
+            "sources_stats": {
+                "cian": 15,
+                "domclick": 15
+            }
+        }
+    """
+    try:
+        import time
+        from src.parsers.multi_source_search import search_across_sources
+
+        request_start = time.time()
+
+        payload = request.json
+        session_id = payload.get('session_id')
+        sources = payload.get('sources', ['cian', 'domclick'])
+        limit_per_source = payload.get('limit_per_source', 15)
+        strategy = payload.get('strategy', 'citywide')
+        parallel = payload.get('parallel', True)
+
+        logger.info(f"📍 [MULTI-SOURCE] search request started (session: {session_id}, sources: {sources}, strategy: {strategy})")
+
+        if not session_id or not session_storage.exists(session_id):
+            logger.error(f"❌ Session not found: {session_id}")
+            return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
+
+        session_data = session_storage.get(session_id)
+        target = session_data['target_property']
+
+        # Определяем регион
+        region = target.get('region')
+        if not region:
+            target_url = target.get('url', '')
+            region = detect_region_from_url(target_url)
+            if not region:
+                address = target.get('address', '')
+                region = detect_region_from_address(address)
+                if not region:
+                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: spb")
+                    region = 'spb'
+
+        logger.info(f"🔍 Multi-source search (sources: {sources}, region: {region}, strategy: {strategy}, limit: {limit_per_source})")
+
+        # Выполняем мультиисточниковый поиск
+        try:
+            search_start = time.time()
+
+            results = search_across_sources(
+                target_property=target,
+                sources=sources,
+                strategy=strategy,
+                limit_per_source=limit_per_source,
+                parallel=parallel
+            )
+
+            search_elapsed = time.time() - search_start
+            logger.info(f"⏱️ Multi-source search took {search_elapsed:.1f}s, found {len(results)} total results")
+
+            # Подсчитываем статистику по источникам
+            sources_stats = {}
+            for result in results:
+                source = result.get('source', 'unknown')
+                sources_stats[source] = sources_stats.get(source, 0) + 1
+
+            logger.info(f"📊 Sources stats: {sources_stats}")
+
+            # Фильтруем дубликаты
+            from src.utils.duplicate_detector import DuplicateDetector
+            detector = DuplicateDetector()
+            unique_results = detector.remove_duplicates(results)
+
+            removed_duplicates = len(results) - len(unique_results)
+            if removed_duplicates > 0:
+                logger.info(f"🗑️ Removed {removed_duplicates} duplicates, {len(unique_results)} unique results remain")
+
+            # Сохраняем в сессию
+            session_data['comparables'] = unique_results
+            session_data['multi_source_used'] = True
+            session_data['sources_stats'] = sources_stats
+            session_storage.set(session_id, session_data)
+
+            request_elapsed = time.time() - request_start
+            logger.info(f"✅ Multi-source search completed in {request_elapsed:.1f}s")
+
+            return jsonify({
+                'status': 'success',
+                'comparables': unique_results,
+                'total': len(unique_results),
+                'sources_stats': sources_stats,
+                'strategy': strategy,
+                'removed_duplicates': removed_duplicates,
+                'search_time': round(search_elapsed, 2)
+            })
+
+        except Exception as search_error:
+            logger.error(f"❌ Multi-source search failed: {search_error}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'message': 'multi_source_search_failed',
+                'details': f'Не удалось выполнить мультиисточниковый поиск: {str(search_error)}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"❌ Multi-source search error: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': 'Внутренняя ошибка при мультиисточниковом поиске',
+            'technical_details': str(e)
+        }), 500
+
+
 @app.route('/api/add-comparable', methods=['POST'])
 def add_comparable():
     """
