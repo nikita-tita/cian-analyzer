@@ -78,6 +78,15 @@ from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
 from src.utils.duplicate_detector import DuplicateDetector
 
+# Task Queue (async operations)
+try:
+    from src.tasks import init_task_queue
+    from src.api import task_api
+    TASK_QUEUE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Task queue not available: {e}")
+    TASK_QUEUE_AVAILABLE = False
+
 app = Flask(__name__)
 
 # SECURITY: Secret key from environment (CRITICAL FIX)
@@ -266,6 +275,21 @@ limiter = Limiter(
 
 logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# TASK QUEUE INITIALIZATION (Async Operations)
+# ═══════════════════════════════════════════════════════════════════════════
+if TASK_QUEUE_AVAILABLE:
+    try:
+        task_queue = init_task_queue()
+        if task_queue:
+            logger.info("✅ Task queue initialized successfully")
+            # Register task API blueprint
+            app.register_blueprint(task_api)
+            logger.info("✅ Task API endpoints registered")
+        else:
+            logger.warning("⚠️ Task queue initialization failed - running without async support")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize task queue: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SECURITY UTILITIES (CRITICAL FIX)
