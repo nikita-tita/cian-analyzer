@@ -33,8 +33,11 @@ def register_blog_routes(app):
             if not post:
                 abort(404)
 
-            # Increment view count
-            blog_db.increment_view_count(slug)
+            # Increment view count (fail silently if DB is readonly)
+            try:
+                blog_db.increment_view_count(slug)
+            except Exception as e:
+                logger.warning(f"Could not increment view count for {slug}: {e}")
 
             # Get recent posts for sidebar
             recent_posts = blog_db.get_recent_posts(limit=5)
