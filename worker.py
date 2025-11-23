@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from redis import Redis
-from rq import Worker, Queue, Connection
+from rq import Worker, Queue
 
 # Настройка логирования
 logging.basicConfig(
@@ -52,10 +52,9 @@ def main():
         logger.info(f"Listening to queues: {[q.name for q in queues]}")
 
         # Запускаем воркер
-        with Connection(redis_conn):
-            worker = Worker(queues)
-            logger.info("🚀 Worker started, waiting for tasks...")
-            worker.work()
+        worker = Worker(queues, connection=redis_conn)
+        logger.info("🚀 Worker started, waiting for tasks...")
+        worker.work()
 
     except KeyboardInterrupt:
         logger.info("\n⏹️  Worker stopped by user")
