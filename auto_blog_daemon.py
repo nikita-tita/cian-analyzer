@@ -33,19 +33,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main():
-    """Основная функция парсинга"""
+def main(source: str = 'cian'):
+    """
+    Основная функция парсинга
+
+    Args:
+        source: Источник для парсинга ('cian' или 'rbc')
+    """
     try:
         logger.info("=" * 60)
-        logger.info("Starting automated blog parsing")
+        logger.info(f"Starting automated blog parsing from {source.upper()}")
 
         # Импорты
         from blog_parser_playwright import CianMagazineParserPlaywright
+        from rbc_realty_parser import RBCRealtyParser
         from yandex_gpt import YandexGPT
         from blog_database import BlogDatabase
 
-        # Инициализация
-        parser = CianMagazineParserPlaywright(headless=True)
+        # Выбираем парсер в зависимости от источника
+        if source.lower() == 'rbc':
+            parser = RBCRealtyParser(headless=True)
+            source_name = "RBC Realty"
+        else:
+            parser = CianMagazineParserPlaywright(headless=True)
+            source_name = "CIAN Magazine"
+
         gpt = YandexGPT()
         db = BlogDatabase()
 
@@ -53,10 +65,10 @@ def main():
         current_posts = db.get_all_posts()
         logger.info(f"Current posts in database: {len(current_posts)}")
 
-        # Получаем статьи из CIAN
-        logger.info("Fetching articles from CIAN Magazine...")
+        # Получаем статьи
+        logger.info(f"Fetching articles from {source_name}...")
         articles = parser.get_recent_articles(limit=6)  # Берем с запасом
-        logger.info(f"Found {len(articles)} articles from CIAN")
+        logger.info(f"Found {len(articles)} articles from {source_name}")
 
         if not articles:
             logger.warning("No articles found, exiting")
@@ -129,4 +141,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Automated blog parser')
+    parser.add_argument(
+        '--source',
+        choices=['cian', 'rbc'],
+        default='cian',
+        help='Source to parse articles from (default: cian)'
+    )
+
+    args = parser.parse_args()
+    main(source=args.source)
