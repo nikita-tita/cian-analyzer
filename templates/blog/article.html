@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ article.title }} | HOUSLER Blog</title>
+    <meta name="description" content="{{ article.meta_description or article.excerpt }}">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="{{ article.title }}">
+    <meta property="og:description" content="{{ article.meta_description or article.excerpt }}">
+    {% if article.cover_image %}
+    <meta property="og:image" content="{{ article.cover_image }}">
+    {% endif %}
+    <meta property="og:type" content="article">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
+
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/blog.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-content">
+                <a href="/" class="logo">HOUSLER</a>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/calculator">Калькулятор</a>
+                    <a href="/blog" class="active">Блог</a>
+                    <a href="/#contact">Контакты</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <article class="article-page">
+        <div class="container article-container">
+            <!-- Breadcrumbs -->
+            <div class="breadcrumbs">
+                <a href="/">Главная</a>
+                <span>→</span>
+                <a href="/blog">Блог</a>
+                <span>→</span>
+                <a href="/blog?category={{ article.category }}">{{ article.category }}</a>
+                <span>→</span>
+                <span>{{ article.title }}</span>
+            </div>
+
+            <!-- Article Header -->
+            <header class="article-header">
+                <div class="article-meta">
+                    <span class="category">{{ article.category }}</span>
+                    <span class="date">{{ article.published_date.strftime('%d %B %Y') }}</span>
+                    <span class="author">{{ article.author }}</span>
+                </div>
+                <h1>{{ article.title }}</h1>
+
+                {% if article.cover_image %}
+                <div class="article-cover">
+                    <img src="{{ article.cover_image }}" alt="{{ article.title }}">
+                </div>
+                {% endif %}
+
+                <div class="article-stats-bar">
+                    <div class="stats">
+                        <span>👁 {{ article.views }} просмотров</span>
+                        <span id="likes-display">❤️ <span id="likes-count">{{ article.likes }}</span> лайков</span>
+                    </div>
+                    <button id="like-button" class="like-button" onclick="likeArticle('{{ article.id }}')">
+                        ❤️ Нравится
+                    </button>
+                </div>
+            </header>
+
+            <!-- Article Content -->
+            <div class="article-body">
+                {{ article.rewritten_content | safe }}
+            </div>
+
+            <!-- Tags -->
+            {% if article.tags and article.tags|length > 0 %}
+            <div class="article-tags">
+                <strong>Теги:</strong>
+                {% for tag in article.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Share Buttons -->
+            <div class="article-share">
+                <h3>Поделиться статьей</h3>
+                <div class="share-buttons">
+                    <a href="https://vk.com/share.php?url={{ request.url }}"
+                       target="_blank"
+                       class="share-btn vk">
+                        ВКонтакте
+                    </a>
+                    <a href="https://t.me/share/url?url={{ request.url }}&text={{ article.title }}"
+                       target="_blank"
+                       class="share-btn telegram">
+                        Telegram
+                    </a>
+                    <a href="https://wa.me/?text={{ article.title }}%20{{ request.url }}"
+                       target="_blank"
+                       class="share-btn whatsapp">
+                        WhatsApp
+                    </a>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <!-- Related Articles -->
+    {% if related and related|length > 0 %}
+    <section class="related-section">
+        <div class="container">
+            <h2>Похожие статьи</h2>
+            <div class="related-grid">
+                {% for rel_article in related %}
+                <article class="related-card">
+                    {% if rel_article.cover_image %}
+                    <div class="related-image">
+                        <a href="/blog/{{ rel_article.slug }}">
+                            <img src="{{ rel_article.cover_image }}" alt="{{ rel_article.title }}" loading="lazy">
+                        </a>
+                    </div>
+                    {% endif %}
+                    <div class="related-content">
+                        <span class="category">{{ rel_article.category }}</span>
+                        <h3><a href="/blog/{{ rel_article.slug }}">{{ rel_article.title }}</a></h3>
+                        <p class="excerpt">{{ rel_article.excerpt }}</p>
+                        <a href="/blog/{{ rel_article.slug }}" class="read-more">Читать →</a>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Хотите оценить свою недвижимость?</h2>
+                <p>Воспользуйтесь нашим калькулятором для бесплатной оценки</p>
+                <a href="/calculator" class="btn btn-primary">Оценить недвижимость</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">HOUSLER</div>
+                    <p>Делаем недвижимость желанной</p>
+                </div>
+                <div class="footer-links">
+                    <div>
+                        <h4>Навигация</h4>
+                        <a href="/">Главная</a>
+                        <a href="/calculator">Калькулятор</a>
+                        <a href="/blog">Блог</a>
+                    </div>
+                    <div>
+                        <h4>Контакты</h4>
+                        <a href="mailto:info@housler.ru">info@housler.ru</a>
+                        <a href="tel:+78129999999">+7 (812) 999-99-99</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 HOUSLER. Все права защищены.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Like button functionality
+        function likeArticle(articleId) {
+            fetch(`/api/blog/articles/${articleId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('likes-count').textContent = data.likes;
+                    document.getElementById('like-button').classList.add('liked');
+                    document.getElementById('like-button').disabled = true;
+                    document.getElementById('like-button').textContent = '❤️ Спасибо!';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

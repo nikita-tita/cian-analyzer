@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Блог о недвижимости | HOUSLER</title>
+    <meta name="description" content="Статьи о недвижимости, советы по покупке и продаже квартир в Санкт-Петербурге">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
+
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/blog.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-content">
+                <a href="/" class="logo">HOUSLER</a>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/calculator">Калькулятор</a>
+                    <a href="/blog" class="active">Блог</a>
+                    <a href="/#contact">Контакты</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Blog Header -->
+    <section class="blog-header">
+        <div class="container">
+            <h1>Блог о недвижимости</h1>
+            <p>Полезные статьи и советы от экспертов Housler</p>
+        </div>
+    </section>
+
+    <!-- Featured Articles (only on first page) -->
+    {% if featured and featured|length > 0 %}
+    <section class="featured-section">
+        <div class="container">
+            <h2>Избранное</h2>
+            <div class="featured-grid">
+                {% for article in featured %}
+                <article class="featured-card">
+                    {% if article.cover_image %}
+                    <div class="featured-image">
+                        <img src="{{ article.cover_image }}" alt="{{ article.title }}" loading="lazy">
+                    </div>
+                    {% endif %}
+                    <div class="featured-content">
+                        <div class="article-meta">
+                            <span class="category">{{ article.category }}</span>
+                            <span class="date">{{ article.published_date.strftime('%d.%m.%Y') }}</span>
+                        </div>
+                        <h3><a href="/blog/{{ article.slug }}">{{ article.title }}</a></h3>
+                        <p class="excerpt">{{ article.excerpt }}</p>
+                        <a href="/blog/{{ article.slug }}" class="read-more">Читать далее →</a>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Categories Filter -->
+    <section class="categories-section">
+        <div class="container">
+            <div class="categories-filter">
+                <a href="/blog" class="category-btn {% if not current_category %}active{% endif %}">
+                    Все статьи
+                </a>
+                {% for cat in categories %}
+                <a href="/blog?category={{ cat.category }}"
+                   class="category-btn {% if current_category == cat.category %}active{% endif %}">
+                    {{ cat.category }} ({{ cat.count }})
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Articles Grid -->
+    <section class="articles-section">
+        <div class="container">
+            {% if articles and articles|length > 0 %}
+            <div class="articles-grid">
+                {% for article in articles %}
+                <article class="article-card">
+                    {% if article.cover_image %}
+                    <div class="article-image">
+                        <a href="/blog/{{ article.slug }}">
+                            <img src="{{ article.cover_image }}" alt="{{ article.title }}" loading="lazy">
+                        </a>
+                    </div>
+                    {% endif %}
+                    <div class="article-content">
+                        <div class="article-meta">
+                            <span class="category">{{ article.category }}</span>
+                            <span class="date">{{ article.published_date.strftime('%d.%m.%Y') }}</span>
+                        </div>
+                        <h3><a href="/blog/{{ article.slug }}">{{ article.title }}</a></h3>
+                        <p class="excerpt">{{ article.excerpt }}</p>
+                        <div class="article-footer">
+                            <a href="/blog/{{ article.slug }}" class="read-more">Читать далее</a>
+                            <div class="article-stats">
+                                <span>👁 {{ article.views }}</span>
+                                <span>❤️ {{ article.likes }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="/blog?page={{ page - 1 }}{% if current_category %}&category={{ current_category }}{% endif %}"
+                   class="pagination-btn">← Предыдущая</a>
+                {% endif %}
+
+                <span class="pagination-info">Страница {{ page }} из {{ total_pages }}</span>
+
+                {% if page < total_pages %}
+                <a href="/blog?page={{ page + 1 }}{% if current_category %}&category={{ current_category }}{% endif %}"
+                   class="pagination-btn">Следующая →</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="no-articles">
+                <p>Статей пока нет. Следите за обновлениями!</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">HOUSLER</div>
+                    <p>Делаем недвижимость желанной</p>
+                </div>
+                <div class="footer-links">
+                    <div>
+                        <h4>Навигация</h4>
+                        <a href="/">Главная</a>
+                        <a href="/calculator">Калькулятор</a>
+                        <a href="/blog">Блог</a>
+                    </div>
+                    <div>
+                        <h4>Контакты</h4>
+                        <a href="mailto:info@housler.ru">info@housler.ru</a>
+                        <a href="tel:+78129999999">+7 (812) 999-99-99</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 HOUSLER. Все права защищены.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

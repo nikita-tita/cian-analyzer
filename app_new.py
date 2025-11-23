@@ -2101,6 +2101,248 @@ def contact_request():
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# BLOG API ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Инициализация блога
+try:
+    from src.blog import BlogStorage, YandexGPTRewriter
+    from src.parsers.cian_magazine_parser import CianMagazineParser
+    from src.models.blog import BlogArticle
+
+    blog_storage = BlogStorage()
+    blog_rewriter = YandexGPTRewriter()
+    blog_parser = CianMagazineParser()
+
+    BLOG_ENABLED = True
+    logger.info("✓ Blog module initialized")
+except Exception as e:
+    logger.warning(f"Blog module not available: {e}")
+    BLOG_ENABLED = False
+
+
+@app.route('/blog')
+def blog_list():
+    """Главная страница блога со списком статей"""
+    if not BLOG_ENABLED:
+        return "Blog not available", 503
+
+    try:
+        # Получаем параметры из query string
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 12))
+        category = request.args.get('category')
+
+        # Получаем статьи
+        offset = (page - 1) * per_page
+        response = blog_storage.get_all(
+            status='published',
+            category=category,
+            limit=per_page,
+            offset=offset
+        )
+
+        # Получаем категории для фильтра
+        categories = blog_storage.get_categories()
+
+        # Получаем избранные статьи для главной
+        featured = blog_storage.get_featured(limit=3) if page == 1 else []
+
+        return render_template(
+            'blog/list.html',
+            articles=response.articles,
+            featured=featured,
+            categories=categories,
+            current_category=category,
+            page=response.page,
+            total_pages=response.total_pages,
+            total=response.total
+        )
+    except Exception as e:
+        logger.error(f"Ошибка отображения блога: {e}", exc_info=True)
+        return f"Ошибка: {str(e)}", 500
+
+
+@app.route('/blog/<slug>')
+def blog_article(slug):
+    """Страница отдельной статьи"""
+    if not BLOG_ENABLED:
+        return "Blog not available", 503
+
+    try:
+        # Получаем статью
+        article = blog_storage.get_by_slug(slug)
+
+        if not article:
+            return "Статья не найдена", 404
+
+        # Увеличиваем счетчик просмотров
+        blog_storage.increment_views(article.id)
+
+        # Получаем похожие статьи из той же категории
+        related_response = blog_storage.get_all(
+            status='published',
+            category=article.category,
+            limit=4
+        )
+        related = [a for a in related_response.articles if a.id != article.id][:3]
+
+        return render_template(
+            'blog/article.html',
+            article=article,
+            related=related
+        )
+    except Exception as e:
+        logger.error(f"Ошибка отображения статьи: {e}", exc_info=True)
+        return f"Ошибка: {str(e)}", 500
+
+
+@app.route('/api/blog/articles', methods=['GET'])
+def api_get_articles():
+    """API: Получить список статей"""
+    if not BLOG_ENABLED:
+        return jsonify({'error': 'Blog not available'}), 503
+
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 12))
+        category = request.args.get('category')
+        status = request.args.get('status', 'published')
+
+        offset = (page - 1) * per_page
+        response = blog_storage.get_all(
+            status=status,
+            category=category,
+            limit=per_page,
+            offset=offset
+        )
+
+        return jsonify(response.dict()), 200
+    except Exception as e:
+        logger.error(f"Ошибка API получения статей: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/blog/articles/<article_id>', methods=['GET'])
+def api_get_article(article_id):
+    """API: Получить статью по ID"""
+    if not BLOG_ENABLED:
+        return jsonify({'error': 'Blog not available'}), 503
+
+    try:
+        article = blog_storage.get_by_id(article_id)
+
+        if not article:
+            return jsonify({'error': 'Article not found'}), 404
+
+        return jsonify(article.dict()), 200
+    except Exception as e:
+        logger.error(f"Ошибка API получения статьи: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/blog/articles/<article_id>/like', methods=['POST'])
+def api_like_article(article_id):
+    """API: Лайкнуть статью"""
+    if not BLOG_ENABLED:
+        return jsonify({'error': 'Blog not available'}), 503
+
+    try:
+        blog_storage.increment_likes(article_id)
+        article = blog_storage.get_by_id(article_id)
+
+        return jsonify({
+            'success': True,
+            'likes': article.likes if article else 0
+        }), 200
+    except Exception as e:
+        logger.error(f"Ошибка API лайка статьи: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/blog/parse-and-create', methods=['POST'])
+def api_parse_and_create_article():
+    """
+    API: Парсит статью с Cian Magazine, рерайтит через Яндекс GPT и сохраняет
+
+    Body:
+    {
+        "url": "https://www.cian.ru/magazine/...",
+        "featured": false
+    }
+    """
+    if not BLOG_ENABLED:
+        return jsonify({'error': 'Blog not available'}), 503
+
+    try:
+        data = request.get_json()
+        url = data.get('url')
+        featured = data.get('featured', False)
+
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+
+        logger.info(f"Парсинг и создание статьи: {url}")
+
+        # Парсим статью
+        article_data = blog_parser.parse_article_content(url)
+
+        if not article_data:
+            return jsonify({'error': 'Failed to parse article'}), 400
+
+        # Рерайтим контент
+        logger.info(f"Рерайт статьи: {article_data['title']}")
+        rewritten_content = blog_rewriter.rewrite_article(
+            original_content=article_data['content'],
+            title=article_data['title']
+        )
+
+        # Создаем объект статьи
+        article = BlogArticle(
+            title=article_data['title'],
+            original_content=article_data['content'],
+            rewritten_content=rewritten_content,
+            cover_image=article_data.get('cover_image'),
+            images=article_data.get('images', []),
+            source_url=url,
+            category=article_data.get('category', 'Недвижимость'),
+            tags=article_data.get('tags', []),
+            meta_description=article_data.get('meta_description'),
+            published_date=article_data.get('published_date', datetime.now()),
+            featured=featured,
+            status='published'
+        )
+
+        # Сохраняем
+        saved_article = blog_storage.create(article)
+
+        logger.info(f"Статья создана: {saved_article.id} - {saved_article.title}")
+
+        return jsonify({
+            'success': True,
+            'article': saved_article.dict()
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Ошибка парсинга и создания статьи: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/blog/categories', methods=['GET'])
+def api_get_categories():
+    """API: Получить список категорий"""
+    if not BLOG_ENABLED:
+        return jsonify({'error': 'Blog not available'}), 503
+
+    try:
+        categories = blog_storage.get_categories()
+        return jsonify({'categories': categories}), 200
+    except Exception as e:
+        logger.error(f"Ошибка API получения категорий: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 async def _generate_pdf_from_page(url: str) -> bytes:
     """
     Генерирует PDF из HTML страницы используя Playwright
