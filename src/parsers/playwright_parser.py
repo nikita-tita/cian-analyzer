@@ -4,7 +4,7 @@
 
 import time
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable, Any
 from functools import wraps
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
@@ -86,7 +86,7 @@ def detect_region_from_address(address: str) -> str:
     return None
 
 
-def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0):
+def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0) -> Callable:
     """
     Декоратор для повторных попыток с экспоненциальной задержкой
 
@@ -95,9 +95,9 @@ def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0
         base_delay: Базовая задержка между попытками (секунды)
         max_delay: Максимальная задержка между попытками (секунды)
     """
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exception = None
 
             for attempt in range(max_retries):
@@ -218,16 +218,16 @@ class PlaywrightParser(BaseCianParser):
 
         logger.info(f"Регион: {region} (код: {self.region_code}), using_pool: {self.using_pool}")
 
-    def __enter__(self):
+    def __enter__(self) -> 'PlaywrightParser':
         """Context manager вход"""
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager выход"""
         self.close()
 
-    def start(self):
+    def start(self) -> None:
         """Запуск браузера (один раз за сессию) или получение из пула"""
         if self.browser:
             logger.warning("Браузер уже запущен")
@@ -286,7 +286,7 @@ class PlaywrightParser(BaseCianParser):
             self.close()
             raise
 
-    def close(self):
+    def close(self) -> None:
         """Закрытие браузера или возврат в пул"""
         # Если используем browser pool, возвращаем браузер в пул
         if self.using_pool and self.browser:
@@ -1056,7 +1056,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   🔍 Определен как вторичка (не найдено признаков новостройки)")
         return False
 
-    def _get_segment_tolerances(self, target_price: float):
+    def _get_segment_tolerances(self, target_price: float) -> tuple[float, float, str]:
         """
         Определяет допуски в зависимости от сегмента недвижимости
 
@@ -1595,7 +1595,13 @@ class PlaywrightParser(BaseCianParser):
             _target_price = target_price
             _target_area = target_area
 
-            def sort_key(result):
+            def sort_key(result: Dict) -> tuple[bool, float]:
+                """
+                Ключ сортировки: сначала аналоги из того же ЖК, затем по близости цены/м²
+
+                Returns:
+                    tuple: (not same_rc, price_diff) для сортировки
+                """
                 # Проверяем наличие ЖК в заголовке или адресе аналога
                 result_title = result.get('title', '').lower()
                 result_address = result.get('address', '').lower()
