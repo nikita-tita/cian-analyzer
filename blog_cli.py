@@ -6,7 +6,7 @@ Parse articles from CIAN magazine and publish to blog
 
 import argparse
 import logging
-from blog_parser import CianMagazineParser
+from blog_parser_playwright import CianMagazineParserPlaywright
 from yandex_gpt import YandexGPT
 from blog_database import BlogDatabase
 
@@ -21,7 +21,7 @@ def parse_and_publish(limit: int = 5, force: bool = False):
     """Parse articles from CIAN and publish to blog"""
     logger.info(f"Starting to parse {limit} articles from CIAN magazine...")
 
-    parser = CianMagazineParser()
+    parser = CianMagazineParserPlaywright(headless=True)
     gpt = YandexGPT()
     db = BlogDatabase()
 
