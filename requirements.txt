@@ -23,8 +23,9 @@ scipy>=1.11.0
 # Production server
 gunicorn>=21.2.0
 
-# Caching
+# Caching and task queue
 redis>=5.0.0
+rq>=1.15.0
 
 # Browser automation (for parser)
 playwright>=1.40.0
