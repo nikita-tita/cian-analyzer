@@ -10,6 +10,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+# Загружаем переменные окружения из .env
+from dotenv import load_dotenv
+env_path = Path(__file__).parent / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+
 # Настраиваем логирование
 log_dir = Path("/var/www/housler/logs")
 log_dir.mkdir(exist_ok=True)
