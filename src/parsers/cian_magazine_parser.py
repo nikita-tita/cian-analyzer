@@ -43,8 +43,17 @@ class CianMagazineParser:
         logger.info(f"Парсинг списка статей: {url}")
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=self.headless)
-            page = browser.new_page()
+            browser = p.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu'
+                ]
+            )
+            context = browser.new_context(ignore_https_errors=True)
+            page = context.new_page()
 
             try:
                 # Переходим на страницу
@@ -170,8 +179,17 @@ class CianMagazineParser:
         logger.info(f"Парсинг статьи: {url}")
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=self.headless)
-            page = browser.new_page()
+            browser = p.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu'
+                ]
+            )
+            context = browser.new_context(ignore_https_errors=True)
+            page = context.new_page()
 
             try:
                 # Переходим на страницу статьи
