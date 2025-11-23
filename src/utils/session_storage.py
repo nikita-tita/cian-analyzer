@@ -123,14 +123,14 @@ class SessionStorage:
             self.stats['evictions'] += 1
             logger.debug(f"Evicted LRU session: {evicted_key}")
 
-    def set(self, session_id: str, data: Dict[str, Any], ttl: int = 3600) -> bool:
+    def set(self, session_id: str, data: Dict[str, Any], ttl: int = 86400) -> bool:
         """
         Store session data
 
         Args:
             session_id: Session identifier
             data: Session data to store
-            ttl: Time to live in seconds (default 1 hour)
+            ttl: Time to live in seconds (default 24 hours)
         """
         try:
             if self.redis_client:
