@@ -35,15 +35,6 @@ except ImportError as e:
     logging.getLogger(__name__).warning(f"CianParser недоступен: {e}")
     CianParser = None
 
-# Пытаемся импортировать DomClickParser (требует Playwright для fallback)
-try:
-    from .domclick_parser import DomClickParser
-    __all__.append('DomClickParser')
-except ImportError as e:
-    import logging
-    logging.getLogger(__name__).warning(f"DomClickParser недоступен: {e}")
-    DomClickParser = None
-
 # Пытаемся импортировать MultiSourceSearchStrategy
 try:
     from .multi_source_search import (
