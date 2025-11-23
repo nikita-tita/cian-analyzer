@@ -1,0 +1,34 @@
+[Unit]
+Description=Housler RQ Worker - Async Task Processor
+After=network.target redis.service
+Requires=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/housler
+Environment="REDIS_URL=redis://localhost:6379/0"
+Environment="PYTHONPATH=/var/www/housler"
+Environment="FLASK_ENV=production"
+
+# Запуск воркера
+ExecStart=/var/www/housler/venv/bin/python /var/www/housler/worker.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=4
+
+# Ресурсы
+MemoryLimit=512M
+CPUQuota=100%
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=housler-worker
+
+[Install]
+WantedBy=multi-user.target
