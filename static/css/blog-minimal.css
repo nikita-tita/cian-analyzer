@@ -1,0 +1,53 @@
+/* Minimal Blog Section */
+.blog-listing {
+    max-width: 900px;
+    margin: 3rem auto 0;
+}
+
+.blog-entry {
+    padding: 2.5rem 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.blog-entry:last-child {
+    border-bottom: none;
+}
+
+.blog-entry-meta {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: #999;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.blog-entry-title {
+    font-size: 1.75rem;
+    font-weight: 400;
+    color: #000;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+}
+
+.blog-entry-excerpt {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .blog-entry {
+        padding: 2rem 0;
+    }
+
+    .blog-entry-title {
+        font-size: 1.4rem;
+    }
+
+    .blog-entry-excerpt {
+        font-size: 0.95rem;
+    }
+}
