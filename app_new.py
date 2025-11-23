@@ -17,23 +17,19 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MULTI-SOURCE PARSER REGISTRY
-# Поддержка множественных источников недвижимости
+# PARSER SETUP
 # ═══════════════════════════════════════════════════════════════════════════
-# Доступные парсеры:
-#   ✅ CianParser (ЦИАН) - СПб и Москва
-#   ⏳ YandexParser (Яндекс.Недвижимость) - вся Россия [в разработке]
-#   ⏳ DomClickParser (ДомКлик/Сбербанк) [в разработке]
-#   ⏳ AvitoParser (Авито) - вся Россия [в разработке]
+# Используемый парсер:
+#   ✅ CianParser (ЦИАН) - Санкт-Петербург и Москва
 # ═══════════════════════════════════════════════════════════════════════════
 
 try:
-    # Импортируем registry
+    # Импортируем parser infrastructure
     from src.parsers import get_global_registry
     from src.parsers.playwright_parser import detect_region_from_url, detect_region_from_address
     from src.parsers.browser_pool import BrowserPool
 
-    # Пытаемся импортировать все доступные парсеры
+    # Импортируем основной парсер
     parsers_loaded = []
 
     try:
@@ -42,26 +38,8 @@ try:
     except ImportError as e:
         logger.warning(f"CianParser недоступен: {e}")
 
-    try:
-        from src.parsers.yandex_realty_parser import YandexParser
-        parsers_loaded.append('Яндекс.Недвижимость')
-    except ImportError as e:
-        logger.warning(f"YandexParser недоступен: {e}")
-
-    try:
-        from src.parsers.domclick_parser import DomClickParser
-        parsers_loaded.append('ДомКлик')
-    except ImportError as e:
-        logger.warning(f"DomClickParser недоступен: {e}")
-
-    try:
-        from src.parsers.avito_parser import AvitoParser
-        parsers_loaded.append('Авито')
-    except ImportError as e:
-        logger.warning(f"AvitoParser недоступен: {e}")
-
     PARSER_REGISTRY_AVAILABLE = True
-    logger.info(f"✓ Parser Registry: {', '.join(parsers_loaded) if parsers_loaded else 'нет парсеров'}")
+    logger.info(f"✓ Parser available: {', '.join(parsers_loaded) if parsers_loaded else 'нет парсеров'}")
 
 except ImportError as e:
     logger.error(f"Failed to import ParserRegistry: {e}")
