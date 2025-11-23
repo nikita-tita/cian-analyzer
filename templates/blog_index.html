@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Блог — HOUSLER</title>
+    <meta name="description" content="Статьи о недвижимости в Санкт-Петербурге от экспертов HOUSLER">
+
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-content">
+                <a href="/" class="logo">HOUSLER</a>
+                <div class="nav-links">
+                    <a href="/#services">Услуги</a>
+                    <a href="/#pricing">Стоимость</a>
+                    <a href="/blog">Блог</a>
+                    <a href="/#contact">Контакты</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Blog Section -->
+    <section class="section">
+        <div class="container">
+            <h1 class="section-title">Блог</h1>
+            <div class="blog-listing">
+                {% if posts %}
+                    {% for post in posts %}
+                    <article class="blog-entry">
+                        <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
+                        <h3 class="blog-entry-title">
+                            <a href="/blog/{{ post.slug }}" style="color: inherit; text-decoration: none;">
+                                {{ post.title }}
+                            </a>
+                        </h3>
+                        {% if post.excerpt %}
+                        <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <p style="text-align: center; color: #666; padding: 4rem 0;">
+                        Статьи скоро появятся
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">HOUSLER</div>
+                <div class="footer-text">© 2025 Агентство недвижимости</div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

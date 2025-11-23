@@ -133,32 +133,31 @@
     <!-- Blog Section -->
     <section class="section section-gray" id="blog">
         <div class="container">
-            <h2 class="section-title">Материалы</h2>
+            <h2 class="section-title">Блог</h2>
+            {% if recent_posts %}
             <div class="blog-listing">
+                {% for post in recent_posts %}
                 <article class="blog-entry">
-                    <div class="blog-entry-meta">Ноябрь 2023</div>
-                    <h3 class="blog-entry-title">Как правильно оценить квартиру перед продажей</h3>
-                    <p class="blog-entry-excerpt">Методы оценки недвижимости: анализ аналогов, учёт факторов локации, состояния и рыночной конъюнктуры.</p>
+                    <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
+                    <h3 class="blog-entry-title">
+                        <a href="/blog/{{ post.slug }}" style="color: inherit; text-decoration: none;">
+                            {{ post.title }}
+                        </a>
+                    </h3>
+                    {% if post.excerpt %}
+                    <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                    {% endif %}
                 </article>
-
-                <article class="blog-entry">
-                    <div class="blog-entry-meta">Октябрь 2023</div>
-                    <h3 class="blog-entry-title">Документы для безопасной сделки</h3>
-                    <p class="blog-entry-excerpt">Полный чек-лист проверок: от ЕГРН до согласий супругов. Что проверять до подписания договора.</p>
-                </article>
-
-                <article class="blog-entry">
-                    <div class="blog-entry-meta">Сентябрь 2023</div>
-                    <h3 class="blog-entry-title">Подготовка объекта к продаже</h3>
-                    <p class="blog-entry-excerpt">Стейджинг, фотосъёмка и подача: как сделать объект привлекательным для покупателей без больших вложений.</p>
-                </article>
-
-                <article class="blog-entry">
-                    <div class="blog-entry-meta">Август 2023</div>
-                    <h3 class="blog-entry-title">Типичные ошибки продавцов</h3>
-                    <p class="blog-entry-excerpt">Завышенная цена, плохая презентация, неверная стратегия — разбираем промахи, которые затягивают продажу.</p>
-                </article>
+                {% endfor %}
             </div>
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="/blog" style="color: #000; text-decoration: none; font-weight: 500; border-bottom: 1px solid #000; padding-bottom: 2px;">Все статьи →</a>
+            </div>
+            {% else %}
+            <p style="text-align: center; color: #666; padding: 2rem 0;">
+                Статьи скоро появятся
+            </p>
+            {% endif %}
         </div>
     </section>
 

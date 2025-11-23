@@ -178,6 +178,16 @@ duplicate_detector = DuplicateDetector(
 )
 logger.info("✓ Duplicate Detector инициализирован")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# BLOG ROUTES REGISTRATION
+# ═══════════════════════════════════════════════════════════════════════════
+try:
+    from blog_routes import register_blog_routes
+    register_blog_routes(app)
+    logger.info("✓ Blog routes зарегистрированы")
+except ImportError as e:
+    logger.warning(f"⚠️ Blog routes недоступны: {e}")
+
 
 def get_parser_for_url(url: str, region: str = 'spb'):
     """
@@ -535,7 +545,16 @@ def set_security_headers(response):
 @app.route('/')
 def index():
     """Landing page - Agency website"""
-    return render_template('index.html')
+    # Load recent blog posts for preview
+    recent_posts = []
+    try:
+        from blog_database import BlogDatabase
+        blog_db = BlogDatabase()
+        recent_posts = blog_db.get_recent_posts(limit=4)
+    except Exception as e:
+        logger.warning(f"Could not load blog posts: {e}")
+
+    return render_template('index.html', recent_posts=recent_posts)
 
 
 @app.route('/health', methods=['GET'])

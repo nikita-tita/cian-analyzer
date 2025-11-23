@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} — HOUSLER</title>
+    <meta name="description" content="{{ post.excerpt or post.content[:200] }}">
+
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        .blog-post-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 3rem 0;
+        }
+
+        .blog-post-header {
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .blog-post-meta {
+            font-size: 0.85rem;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5rem;
+        }
+
+        .blog-post-title {
+            font-size: 2.5rem;
+            font-weight: 400;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            color: #000;
+        }
+
+        .blog-post-excerpt {
+            font-size: 1.2rem;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .blog-post-body {
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .blog-post-body p {
+            margin-bottom: 1.5rem;
+        }
+
+        .blog-post-footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .blog-post-title {
+                font-size: 1.8rem;
+            }
+
+            .blog-post-excerpt {
+                font-size: 1.05rem;
+            }
+
+            .blog-post-body {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-content">
+                <a href="/" class="logo">HOUSLER</a>
+                <div class="nav-links">
+                    <a href="/#services">Услуги</a>
+                    <a href="/#pricing">Стоимость</a>
+                    <a href="/blog">Блог</a>
+                    <a href="/#contact">Контакты</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Blog Post -->
+    <section class="section">
+        <div class="container">
+            <div class="blog-post-content">
+                <div class="blog-post-header">
+                    <div class="blog-post-meta">{{ post.published_at[:10] }}</div>
+                    <h1 class="blog-post-title">{{ post.title }}</h1>
+                    {% if post.excerpt %}
+                    <div class="blog-post-excerpt">{{ post.excerpt }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="blog-post-body">
+                    {% for paragraph in post.content.split('\n\n') %}
+                        {% if paragraph.strip() %}
+                        <p>{{ paragraph }}</p>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="blog-post-footer">
+                    <a href="/blog" style="color: #000; text-decoration: none; font-weight: 500;">← Все статьи</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">HOUSLER</div>
+                <div class="footer-text">© 2025 Агентство недвижимости</div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
