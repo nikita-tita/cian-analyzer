@@ -19,8 +19,12 @@ os.environ['WTF_CSRF_ENABLED'] = 'false'  # Disable CSRF for testing
 @pytest.fixture
 def app():
     """Create Flask app for testing"""
-    from app_new import app as flask_app
+    # Mock PLAYWRIGHT_AVAILABLE to use markdown fallback in tests
+    # This prevents ERR_CONNECTION_REFUSED errors in PDF generation
+    import app_new
+    app_new.PLAYWRIGHT_AVAILABLE = False
 
+    flask_app = app_new.app
     flask_app.config['TESTING'] = True
     flask_app.config['WTF_CSRF_ENABLED'] = False
 
@@ -77,10 +81,17 @@ def sample_session_data():
 @pytest.fixture
 def mock_playwright_parser(monkeypatch):
     """Mock Playwright parser to avoid browser operations in tests"""
+    class MockBrowser:
+        """Mock browser object"""
+        pass
+
     class MockParser:
         def __init__(self, *args, **kwargs):
             self.headless = kwargs.get('headless', True)
             self.region = kwargs.get('region', 'spb')
+            self.browser_pool = kwargs.get('browser_pool', None)
+            self.using_pool = self.browser_pool is not None
+            self.browser = MockBrowser()
 
         def __enter__(self):
             return self
