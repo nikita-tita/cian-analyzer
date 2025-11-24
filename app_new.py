@@ -633,18 +633,43 @@ def health_check():
 
     # Проверка парсера
     try:
-        # Просто проверяем, что класс доступен
-        parser_name = Parser.__name__
-        health_status['components']['parser'] = {
-            'status': 'healthy',
-            'type': parser_name
-        }
+        # Проверяем какие парсеры доступны
+        available_parsers = []
+        try:
+            from src.parsers import CianParser
+            available_parsers.append('CianParser')
+        except ImportError:
+            pass
+
+        try:
+            from src.parsers.playwright_parser import PlaywrightParser
+            available_parsers.append('PlaywrightParser')
+        except ImportError:
+            pass
+
+        try:
+            from src.parsers.simple_parser import SimpleParser
+            available_parsers.append('SimpleParser')
+        except ImportError:
+            pass
+
+        if available_parsers:
+            health_status['components']['parser'] = {
+                'status': 'healthy',
+                'available_parsers': available_parsers
+            }
+        else:
+            health_status['components']['parser'] = {
+                'status': 'unhealthy',
+                'error': 'No parsers available'
+            }
+            all_healthy = False
+            health_status['status'] = 'unhealthy'
     except Exception as e:
         # Parser недоступен - это не критично, есть fallback
         health_status['components']['parser'] = {
             'status': 'degraded',
-            'error': str(e),
-            'fallback': 'SimpleParser available'
+            'error': str(e)
         }
         # НЕ устанавливаем all_healthy = False, парсер не критичен
         if health_status['status'] == 'healthy':
