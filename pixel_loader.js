@@ -114,6 +114,9 @@ const pixelLoader = {
             clearInterval(this.messageInterval);
             this.messageInterval = null;
         }
+
+        // Сбрасываем прогресс
+        this.resetProgress();
     },
 
     // Создать лоадер в DOM
@@ -171,6 +174,37 @@ const pixelLoader = {
         loader.className = 'pixel-loader ' + type;
         textElement.textContent = message + ' ⚡ ' + message + ' ⚡ ';
         loader.style.display = 'flex';
+    },
+
+    // Обновить прогресс (0-100)
+    updateProgress(percentage) {
+        const progressFill = document.querySelector('.pixel-progress-fill');
+        if (progressFill) {
+            // Ограничиваем от 0 до 100
+            const clampedPercentage = Math.max(0, Math.min(100, percentage));
+            progressFill.style.width = clampedPercentage + '%';
+        }
+    },
+
+    // Показать прогресс с сообщением
+    showProgress(percentage, message = null, type = 'parsing') {
+        this.show(type);
+        this.updateProgress(percentage);
+
+        if (message) {
+            const textElement = document.getElementById('pixel-text');
+            if (textElement) {
+                textElement.textContent = message + ' ⚡ ' + message + ' ⚡ ';
+            }
+        }
+    },
+
+    // Сброс прогресса
+    resetProgress() {
+        const progressFill = document.querySelector('.pixel-progress-fill');
+        if (progressFill) {
+            progressFill.style.width = '0%';
+        }
     }
 };
 
@@ -201,4 +235,17 @@ pixelLoader.hide();
 
 // Для показа конкретного сообщения
 pixelLoader.showMessage('🏃 Бегу за кофе...', 'parsing');
+
+// С индикатором прогресса (новое!)
+pixelLoader.showProgress(0, 'Начинаем поиск...', 'searching');
+// ... поиск 1/3 ...
+pixelLoader.updateProgress(33);
+// ... поиск 2/3 ...
+pixelLoader.updateProgress(66);
+// ... поиск завершен ...
+pixelLoader.updateProgress(100);
+pixelLoader.hide();
+
+// Короткий способ с прогрессом и сообщением
+pixelLoader.showProgress(50, '🔍 Найдено 25 из 50 объектов...', 'searching');
 */

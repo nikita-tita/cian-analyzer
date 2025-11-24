@@ -17,23 +17,19 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MULTI-SOURCE PARSER REGISTRY
-# Поддержка множественных источников недвижимости
+# PARSER SETUP
 # ═══════════════════════════════════════════════════════════════════════════
-# Доступные парсеры:
-#   ✅ CianParser (ЦИАН) - СПб и Москва
-#   ⏳ YandexParser (Яндекс.Недвижимость) - вся Россия [в разработке]
-#   ⏳ DomClickParser (ДомКлик/Сбербанк) [в разработке]
-#   ⏳ AvitoParser (Авито) - вся Россия [в разработке]
+# Используемый парсер:
+#   ✅ CianParser (ЦИАН) - Санкт-Петербург и Москва
 # ═══════════════════════════════════════════════════════════════════════════
 
 try:
-    # Импортируем registry
+    # Импортируем parser infrastructure
     from src.parsers import get_global_registry
     from src.parsers.playwright_parser import detect_region_from_url, detect_region_from_address
     from src.parsers.browser_pool import BrowserPool
 
-    # Пытаемся импортировать все доступные парсеры
+    # Импортируем основной парсер
     parsers_loaded = []
 
     try:
@@ -42,26 +38,8 @@ try:
     except ImportError as e:
         logger.warning(f"CianParser недоступен: {e}")
 
-    try:
-        from src.parsers.yandex_realty_parser import YandexParser
-        parsers_loaded.append('Яндекс.Недвижимость')
-    except ImportError as e:
-        logger.warning(f"YandexParser недоступен: {e}")
-
-    try:
-        from src.parsers.domclick_parser import DomClickParser
-        parsers_loaded.append('ДомКлик')
-    except ImportError as e:
-        logger.warning(f"DomClickParser недоступен: {e}")
-
-    try:
-        from src.parsers.avito_parser import AvitoParser
-        parsers_loaded.append('Авито')
-    except ImportError as e:
-        logger.warning(f"AvitoParser недоступен: {e}")
-
     PARSER_REGISTRY_AVAILABLE = True
-    logger.info(f"✓ Parser Registry: {', '.join(parsers_loaded) if parsers_loaded else 'нет парсеров'}")
+    logger.info(f"✓ Parser available: {', '.join(parsers_loaded) if parsers_loaded else 'нет парсеров'}")
 
 except ImportError as e:
     logger.error(f"Failed to import ParserRegistry: {e}")
@@ -99,6 +77,15 @@ from src.models.property import (
 from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
 from src.utils.duplicate_detector import DuplicateDetector
+
+# Task Queue (async operations)
+try:
+    from src.tasks import init_task_queue
+    from src.api import task_api
+    TASK_QUEUE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Task queue not available: {e}")
+    TASK_QUEUE_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -288,6 +275,21 @@ limiter = Limiter(
 
 logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# TASK QUEUE INITIALIZATION (Async Operations)
+# ═══════════════════════════════════════════════════════════════════════════
+if TASK_QUEUE_AVAILABLE:
+    try:
+        task_queue = init_task_queue()
+        if task_queue:
+            logger.info("✅ Task queue initialized successfully")
+            # Register task API blueprint
+            app.register_blueprint(task_api)
+            logger.info("✅ Task API endpoints registered")
+        else:
+            logger.warning("⚠️ Task queue initialization failed - running without async support")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize task queue: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SECURITY UTILITIES (CRITICAL FIX)

@@ -102,14 +102,14 @@ class TestSessionStorageTTL:
         assert storage.stats['expirations'] >= 1
 
     def test_default_ttl(self, storage):
-        """Test default TTL of 1 hour"""
+        """Test default TTL of 24 hours"""
         storage.set('long-session', {'data': 'value'})  # Default TTL
 
         # Check expiration time was set
         _, expires_at = storage.memory_storage['long-session']
-        expected_expiry = datetime.now() + timedelta(seconds=3600)
+        expected_expiry = datetime.now() + timedelta(seconds=86400)
 
-        # Should expire approximately 1 hour from now (within 10 seconds tolerance)
+        # Should expire approximately 24 hours from now (within 10 seconds tolerance)
         time_diff = abs((expires_at - expected_expiry).total_seconds())
         assert time_diff < 10
 

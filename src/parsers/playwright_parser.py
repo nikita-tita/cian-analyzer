@@ -4,7 +4,7 @@
 
 import time
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable, Any
 from functools import wraps
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
@@ -86,7 +86,7 @@ def detect_region_from_address(address: str) -> str:
     return None
 
 
-def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0):
+def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0) -> Callable:
     """
     Декоратор для повторных попыток с экспоненциальной задержкой
 
@@ -95,9 +95,9 @@ def retry_with_exponential_backoff(max_retries: int = 3, base_delay: float = 1.0
         base_delay: Базовая задержка между попытками (секунды)
         max_delay: Максимальная задержка между попытками (секунды)
     """
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exception = None
 
             for attempt in range(max_retries):
@@ -138,6 +138,49 @@ class PlaywrightParser(BaseCianParser):
     - Redis кэширование парсинга
     """
 
+    # Константы для валидации и фильтрации
+    MIN_HTML_SIZE = 1000  # Минимальный размер HTML (символов)
+    MAX_ADDRESS_LENGTH = 200  # Максимальная длина адреса (символов)
+    MIN_RESULTS_THRESHOLD = 5  # Минимум аналогов для завершения уровня 0
+    PREFERRED_RESULTS_THRESHOLD = 10  # Предпочтительное количество аналогов
+
+    @staticmethod
+    def _normalize_rooms(target_rooms) -> int:
+        """
+        Конвертирует значение rooms в int
+
+        Args:
+            target_rooms: Количество комнат (str, int или None)
+
+        Returns:
+            int: Количество комнат (студия → 1, '2-комн' → 2, None → 0)
+
+        Examples:
+            >>> PlaywrightParser._normalize_rooms('студия')
+            1
+            >>> PlaywrightParser._normalize_rooms('2-комн. квартира')
+            2
+            >>> PlaywrightParser._normalize_rooms(3)
+            3
+            >>> PlaywrightParser._normalize_rooms(None)
+            0
+        """
+        if not target_rooms:
+            return 0
+
+        if isinstance(target_rooms, str):
+            # Проверка на студию
+            if 'студ' in target_rooms.lower():
+                return 1
+
+            # Извлечение числа из строки
+            import re
+            match = re.search(r'\d+', target_rooms)
+            return int(match.group()) if match else 0
+
+        # Если уже int
+        return int(target_rooms)
+
     def __init__(
         self,
         headless: bool = True,
@@ -175,16 +218,16 @@ class PlaywrightParser(BaseCianParser):
 
         logger.info(f"Регион: {region} (код: {self.region_code}), using_pool: {self.using_pool}")
 
-    def __enter__(self):
+    def __enter__(self) -> 'PlaywrightParser':
         """Context manager вход"""
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager выход"""
         self.close()
 
-    def start(self):
+    def start(self) -> None:
         """Запуск браузера (один раз за сессию) или получение из пула"""
         if self.browser:
             logger.warning("Браузер уже запущен")
@@ -243,7 +286,7 @@ class PlaywrightParser(BaseCianParser):
             self.close()
             raise
 
-    def close(self):
+    def close(self) -> None:
         """Закрытие браузера или возврат в пул"""
         # Если используем browser pool, возвращаем браузер в пул
         if self.using_pool and self.browser:
@@ -354,7 +397,7 @@ class PlaywrightParser(BaseCianParser):
 
                 html = page.content()
 
-                if not html or len(html) < 1000:
+                if not html or len(html) < self.MIN_HTML_SIZE:
                     raise ValueError(f"Получен пустой или слишком короткий HTML ({len(html) if html else 0} символов)")
 
                 logger.info(f"✓ Страница загружена ({len(html)} символов)")
@@ -516,7 +559,7 @@ class PlaywrightParser(BaseCianParser):
             for elem in card.find_all(['div', 'span', 'a']):
                 text = elem.get_text(strip=True)
                 if 'Санкт-Петербург' in text or 'Москва' in text:
-                    if len(text) < 200:  # Не берем слишком длинные тексты
+                    if len(text) < self.MAX_ADDRESS_LENGTH:  # Не берем слишком длинные тексты
                         data['address'] = text
                         break
 
@@ -904,22 +947,11 @@ class PlaywrightParser(BaseCianParser):
             logger.info(f"   Фильтр площади: {search_params['minArea']}-{search_params['maxArea']} м²")
 
         # Добавляем фильтр по комнатам (±1 комната)
-        if target_rooms:
-            # Обработка различных типов target_rooms
-            if isinstance(target_rooms, str):
-                if 'студия' in target_rooms.lower():
-                    target_rooms_int = 1
-                else:
-                    import re
-                    match = re.search(r'\d+', target_rooms)
-                    target_rooms_int = int(match.group()) if match else 0
-            else:
-                target_rooms_int = int(target_rooms) if target_rooms else 0
-
-            if target_rooms_int > 0:
-                # СТРОГИЙ фильтр комнат (без смешивания!)
-                search_params[f'room{target_rooms_int}'] = '1'
-                logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
+        target_rooms_int = self._normalize_rooms(target_rooms)
+        if target_rooms_int > 0:
+            # СТРОГИЙ фильтр комнат (без смешивания!)
+            search_params[f'room{target_rooms_int}'] = '1'
+            logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
 
         url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
@@ -1030,7 +1062,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   🔍 Определен как вторичка (не найдено признаков новостройки)")
         return False
 
-    def _get_segment_tolerances(self, target_price: float):
+    def _get_segment_tolerances(self, target_price: float) -> tuple[float, float, str]:
         """
         Определяет допуски в зависимости от сегмента недвижимости
 
@@ -1202,17 +1234,7 @@ class PlaywrightParser(BaseCianParser):
                     pass
 
         # Комнаты (диапазон ±1)
-        # Обработка различных типов target_rooms
-        if isinstance(target_rooms, str):
-            if 'студия' in target_rooms.lower():
-                target_rooms_int = 1
-            else:
-                # Извлекаем число из строки (например, "2-комн." -> 2)
-                import re
-                match = re.search(r'\d+', target_rooms)
-                target_rooms_int = int(match.group()) if match else 2
-        else:
-            target_rooms_int = int(target_rooms) if target_rooms else 2
+        target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2 для этого метода
 
         # КРИТИЧЕСКИЙ ФИКС: СТРОГИЙ фильтр комнат (без смешивания!)
         # БЫЛО: rooms_min=1, rooms_max=2 → room1=1 И room2=1 (искало 1-комн И 2-комн!)
@@ -1367,7 +1389,7 @@ class PlaywrightParser(BaseCianParser):
             logger.info(f"🏗️ УРОВЕНЬ 0: Новостройка - пробуем поиск по ЖК '{residential_complex}'")
             try:
                 results_level0 = self.search_similar_in_building(target_property, limit=limit)
-                if len(results_level0) >= 5:
+                if len(results_level0) >= self.MIN_RESULTS_THRESHOLD:
                     logger.info(f"   ✅ УРОВЕНЬ 0: Нашли достаточно аналогов в ЖК ({len(results_level0)} шт.)")
                     validated_level0 = self._validate_and_prepare_results(results_level0, limit, target_property=target_property)
                     final_results.extend(validated_level0)
@@ -1430,15 +1452,7 @@ class PlaywrightParser(BaseCianParser):
                 logger.info(f"   🏠 Тип: ВТОРИЧКА (type=1)")
 
             # КРИТИЧНО: Комнаты (СТРОГО указанное количество)
-            if isinstance(target_rooms, str):
-                if 'студия' in target_rooms.lower():
-                    target_rooms_int = 1
-                else:
-                    import re
-                    match = re.search(r'\d+', target_rooms)
-                    target_rooms_int = int(match.group()) if match else 2
-            else:
-                target_rooms_int = int(target_rooms) if target_rooms else 2
+            target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2
 
             search_params_relaxed[f'room{target_rooms_int}'] = '1'
             logger.info(f"   🏠 Комнаты: СТРОГО {target_rooms_int}-комнатные")
@@ -1465,7 +1479,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info("")
 
         # Проверяем, достаточно ли аналогов
-        if len(final_results) >= 10:
+        if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
             logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
@@ -1549,15 +1563,7 @@ class PlaywrightParser(BaseCianParser):
             }
 
             # Комнаты (±1)
-            if isinstance(target_rooms, str):
-                if 'студия' in target_rooms.lower():
-                    target_rooms_int = 1
-                else:
-                    import re
-                    match = re.search(r'\d+', target_rooms)
-                    target_rooms_int = int(match.group()) if match else 2
-            else:
-                target_rooms_int = int(target_rooms) if target_rooms else 2
+            target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2
 
             # СТРОГИЙ фильтр комнат (без смешивания!)
             search_params_fallback[f'room{target_rooms_int}'] = '1'
@@ -1595,7 +1601,13 @@ class PlaywrightParser(BaseCianParser):
             _target_price = target_price
             _target_area = target_area
 
-            def sort_key(result):
+            def sort_key(result: Dict) -> tuple[bool, float]:
+                """
+                Ключ сортировки: сначала аналоги из того же ЖК, затем по близости цены/м²
+
+                Returns:
+                    tuple: (not same_rc, price_diff) для сортировки
+                """
                 # Проверяем наличие ЖК в заголовке или адресе аналога
                 result_title = result.get('title', '').lower()
                 result_address = result.get('address', '').lower()
