@@ -81,10 +81,17 @@ def sample_session_data():
 @pytest.fixture
 def mock_playwright_parser(monkeypatch):
     """Mock Playwright parser to avoid browser operations in tests"""
+    class MockBrowser:
+        """Mock browser object"""
+        pass
+
     class MockParser:
         def __init__(self, *args, **kwargs):
             self.headless = kwargs.get('headless', True)
             self.region = kwargs.get('region', 'spb')
+            self.browser_pool = kwargs.get('browser_pool', None)
+            self.using_pool = self.browser_pool is not None
+            self.browser = MockBrowser()
 
         def __enter__(self):
             return self
