@@ -1185,21 +1185,110 @@ const screen3 = {
                         ` : ''}
                         ${rec.financial_impact && Object.keys(rec.financial_impact).length > 0 ? `
                             <div class="mt-2">
-                                <small class="text-muted">
-                                    <strong>Финансовый эффект:</strong>
-                                    ${Object.entries(rec.financial_impact).map(([key, value]) => {
-                                        if (typeof value === 'number' && value > 1000) {
-                                            return `${key}: ${utils.formatPrice(value)}`;
-                                        }
-                                        return `${key}: ${value}`;
-                                    }).join(', ')}
-                                </small>
+                                <div class="alert alert-info py-2 mb-0">
+                                    <strong>📊 Финансовый эффект:</strong>
+                                    <ul class="mb-0 mt-2" style="list-style: none; padding-left: 0;">
+                                        ${Object.entries(rec.financial_impact).map(([key, value]) => {
+                                            // Маппинг технических названий на читаемый текст
+                                            const fieldLabels = {
+                                                'current_scenario': '📍 Текущий сценарий',
+                                                'with_action': '✅ После изменений',
+                                                'time_saved_months': '⏱️ Экономия времени',
+                                                'opportunity_cost_saved': '💰 Экономия на упущенной выгоде',
+                                                'opportunity_rate_percent': '📈 Ставка упущенной выгоды',
+                                                'opportunity_rate_note': '💡 Пояснение по ставке',
+                                                'opportunity_rate_source': '🔍 Источник ставки',
+                                                'recommendation': '👉 Рекомендация',
+                                                'price_reduction': '💸 Снижение цены',
+                                                'probability_increase': '📊 Рост вероятности продажи',
+                                                'expected_time_reduction': '⏰ Сокращение срока продажи',
+                                                'potential_gain': '💵 Потенциальная прибыль',
+                                                'risk_level': '⚠️ Уровень риска',
+                                                'торг_диапазон': '🤝 Диапазон для торга',
+                                                'expected_time': '🕐 Ожидаемое время продажи',
+                                                'investment': '💰 Инвестиции',
+                                                'cost_per_sqm': '📏 Стоимость за м²',
+                                                'return': '💵 Возврат инвестиций',
+                                                'net_profit': '✅ Чистая прибыль',
+                                                'net_loss': '❌ Чистый убыток',
+                                                'payback_period': '⏳ Период окупаемости',
+                                                'note': '📝 Примечание',
+                                                'views_increase_percent': '👀 Увеличение просмотров',
+                                                'conversion_boost_percent': '📈 Увеличение конверсии',
+                                                'time_saved_months': '⏱️ Экономия времени',
+                                                'time_value_of_money': '💎 Альтернативная стоимость времени',
+                                                'net_benefit': '✨ Чистая выгода',
+                                                'serious_inquiries_boost': '🎯 Рост серьезных обращений',
+                                                'scenario': '📋 Сценарий',
+                                                'expected_time_months': '📅 Ожидаемое время',
+                                                'probability_percent': '🎲 Вероятность продажи',
+                                                'expected_value': '💰 Ожидаемый доход',
+                                                'fast_scenario_expected': '⚡ Быстрая продажа (ожидаемое)',
+                                                'max_scenario_expected': '🎯 Максимум (ожидаемое)',
+                                                'difference': '📊 Разница',
+                                                'explanation': '💡 Пояснение',
+                                                'liquidity_index': '💧 Индекс ликвидности',
+                                                'context_notes': '📌 Контекстные заметки',
+                                                'системный_штраф': '⚙️ Системная корректировка',
+                                                'реальный_эффект': '🎯 Реальный эффект',
+                                                'объяснение': '💬 Объяснение',
+                                                'системный_бонус': '⚙️ Системная премия',
+                                                'реальный_риск': '⚠️ Реальный риск',
+                                                'cost': '💰 Стоимость',
+                                                'impact': '📊 Влияние',
+                                                'time_to_implement': '⏱️ Время на реализацию',
+                                                'value_increase': '📈 Прирост стоимости',
+                                                'liquidity_boost': '💧 Улучшение ликвидности'
+                                            };
+
+                                            // Подсказки для сложных терминов
+                                            const tooltips = {
+                                                'opportunity_cost_saved': 'Сколько денег вы не потеряете, если продадите быстрее (вместо того чтобы они лежали мертвым грузом)',
+                                                'opportunity_rate_percent': 'Процентная ставка, которую вы могли бы получить, разместив эти деньги в альтернативные инструменты (депозиты, облигации и т.д.)',
+                                                'time_value_of_money': 'Деньги, которые вы могли бы заработать за это время, вложив средства в другие инструменты',
+                                                'expected_value': 'Доход с учетом вероятности продажи (реалистичная оценка, а не оптимистичная)',
+                                                'liquidity_index': 'Показатель того, насколько быстро продается недвижимость в этом сегменте. >1.0 = быстро, <0.7 = медленно',
+                                                'net_benefit': 'Реальная выгода за вычетом всех затрат'
+                                            };
+
+                                            const label = fieldLabels[key] || key;
+                                            const tooltip = tooltips[key] ? `title="${tooltips[key]}" data-bs-toggle="tooltip"` : '';
+
+                                            // Форматирование значения
+                                            let formattedValue;
+                                            if (typeof value === 'number') {
+                                                if (value > 1000) {
+                                                    formattedValue = utils.formatPrice(value);
+                                                } else if (key.includes('percent') || key.includes('index')) {
+                                                    formattedValue = `${value}%`;
+                                                } else if (key.includes('months') || key.includes('мес')) {
+                                                    formattedValue = `${value} мес.`;
+                                                } else {
+                                                    formattedValue = utils.formatNumber(value, 1);
+                                                }
+                                            } else if (Array.isArray(value)) {
+                                                formattedValue = value.join(', ');
+                                            } else {
+                                                formattedValue = value;
+                                            }
+
+                                            return `<li ${tooltip} style="cursor: ${tooltip ? 'help' : 'default'}; padding: 3px 0;"><strong>${label}:</strong> ${formattedValue}</li>`;
+                                        }).join('')}
+                                    </ul>
+                                </div>
                             </div>
                         ` : ''}
                     </div>
                 </div>
             `;
         }).join('');
+
+        // Инициализируем tooltips после рендера рекомендаций
+        setTimeout(() => {
+            if (window.initTooltips) {
+                window.initTooltips();
+            }
+        }, 100);
     }
 };
 
@@ -1253,6 +1342,13 @@ const floatingButtons = {
     }
 };
 
+// Функция для инициализации tooltips
+function initTooltips() {
+    // Инициализируем все Bootstrap tooltips на странице
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+}
+
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     screen1.init();
@@ -1260,6 +1356,10 @@ document.addEventListener('DOMContentLoaded', () => {
     screen3.init();
     floatingButtons.init();
 
+    // Инициализируем tooltips
+    initTooltips();
+
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;
+    window.initTooltips = initTooltips;
 });

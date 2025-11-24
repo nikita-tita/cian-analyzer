@@ -1428,45 +1428,90 @@ const screen3 = {
 
                     // Финансовый эффект если есть
                     if (Object.keys(financial).length > 0) {
-                        html += '<div class="alert alert-light mt-2"><strong>Финансовый эффект:</strong><ul class="mb-0 mt-2">';
+                        html += '<div class="alert alert-info mt-2"><strong>📊 Финансовый эффект:</strong><ul class="mb-0 mt-2" style="list-style: none; padding-left: 0;">';
 
-                        // Маппинг технических названий на понятные
+                        // Полный маппинг технических названий на читаемый текст с эмодзи
                         const keyLabels = {
-                            'investment': 'Инвестиции',
-                            'views_increase_percent': 'Увеличение просмотров',
-                            'conversion_boost_percent': 'Увеличение конверсии',
-                            'estimated_time_reduction': 'Сокращение времени продажи',
-                            'expected_time': 'Ожидаемое время',
-                            'expected_time_months': 'Ожидаемое время',
-                            'торг_диапазон': 'Диапазон торга',
-                            'expected_value': 'Ожидаемый доход',
-                            'net_profit': 'Чистая прибыль',
-                            'probability_percent': 'Вероятность',
-                            'scenario': 'Сценарий',
-                            'difference': 'Разница',
-                            'explanation': 'Пояснение',
-                            'fast_scenario_expected': 'Быстрая продажа (ожидаемое)',
-                            'max_scenario_expected': 'Максимум (ожидаемое)'
+                            'current_scenario': '📍 Текущий сценарий',
+                            'with_action': '✅ После изменений',
+                            'time_saved_months': '⏱️ Экономия времени',
+                            'opportunity_cost_saved': '💰 Экономия на упущенной выгоде',
+                            'opportunity_rate_percent': '📈 Ставка упущенной выгоды',
+                            'opportunity_rate_note': '💡 Пояснение по ставке',
+                            'opportunity_rate_source': '🔍 Источник ставки',
+                            'recommendation': '👉 Рекомендация',
+                            'price_reduction': '💸 Снижение цены',
+                            'probability_increase': '📊 Рост вероятности продажи',
+                            'expected_time_reduction': '⏰ Сокращение срока продажи',
+                            'potential_gain': '💵 Потенциальная прибыль',
+                            'risk_level': '⚠️ Уровень риска',
+                            'торг_диапазон': '🤝 Диапазон для торга',
+                            'expected_time': '🕐 Ожидаемое время продажи',
+                            'investment': '💰 Инвестиции',
+                            'cost_per_sqm': '📏 Стоимость за м²',
+                            'return': '💵 Возврат инвестиций',
+                            'net_profit': '✅ Чистая прибыль',
+                            'net_loss': '❌ Чистый убыток',
+                            'payback_period': '⏳ Период окупаемости',
+                            'note': '📝 Примечание',
+                            'views_increase_percent': '👀 Увеличение просмотров',
+                            'conversion_boost_percent': '📈 Увеличение конверсии',
+                            'time_value_of_money': '💎 Альтернативная стоимость времени',
+                            'net_benefit': '✨ Чистая выгода',
+                            'serious_inquiries_boost': '🎯 Рост серьезных обращений',
+                            'scenario': '📋 Сценарий',
+                            'expected_time_months': '📅 Ожидаемое время',
+                            'probability_percent': '🎲 Вероятность продажи',
+                            'expected_value': '💰 Ожидаемый доход',
+                            'fast_scenario_expected': '⚡ Быстрая продажа (ожидаемое)',
+                            'max_scenario_expected': '🎯 Максимум (ожидаемое)',
+                            'difference': '📊 Разница',
+                            'explanation': '💡 Пояснение',
+                            'liquidity_index': '💧 Индекс ликвидности',
+                            'context_notes': '📌 Контекстные заметки',
+                            'системный_штраф': '⚙️ Системная корректировка',
+                            'реальный_эффект': '🎯 Реальный эффект',
+                            'объяснение': '💬 Объяснение',
+                            'системный_бонус': '⚙️ Системная премия',
+                            'реальный_риск': '⚠️ Реальный риск',
+                            'cost': '💰 Стоимость',
+                            'impact': '📊 Влияние',
+                            'time_to_implement': '⏱️ Время на реализацию',
+                            'value_increase': '📈 Прирост стоимости',
+                            'liquidity_boost': '💧 Улучшение ликвидности'
+                        };
+
+                        // Подсказки для сложных терминов
+                        const tooltips = {
+                            'opportunity_cost_saved': 'Сколько денег вы не потеряете, если продадите быстрее (вместо того чтобы они лежали мертвым грузом)',
+                            'opportunity_rate_percent': 'Процентная ставка, которую вы могли бы получить, разместив эти деньги в альтернативные инструменты (депозиты, облигации и т.д.)',
+                            'time_value_of_money': 'Деньги, которые вы могли бы заработать за это время, вложив средства в другие инструменты',
+                            'expected_value': 'Доход с учетом вероятности продажи (реалистичная оценка, а не оптимистичная)',
+                            'liquidity_index': 'Показатель того, насколько быстро продается недвижимость в этом сегменте. >1.0 = быстро, <0.7 = медленно',
+                            'net_benefit': 'Реальная выгода за вычетом всех затрат'
                         };
 
                         for (const [key, value] of Object.entries(financial)) {
                             const label = keyLabels[key] || key;
+                            const tooltip = tooltips[key] ? ` title="${tooltips[key]}" data-bs-toggle="tooltip" style="cursor: help;"` : '';
 
                             if (typeof value === 'number') {
                                 if (Math.abs(value) > 1000) {
                                     // Большие числа - это деньги
-                                    html += `<li><strong>${label}:</strong> ${utils.formatPrice(value)}</li>`;
-                                } else if (key.includes('percent')) {
+                                    html += `<li${tooltip}><strong>${label}:</strong> ${utils.formatPrice(value)}</li>`;
+                                } else if (key.includes('percent') || key.includes('index')) {
                                     // Проценты
-                                    html += `<li><strong>${label}:</strong> ${value}%</li>`;
-                                } else if (key.includes('months')) {
+                                    html += `<li${tooltip}><strong>${label}:</strong> ${value}%</li>`;
+                                } else if (key.includes('months') || key.includes('мес')) {
                                     // Месяцы
-                                    html += `<li><strong>${label}:</strong> ${value} мес.</li>`;
+                                    html += `<li${tooltip}><strong>${label}:</strong> ${value} мес.</li>`;
                                 } else {
-                                    html += `<li><strong>${label}:</strong> ${value}</li>`;
+                                    html += `<li${tooltip}><strong>${label}:</strong> ${value}</li>`;
                                 }
+                            } else if (Array.isArray(value)) {
+                                html += `<li${tooltip}><strong>${label}:</strong> ${value.join(', ')}</li>`;
                             } else {
-                                html += `<li><strong>${label}:</strong> ${value}</li>`;
+                                html += `<li${tooltip}><strong>${label}:</strong> ${value}</li>`;
                             }
                         }
                         html += '</ul></div>';
@@ -1487,6 +1532,13 @@ const screen3 = {
         }
 
         container.innerHTML = html;
+
+        // Инициализируем tooltips после рендера рекомендаций
+        setTimeout(() => {
+            if (window.initTooltips) {
+                window.initTooltips();
+            }
+        }, 100);
     },
 
     renderHouslerOffer(offer) {
@@ -2076,6 +2128,13 @@ const pixelLoader = {
     }
 };
 
+// Функция для инициализации tooltips
+function initTooltips() {
+    // Инициализируем все Bootstrap tooltips на странице
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+}
+
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async () => {
     // SECURITY: Fetch CSRF token first
@@ -2086,9 +2145,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     screen3.init();
     floatingButtons.init();
 
+    // Инициализируем tooltips
+    initTooltips();
+
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;
     window.screen3 = screen3; // Нужно для auto-run анализа
+    window.initTooltips = initTooltips;
 
     // Breadcrumbs: Make progress bar clickable
     document.querySelectorAll('.progress-step').forEach((stepEl) => {
