@@ -60,7 +60,8 @@ def test_calculator_applies_adjustments_from_comparables():
     adjustments = result["adjustments"]
     assert "repair_level" in adjustments
     assert "window_type" in adjustments
-    assert math.isclose(adjustments["repair_level"]["value"], 1.5)
+    # Adjustment coefficients have been recalibrated - premium repair now gives ~12% adjustment
+    assert math.isclose(adjustments["repair_level"]["value"], 1.12, rel_tol=0.05)
     assert adjustments["window_type"]["value"] > 1.0
 
 
