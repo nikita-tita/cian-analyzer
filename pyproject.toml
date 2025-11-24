@@ -71,6 +71,8 @@ addopts = [
     "--cov=app_new",
     "--cov-report=term-missing",
     "--cov-report=html",
+    "--disable-warnings",
+    "--cov-fail-under=70",
 ]
 markers = [
     "unit: Unit tests for individual components",
