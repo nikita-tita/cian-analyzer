@@ -187,15 +187,16 @@ class TestBrowserPool:
         pool = BrowserPool(max_browsers=2, max_age_seconds=1)
         pool.start()
 
-        # Create and release a browser
+        # Fill the pool to max capacity
         browser1, _ = pool.acquire()
-        pool.release(browser1)
+        browser2, _ = pool.acquire()
 
-        # Wait for it to become stale
+        # Release first browser and wait for it to become stale
+        pool.release(browser1)
         time.sleep(1.1)
 
-        # Acquire again - should evict stale and create new
-        browser2, _ = pool.acquire()
+        # Acquire again while pool is full - should evict stale browser1 and reuse slot
+        browser3, _ = pool.acquire()
 
         # Should have destroyed the stale one
         assert pool.total_destroyed >= 1
