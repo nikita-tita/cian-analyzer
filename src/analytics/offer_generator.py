@@ -273,19 +273,15 @@ class HouslerOfferGenerator:
         return 'Определим после диагностики и анализа рынка'
 
     def _get_payment_options(self, price_tier: Dict) -> tuple:
-        """Возвращает варианты оплаты"""
+        """Возвращает варианты оплаты - ЕДИНАЯ КОМИССИЯ 2%"""
         commission_option = {
             'type': 'Комиссия',
-            'value': price_tier['commission'],
-            'description': 'Без предоплат. Оплата в день сделки.'
+            'value': '2%',
+            'description': 'Единая комиссия 2% от стоимости сделки. Оплата в день сделки. Без предоплат и скрытых платежей.'
         }
 
-        prepay_option = {
-            'type': 'Предоплата + успех',
-            'prepay': price_tier['prepay'],
-            'success_fee': price_tier['success_fee'],
-            'description': f"{price_tier['prepay']} предоплата + {price_tier['success_fee']} успех-фи при продаже клиенту, приведённому нашей активностью. Предоплата не возвращается."
-        }
+        # Второй вариант убираем, оставляем только один
+        prepay_option = None
 
         return commission_option, prepay_option
 

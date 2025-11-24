@@ -966,6 +966,8 @@ def update_target():
     """
     API: Обновление целевого объекта с заполненными полями (Экран 1 → 2)
 
+    НОВОЕ: Автоматически перепоискивает аналоги при изменении критических параметров
+
     Body:
         {
             "session_id": "uuid",
@@ -979,7 +981,9 @@ def update_target():
     Returns:
         {
             "status": "success",
-            "message": "Данные обновлены"
+            "message": "Данные обновлены",
+            "needs_research": false,  // true если изменились критические параметры
+            "changed_critical_params": []  // список изменённых критических параметров
         }
     """
     try:
@@ -990,15 +994,63 @@ def update_target():
         if not session_id or not session_storage.exists(session_id):
             return jsonify({'status': 'error', 'message': 'Сессия не найдена'}), 404
 
-        # Обновляем данные
+        # Получаем текущие данные
         session_data = session_storage.get(session_id)
+        old_target = session_data['target_property'].copy()
+
+        # Проверяем изменение КРИТИЧЕСКИХ параметров
+        critical_params_changed = []
+
+        # 1. Комнаты (если изменились)
+        if 'rooms' in data and data['rooms'] != old_target.get('rooms'):
+            critical_params_changed.append('rooms')
+            logger.info(f"🔄 Комнаты изменились: {old_target.get('rooms')} → {data['rooms']}")
+
+        # 2. Площадь (если изменение >15%)
+        if 'total_area' in data:
+            old_area = old_target.get('total_area', 0)
+            new_area = data['total_area']
+            if old_area > 0:
+                area_diff_percent = abs((new_area - old_area) / old_area * 100)
+                if area_diff_percent > 15:
+                    critical_params_changed.append('total_area')
+                    logger.info(f"🔄 Площадь изменилась на {area_diff_percent:.1f}%: {old_area} → {new_area}")
+
+        # 3. Регион/адрес (если изменился)
+        if 'region' in data and data['region'] != old_target.get('region'):
+            critical_params_changed.append('region')
+            logger.info(f"🔄 Регион изменился: {old_target.get('region')} → {data['region']}")
+
+        if 'address' in data and data['address'] != old_target.get('address'):
+            # Проверяем существенное изменение адреса (не просто опечатка)
+            old_addr = old_target.get('address', '').lower()
+            new_addr = data['address'].lower()
+            # Простая эвристика: если изменилось >30% символов - считаем критичным
+            if len(old_addr) > 0:
+                from difflib import SequenceMatcher
+                similarity = SequenceMatcher(None, old_addr, new_addr).ratio()
+                if similarity < 0.7:  # Изменение >30%
+                    critical_params_changed.append('address')
+                    logger.info(f"🔄 Адрес существенно изменился (схожесть {similarity:.0%})")
+
+        # Обновляем данные
         session_data['target_property'].update(data)
         session_data['step'] = 2
+
+        # Если есть критические изменения - помечаем что нужен перепоиск
+        needs_research = len(critical_params_changed) > 0
+        if needs_research:
+            session_data['needs_research'] = True
+            session_data['research_reason'] = critical_params_changed
+            logger.warning(f"⚠️ Требуется перепоиск аналогов: изменены {critical_params_changed}")
+
         session_storage.set(session_id, session_data)
 
         return jsonify({
             'status': 'success',
-            'message': 'Данные обновлены'
+            'message': 'Данные обновлены',
+            'needs_research': needs_research,
+            'changed_critical_params': critical_params_changed
         })
 
     except Exception as e:

@@ -654,6 +654,23 @@ const screen1 = {
 
                     utils.showToast('Данные сохранены', 'success');
 
+                    // НОВОЕ: Проверяем нужен ли перепоиск аналогов
+                    if (result.needs_research && result.changed_critical_params && result.changed_critical_params.length > 0) {
+                        // Критические параметры изменились - перепоискиваем аналоги
+                        const paramsText = result.changed_critical_params.join(', ');
+                        utils.showToast(
+                            `Критические параметры изменились (${paramsText}). Перепоискиваем аналоги...`,
+                            'info',
+                            5000
+                        );
+
+                        pixelLoader.hide(); // Скрываем текущий лоадер
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Небольшая пауза
+
+                        // Запускаем перепоиск
+                        await this.researchComparables();
+                    }
+
                     // Переходим на шаг 2
                     navigation.goToStep(2);
                 } else {
@@ -670,6 +687,48 @@ const screen1 = {
         } else {
             // Нет данных для сохранения, просто переходим
             navigation.goToStep(2);
+        }
+    },
+
+    /**
+     * Перепоиск аналогов при изменении критических параметров
+     */
+    async researchComparables() {
+        console.log('🔄 Запуск перепоиска аналогов...');
+        pixelLoader.show('searching');
+
+        try {
+            // Используем мультиисточниковый поиск
+            const response = await fetch('/api/multi-source-search', {
+                method: 'POST',
+                headers: utils.getCsrfHeaders(),
+                body: JSON.stringify({
+                    session_id: state.sessionId,
+                    sources: ['cian', 'domclick'],
+                    limit_per_source: 15,
+                    strategy: 'citywide',
+                    parallel: true
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                state.comparables = result.comparables || [];
+                console.log(`✅ Найдено ${state.comparables.length} новых аналогов`);
+                utils.showToast(
+                    `Найдено ${state.comparables.length} новых аналогов с обновленными параметрами`,
+                    'success'
+                );
+            } else {
+                console.error('Ошибка перепоиска:', result);
+                utils.showToast('Не удалось перепоискать аналоги, используем старые', 'warning');
+            }
+        } catch (error) {
+            console.error('Ошибка перепоиска:', error);
+            utils.showToast('Ошибка перепоиска аналогов, используем старые', 'warning');
+        } finally {
+            pixelLoader.hide();
         }
     }
 };

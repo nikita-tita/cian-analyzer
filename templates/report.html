@@ -699,32 +699,20 @@
                 </p>
             </div>
 
-            <!-- Варианты оплаты -->
+            <!-- Стоимость услуг -->
             <div style="margin-bottom: 25px;">
-                <h3 class="subsection-title">💳 Выберите удобный вариант оплаты</h3>
-                <p style="color: #6c757d; margin-bottom: 15px;">
-                    Ваш объект относится к диапазону: <strong>{{ housler_offer.price_tier.range }}</strong>
-                </p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <!-- Опция A: Комиссия -->
-                    <div style="background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 20px;">
-                        <h4 style="margin: 0 0 10px 0; color: #007bff;">Опция A — Комиссия</h4>
-                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
-                            {{ housler_offer.commission_option.value }}
-                        </div>
-                        <p style="margin: 0; color: #6c757d;">
-                            {{ housler_offer.commission_option.description }}
-                        </p>
+                <h3 class="subsection-title">💳 Стоимость услуг</h3>
+                <div style="background: #fff; border: 3px solid #007bff; border-radius: 12px; padding: 30px; text-align: center; max-width: 600px; margin: 0 auto;">
+                    <h4 style="margin: 0 0 15px 0; color: #007bff; font-size: 20px;">Единая комиссия</h4>
+                    <div style="font-size: 48px; font-weight: bold; margin: 15px 0; color: #000;">
+                        {{ housler_offer.commission_option.value }}
                     </div>
-
-                    <!-- Опция B: Предоплата -->
-                    <div style="background: #fff; border: 2px solid #28a745; border-radius: 8px; padding: 20px;">
-                        <h4 style="margin: 0 0 10px 0; color: #28a745;">Опция B — Предоплата + успех</h4>
-                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
-                            {{ housler_offer.prepay_option.prepay }}
-                        </div>
-                        <p style="margin: 0; color: #6c757d;">
-                            {{ housler_offer.prepay_option.description }}
+                    <p style="margin: 15px 0 0 0; color: #6c757d; font-size: 16px; line-height: 1.6;">
+                        {{ housler_offer.commission_option.description }}
+                    </p>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                        <p style="margin: 0; color: #666; font-size: 14px;">
+                            Ваш объект: <strong>{{ housler_offer.price_tier.range }}</strong>
                         </p>
                     </div>
                 </div>
