@@ -28,11 +28,14 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/static/images/favicon-192.png">
     <link rel="manifest" href="/static/manifest.json">
 
-    <!-- Единая минималистичная система дизайна -->
-    <link rel="stylesheet" href="/static/css/unified-minimal.css">
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/pricing-improvements.css?v=20251108">
+    <link rel="stylesheet" href="/static/css/pricing-unified.css">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css">
+    <link rel="stylesheet" href="/static/css/advice-ticker.css?v=20251108210930">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -40,20 +43,32 @@
         <div class="container">
             <div class="nav-content">
                 <div class="logo">HOUSLER</div>
-                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Меню">
+                <div class="nav-links">
+                    <a href="#services">Услуги</a>
+                    <a href="#pricing">Стоимость</a>
+                    <a href="#blog">Блог</a>
+                    <a href="#contact">Контакты</a>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Меню">
                     <span></span>
                     <span></span>
                     <span></span>
                 </button>
-                <div class="nav-links" id="navLinks">
-                    <a href="#services">Услуги</a>
-                    <a href="#pricing">Стоимость</a>
-                    <a href="/blog">Блог</a>
-                    <a href="#contact">Контакты</a>
-                </div>
             </div>
         </div>
     </nav>
+
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-menu-overlay"></div>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <a href="#services">Услуги</a>
+        <a href="#pricing">Стоимость</a>
+        <a href="#blog">Блог</a>
+        <a href="#contact">Контакты</a>
+        <a href="/blog">Все статьи</a>
+    </div>
 
     <!-- Hero Section -->
     <section class="hero">
@@ -154,21 +169,19 @@
             {% if recent_posts %}
             <div class="blog-listing">
                 {% for post in recent_posts %}
-                <article class="blog-entry">
-                    <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
-                    <h3 class="blog-entry-title">
-                        <a href="/blog/{{ post.slug }}" style="color: inherit; text-decoration: none;">
-                            {{ post.title }}
-                        </a>
-                    </h3>
-                    {% if post.excerpt %}
-                    <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
-                    {% endif %}
-                </article>
+                <a href="/blog/{{ post.slug }}" class="blog-entry-link">
+                    <article class="blog-entry">
+                        <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
+                        <h3 class="blog-entry-title">{{ post.title }}</h3>
+                        {% if post.excerpt %}
+                        <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                        {% endif %}
+                    </article>
+                </a>
                 {% endfor %}
             </div>
             <div style="text-align: center; margin-top: 2rem;">
-                <a href="/blog" style="color: #000; text-decoration: none; font-weight: 500; border-bottom: 1px solid #000; padding-bottom: 2px;">Все статьи →</a>
+                <a href="/blog" class="blog-all-link">Все статьи →</a>
             </div>
             {% else %}
             <p style="text-align: center; color: #666; padding: 2rem 0;">
@@ -242,7 +255,6 @@
     <script src="/static/js/advice-ticker.js?v=20251108210930"></script>
     <script>
         // Smooth scroll
-        // Плавная прокрутка к якорям
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -250,31 +262,29 @@
                 if (target) {
                     target.scrollIntoView({ behavior: 'smooth' });
                 }
-                // Закрыть мобильное меню после клика
-                const navLinks = document.getElementById('navLinks');
-                if (navLinks && navLinks.classList.contains('active')) {
-                    navLinks.classList.remove('active');
-                }
             });
         });
 
-        // Мобильное меню
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
+        // Mobile menu toggle
+        const menuToggle = document.querySelector('.mobile-menu-toggle');
+        const mobileMenu = document.querySelector('.mobile-menu');
+        const menuOverlay = document.querySelector('.mobile-menu-overlay');
+        const body = document.body;
 
-        if (mobileMenuBtn && navLinks) {
-            mobileMenuBtn.addEventListener('click', function() {
-                navLinks.classList.toggle('active');
-            });
-
-            // Закрыть меню при клике вне его
-            document.addEventListener('click', function(event) {
-                const isClickInside = mobileMenuBtn.contains(event.target) || navLinks.contains(event.target);
-                if (!isClickInside && navLinks.classList.contains('active')) {
-                    navLinks.classList.remove('active');
-                }
-            });
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            mobileMenu.classList.toggle('active');
+            menuOverlay.classList.toggle('active');
+            body.style.overflow = mobileMenu.classList.contains('active') ? 'hidden' : '';
         }
+
+        menuToggle.addEventListener('click', toggleMenu);
+        menuOverlay.addEventListener('click', toggleMenu);
+
+        // Close menu when clicking on a link
+        mobileMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', toggleMenu);
+        });
     </script>
 
     {% include '_metrika.html' %}
