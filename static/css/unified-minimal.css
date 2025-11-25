@@ -603,6 +603,306 @@ a:hover {
 }
 
 /* ========================================
+   SERVICES SECTION
+   ======================================== */
+
+.section-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.swipe-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+}
+
+.service-card {
+    border: var(--border-thin);
+    padding: var(--spacing-md);
+    background: var(--color-white);
+    transition: var(--transition);
+}
+
+.service-card:hover {
+    background: var(--color-black);
+    color: var(--color-white);
+}
+
+.service-card h3 {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* ========================================
+   PRICING SECTION
+   ======================================== */
+
+.pricing-unified {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: var(--spacing-lg);
+    border: var(--border-thin);
+    padding: var(--spacing-lg);
+}
+
+.pricing-main-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.pricing-rate {
+    text-align: center;
+    padding: var(--spacing-md);
+    border: var(--border-thin);
+}
+
+.rate-amount {
+    font-size: 72px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: var(--spacing-xs);
+}
+
+.rate-description {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-xs);
+}
+
+.rate-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-text);
+}
+
+.pricing-conditions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.condition-item {
+    padding: var(--spacing-sm);
+    border: var(--border-thin);
+    text-align: center;
+    font-size: var(--font-size-sm);
+}
+
+.pricing-scope {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.scope-title {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: var(--border-thin);
+}
+
+.scope-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+}
+
+.scope-item {
+    padding: var(--spacing-md);
+    border: var(--border-thin);
+}
+
+.scope-item-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.scope-item-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-text);
+}
+
+/* ========================================
+   WHY SECTION
+   ======================================== */
+
+.why-description {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+    font-size: var(--font-size-lg);
+    line-height: 1.7;
+}
+
+/* ========================================
+   BLOG SECTION
+   ======================================== */
+
+.section-gray {
+    background: var(--color-gray-light);
+}
+
+.blog-listing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.blog-entry {
+    border: var(--border-thin);
+    padding: var(--spacing-md);
+    background: var(--color-white);
+    transition: var(--transition);
+}
+
+.blog-entry:hover {
+    border-color: var(--color-black);
+    transform: translateX(4px);
+}
+
+.blog-entry-meta {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-text);
+    margin-bottom: var(--spacing-xs);
+}
+
+.blog-entry-title {
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-xl);
+}
+
+.blog-entry-excerpt {
+    color: var(--color-gray-text);
+    margin-bottom: 0;
+}
+
+/* ========================================
+   CTA SECTION
+   ======================================== */
+
+.section-cta {
+    background: var(--color-black);
+    color: var(--color-white);
+}
+
+.cta-content {
+    text-align: center;
+    padding: var(--spacing-lg) 0;
+}
+
+.cta-content h2 {
+    color: var(--color-white);
+}
+
+.btn-large {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--font-size-lg);
+}
+
+/* ========================================
+   CONTACT SECTION
+   ======================================== */
+
+.contact-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-md);
+}
+
+.contact-item {
+    border: var(--border-thin);
+    padding: var(--spacing-md);
+    text-align: center;
+}
+
+.contact-label {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-text);
+}
+
+/* ========================================
+   ADVICE TICKER
+   ======================================== */
+
+.advice-ticker {
+    border-top: var(--border-thin);
+    border-bottom: var(--border-thin);
+    padding: var(--spacing-sm) 0;
+    overflow: hidden;
+    background: var(--color-gray-light);
+}
+
+.advice-ticker-track {
+    display: flex;
+    gap: var(--spacing-lg);
+    animation: scroll 30s linear infinite;
+}
+
+@keyframes scroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* ========================================
+   FOOTER ADDITIONS
+   ======================================== */
+
+.footer-brand {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.footer-text {
+    color: var(--color-gray-text);
+    font-size: var(--font-size-sm);
+}
+
+.footer-right {
+    display: flex;
+    gap: var(--spacing-lg);
+}
+
+/* ========================================
+   RESPONSIVE / ADDITIONAL
+   ======================================== */
+
+@media (max-width: 768px) {
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pricing-unified {
+        grid-template-columns: 1fr;
+    }
+
+    .scope-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .contact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-right {
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+}
+
+/* ========================================
    DARK MODE (опционально, если понадобится)
    ======================================== */
 
