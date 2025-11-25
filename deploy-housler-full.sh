@@ -288,9 +288,46 @@ else
     systemctl status housler
     exit 1
 fi
+
+# Настройка cron job для автоматического парсинга блога
+echo "Настройка cron job для blog parser..."
+
+# Создаём скрипт для cron
+cat > /var/www/housler/cron_parse_blog.sh << 'CRONSCRIPT'
+#!/bin/bash
+cd /var/www/housler
+source venv/bin/activate
+python3 blog_cli.py parse -n 3 >> /var/log/housler/blog_parser_cron.log 2>&1
+CRONSCRIPT
+
+chmod +x /var/www/housler/cron_parse_blog.sh
+
+# Добавляем в crontab (запуск каждый день в 10:00)
+CRON_JOB="0 10 * * * /var/www/housler/cron_parse_blog.sh"
+
+# Проверяем есть ли уже этот cron job
+if ! crontab -l 2>/dev/null | grep -q "cron_parse_blog.sh"; then
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    echo "✅ Cron job для blog parser добавлен (ежедневно в 10:00)"
+else
+    echo "✅ Cron job для blog parser уже существует"
+fi
+
+# Инициализируем блог seed данными если база пустая
+cd /var/www/housler
+POSTS_COUNT=$(source venv/bin/activate && python3 -c "from blog_database import BlogDatabase; db = BlogDatabase(); print(len(db.get_all_posts()))")
+if [ "$POSTS_COUNT" = "0" ]; then
+    echo "База блога пустая, добавляем seed данные..."
+    source venv/bin/activate
+    python3 seed_blog.py
+    echo "✅ Seed данные добавлены"
+else
+    echo "✅ В базе блога уже есть $POSTS_COUNT статей"
+fi
+
 ENDSSH
 
-echo -e "${GREEN}✅ Приложение запущено${NC}"
+echo -e "${GREEN}✅ Приложение запущено и blog parser настроен${NC}"
 
 # ========================================
 # 9. Проверка работоспособности

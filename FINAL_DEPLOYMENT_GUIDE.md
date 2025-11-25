@@ -149,7 +149,7 @@ git push origin main
 5. ✅ **[5/9]** Настройка systemd сервиса
 6. ✅ **[6/9]** Настройка Nginx
 7. ✅ **[7/9]** Получение SSL сертификата (Let's Encrypt)
-8. ✅ **[8/9]** Запуск приложения
+8. ✅ **[8/9]** Запуск приложения + настройка cron job для автопарсинга блога
 9. ✅ **[9/9]** Проверка работоспособности
 
 ---
@@ -347,6 +347,25 @@ ssh -i ~/.ssh/id_housler root@91.229.8.221 'systemctl status housler'
 # Просто запустите деплой снова!
 ./deploy-housler-full.sh
 ```
+
+### Проверка cron job (автопарсинг блога)
+
+```bash
+# Проверить что cron job настроен
+ssh -i ~/.ssh/id_housler root@91.229.8.221 'crontab -l | grep blog'
+
+# Посмотреть логи парсера
+ssh -i ~/.ssh/id_housler root@91.229.8.221 'tail -50 /var/log/housler/blog_parser_cron.log'
+
+# Запустить парсинг вручную (для теста)
+ssh -i ~/.ssh/id_housler root@91.229.8.221 'cd /var/www/housler && source venv/bin/activate && python3 blog_cli.py parse -n 3'
+```
+
+**Cron job настроен на:**
+- Запуск каждый день в 10:00 утра
+- Парсит до 3 новых статей с CIAN Magazine
+- Рерайтит через Yandex GPT
+- Автоматически публикует в блог
 
 ---
 
