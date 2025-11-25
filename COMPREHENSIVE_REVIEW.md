@@ -1110,7 +1110,7 @@ from functools import wraps
 class RedisCache:
     """Кеш для результатов анализа"""
 
-    def __init__(self, host='localhost', port=6379, ttl=3600):
+    def __init__(self, host='localhost', port=6380, ttl=3600):
         self.redis = redis.Redis(host=host, port=port, decode_responses=False)
         self.ttl = ttl
 

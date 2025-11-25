@@ -111,7 +111,7 @@ logger.info("CSRF protection enabled")
 # В продакшене параметры берутся из env переменных
 property_cache = init_cache(
     host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(os.getenv('REDIS_PORT', 6379)),
+    port=int(os.getenv('REDIS_PORT', 6380)),
     db=int(os.getenv('REDIS_DB', 0)),
     password=os.getenv('REDIS_PASSWORD'),
     namespace=os.getenv('REDIS_NAMESPACE', 'housler'),
@@ -267,7 +267,7 @@ def get_rate_limit_key():
 limiter = Limiter(
     app=app,
     key_func=get_rate_limit_key,  # Используем улучшенный ключ
-    storage_uri=f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}/{os.getenv('REDIS_DB', 0)}" if os.getenv('REDIS_ENABLED', 'false').lower() == 'true' else 'memory://',
+    storage_uri=f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6380)}/{os.getenv('REDIS_DB', 0)}" if os.getenv('REDIS_ENABLED', 'false').lower() == 'true' else 'memory://',
     default_limits=["200 per day", "50 per hour"],
     storage_options={"socket_connect_timeout": 30},
     strategy="moving-window"  # Более строгая стратегия

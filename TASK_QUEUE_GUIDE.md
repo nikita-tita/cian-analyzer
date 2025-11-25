@@ -35,7 +35,7 @@ pip install -r requirements.txt
 
 ```bash
 # Docker
-docker run -d -p 6379:6379 redis:7-alpine
+docker run -d -p 6380:6380 redis:7-alpine
 
 # Или через brew на macOS
 brew services start redis
@@ -48,7 +48,7 @@ brew services start redis
 python worker.py
 
 # Или с явным указанием Redis
-REDIS_URL=redis://localhost:6379/0 python worker.py
+REDIS_URL=redis://localhost:6380/0 python worker.py
 ```
 
 ### 4. Запуск Flask приложения
@@ -217,7 +217,7 @@ try {
 
 ```bash
 # Redis URL для очереди задач
-REDIS_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6380/0
 
 # Таймаут задач (секунды)
 RQ_JOB_TIMEOUT=300  # 5 минут
@@ -256,7 +256,7 @@ After=network.target redis.service
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/housler
-Environment="REDIS_URL=redis://localhost:6379/0"
+Environment="REDIS_URL=redis://localhost:6380/0"
 Environment="PYTHONPATH=/var/www/housler"
 ExecStart=/var/www/housler/venv/bin/python worker.py
 Restart=always
@@ -299,7 +299,7 @@ sudo systemctl start housler-worker@{1..4}
 
 ```bash
 pip install rq-dashboard
-rq-dashboard --redis-url redis://localhost:6379/0
+rq-dashboard --redis-url redis://localhost:6380/0
 ```
 
 Откройте http://localhost:9181 для просмотра:
@@ -347,7 +347,7 @@ redis-cli
 from rq import Queue
 from redis import Redis
 
-redis_conn = Redis.from_url('redis://localhost:6379/0')
+redis_conn = Redis.from_url('redis://localhost:6380/0')
 queue = Queue('housler-tasks', connection=redis_conn)
 
 # Получить failed jobs

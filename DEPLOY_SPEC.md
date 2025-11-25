@@ -82,7 +82,7 @@ playwright --version
 SECRET_KEY=<ваш-секретный-ключ>  # Для CSRF защиты
 
 # Опциональные (рекомендуемые)
-REDIS_URL=redis://localhost:6379  # Для session storage
+REDIS_URL=redis://localhost:6380  # Для session storage
 FLASK_ENV=production
 PORT=5000
 ```

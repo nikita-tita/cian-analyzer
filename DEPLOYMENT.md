@@ -44,7 +44,7 @@ cd housler
 cat > .env << EOF
 REDIS_ENABLED=true
 REDIS_HOST=redis
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_DB=0
 REDIS_NAMESPACE=housler
 FLASK_ENV=production
@@ -59,7 +59,7 @@ curl http://localhost:5000/health
 
 **Результат:**
 - ✅ App: http://localhost:5000
-- ✅ Redis: localhost:6379
+- ✅ Redis: localhost:6380
 - ✅ Health: http://localhost:5000/health
 
 ---
@@ -95,7 +95,7 @@ cat > .env.production << 'EOF'
 # Redis
 REDIS_ENABLED=true
 REDIS_HOST=redis
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_DB=0
 REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD
 REDIS_NAMESPACE=housler_prod
@@ -111,7 +111,7 @@ TIMEOUT=300
 BIND=0.0.0.0:5000
 
 # Rate Limiting
-RATELIMIT_STORAGE_URL=redis://redis:6379/1
+RATELIMIT_STORAGE_URL=redis://redis:6380/1
 EOF
 ```
 

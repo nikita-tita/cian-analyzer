@@ -219,7 +219,7 @@ Internet
          ↓
     [Flask app:5000]
          ↓
-    [Redis:6379]
+    [Redis:6380]
 ```
 
 **Компоненты:**
