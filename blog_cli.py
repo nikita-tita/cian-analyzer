@@ -6,6 +6,10 @@ Parse articles from CIAN magazine and publish to blog
 
 import argparse
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from blog_parser_playwright import CianMagazineParserPlaywright
 from yandex_gpt import YandexGPT
 from blog_database import BlogDatabase

@@ -29,7 +29,7 @@ class RBCRealtyParser:
                 page = browser.new_page()
 
                 logger.info(f"Navigating to {self.base_url}")
-                page.goto(self.base_url, wait_until='networkidle', timeout=30000)
+                page.goto(self.base_url, wait_until='domcontentloaded', timeout=30000)
 
                 # Даем странице время на загрузку JS-контента
                 time.sleep(3)
@@ -41,17 +41,20 @@ class RBCRealtyParser:
                 # Ищем статьи по различным селекторам
                 article_links = []
 
-                # Вариант 1: ссылки на статьи (обычно в формате /news/ или /article/)
+                # Вариант 1: ссылки на статьи (формат /news/[hash] или /news/2024/01/01/slug)
                 for link in soup.find_all('a', href=re.compile(r'/(news|article)/')):
                     href = link.get('href')
                     if href:
-                        # Проверяем что это полноценная статья
-                        if re.match(r'/(news|article)/\d{4}/\d{2}/\d{2}/[a-z0-9_-]+', href):
+                        # Новый формат: /news/69254def9a794747abab35d1
+                        # Старый формат: /news/2024/01/01/slug
+                        if re.match(r'(https?://[^/]+)?/(news|article)/[a-z0-9_-]+', href, re.I):
                             full_url = href if href.startswith('http') else f"{self.base_url}{href}"
-                            article_links.append({
-                                'url': full_url,
-                                'element': link
-                            })
+                            # Пропускаем страницы-разделы
+                            if not re.search(r'/(news|article)/?$', full_url):
+                                article_links.append({
+                                    'url': full_url,
+                                    'element': link
+                                })
 
                 # Убираем дубликаты
                 seen_urls = set()
@@ -124,7 +127,7 @@ class RBCRealtyParser:
                 page = browser.new_page()
 
                 logger.info(f"Parsing article: {url}")
-                page.goto(url, wait_until='networkidle', timeout=30000)
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 time.sleep(2)
 
                 html = page.content()
