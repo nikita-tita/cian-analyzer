@@ -67,7 +67,7 @@ def main(source: str = 'cian'):
 
         # Получаем статьи
         logger.info(f"Fetching articles from {source_name}...")
-        articles = parser.get_recent_articles(limit=6)  # Берем с запасом
+        articles = parser.get_recent_articles(limit=20)  # Берем с запасом
         logger.info(f"Found {len(articles)} articles from {source_name}")
 
         if not articles:
@@ -76,7 +76,7 @@ def main(source: str = 'cian'):
 
         # Парсим и публикуем новые статьи
         published_count = 0
-        target_count = 3  # Добавляем до 3 новых статей за запуск
+        target_count = 10  # Добавляем до 10 новых статей за запуск
 
         for article_preview in articles:
             if published_count >= target_count:
