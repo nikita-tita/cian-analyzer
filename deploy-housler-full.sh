@@ -36,7 +36,7 @@ echo ""
 # ========================================
 
 echo -e "${CYAN}[1/9] Проверка подключения к серверу...${NC}"
-if ! ssh -o ConnectTimeout=5 "$SERVER_USER@$SERVER_IP" "echo 'OK'" > /dev/null 2>&1; then
+if ! ssh -o ConnectTimeout=5 -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "echo 'OK'" > /dev/null 2>&1; then
     echo -e "${RED}❌ Не удалось подключиться к серверу${NC}"
     echo "Проверьте SSH ключи и доступность сервера"
     exit 1
@@ -51,10 +51,10 @@ echo ""
 echo -e "${CYAN}[2/9] Копирование файлов на сервер...${NC}"
 
 # Создаем директорию на сервере
-ssh "$SERVER_USER@$SERVER_IP" "mkdir -p $APP_DIR/backups"
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "mkdir -p $APP_DIR/backups"
 
 # Список файлов для деплоя (исключаем venv, cache, и т.д.)
-rsync -avz --progress \
+rsync -avz --progress -e "ssh -i ~/.ssh/id_housler" \
     --exclude 'venv/' \
     --exclude 'venv_dashboard/' \
     --exclude '__pycache__/' \
@@ -76,7 +76,7 @@ echo -e "${GREEN}✅ Файлы скопированы${NC}"
 echo ""
 echo -e "${CYAN}[3/9] Установка зависимостей...${NC}"
 
-ssh "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
 set -e
 cd /var/www/housler
 
@@ -117,10 +117,10 @@ echo -e "${CYAN}[4/9] Настройка окружения...${NC}"
 # Проверяем есть ли .env локально
 if [ -f ".env" ]; then
     echo "Копируем локальный .env файл..."
-    scp .env "$SERVER_USER@$SERVER_IP:$APP_DIR/.env"
+    scp -i ~/.ssh/id_housler .env "$SERVER_USER@$SERVER_IP:$APP_DIR/.env"
 else
     echo "Создаем .env из .env.example..."
-    ssh "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
+    ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
     cd /var/www/housler
     if [ ! -f ".env" ] && [ -f ".env.example" ]; then
         cp .env.example .env
@@ -140,7 +140,7 @@ echo -e "${GREEN}✅ Окружение настроено${NC}"
 echo ""
 echo -e "${CYAN}[5/9] Настройка systemd сервиса...${NC}"
 
-ssh "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
 set -e
 
 # Создаем systemd service файл
@@ -187,9 +187,9 @@ echo ""
 echo -e "${CYAN}[6/9] Настройка Nginx...${NC}"
 
 # Копируем Nginx конфигурацию
-scp nginx-housler-main.conf "$SERVER_USER@$SERVER_IP:/tmp/housler.ru.conf"
+scp -i ~/.ssh/id_housler nginx-housler-main.conf "$SERVER_USER@$SERVER_IP:/tmp/housler.ru.conf"
 
-ssh "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
 set -e
 
 # Устанавливаем Nginx если его нет
@@ -227,7 +227,7 @@ echo -e "${GREEN}✅ Nginx настроен${NC}"
 echo ""
 echo -e "${CYAN}[7/9] Настройка SSL сертификата...${NC}"
 
-ssh "$SERVER_USER@$SERVER_IP" bash << ENDSSH
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << ENDSSH
 set -e
 
 # Устанавливаем Certbot если его нет
@@ -263,7 +263,7 @@ echo -e "${GREEN}✅ SSL настроен${NC}"
 echo ""
 echo -e "${CYAN}[8/9] Запуск приложения...${NC}"
 
-ssh "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'ENDSSH'
 set -e
 
 # Останавливаем старую версию
@@ -303,7 +303,7 @@ echo -e "${CYAN}[9/9] Проверка работоспособности...${NC
 echo "Проверка health endpoint..."
 sleep 5
 
-HEALTH_STATUS=$(ssh "$SERVER_USER@$SERVER_IP" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$APP_PORT/health" || echo "000")
+HEALTH_STATUS=$(ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$APP_PORT/health" || echo "000")
 
 if [ "$HEALTH_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ Health check: OK (HTTP $HEALTH_STATUS)${NC}"
