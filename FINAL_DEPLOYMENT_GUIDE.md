@@ -358,14 +358,18 @@ ssh -i ~/.ssh/id_housler root@91.229.8.221 'crontab -l | grep blog'
 ssh -i ~/.ssh/id_housler root@91.229.8.221 'tail -50 /var/log/housler/blog_parser_cron.log'
 
 # Запустить парсинг вручную (для теста)
-ssh -i ~/.ssh/id_housler root@91.229.8.221 'cd /var/www/housler && source venv/bin/activate && python3 blog_cli.py parse -n 3'
+ssh -i ~/.ssh/id_housler root@91.229.8.221 'cd /var/www/housler && source venv/bin/activate && python3 blog_cli.py parse -n 10'
 ```
 
 **Cron job настроен на:**
 - Запуск каждый день в 10:00 утра
-- Парсит до 3 новых статей с CIAN Magazine
+- Парсит до **10 новых статей** с CIAN Magazine
 - Рерайтит через Yandex GPT
 - Автоматически публикует в блог
+
+**Если источников не хватает:**
+- Можно подключить **RBC Realty** как второй источник
+- Можно добавить другие источники недвижимости
 
 ---
 
