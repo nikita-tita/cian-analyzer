@@ -23,78 +23,11 @@
     <link rel="canonical" href="https://housler.ru/blog/{{ post.slug }}">
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/landing.css">
-    <link rel="stylesheet" href="/static/css/blog-minimal.css">
+    <!-- Единая минималистичная система дизайна -->
+    <link rel="stylesheet" href="/static/css/unified-minimal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-
-    <style>
-        .blog-post-content {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 3rem 0;
-        }
-
-        .blog-post-header {
-            margin-bottom: 3rem;
-            padding-bottom: 2rem;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .blog-post-meta {
-            font-size: 0.85rem;
-            color: #999;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1.5rem;
-        }
-
-        .blog-post-title {
-            font-size: 2.5rem;
-            font-weight: 400;
-            line-height: 1.2;
-            margin-bottom: 1rem;
-            color: #000;
-        }
-
-        .blog-post-excerpt {
-            font-size: 1.2rem;
-            color: #666;
-            line-height: 1.6;
-        }
-
-        .blog-post-body {
-            font-size: 1.05rem;
-            line-height: 1.8;
-            color: #333;
-        }
-
-        .blog-post-body p {
-            margin-bottom: 1.5rem;
-        }
-
-        .blog-post-footer {
-            margin-top: 4rem;
-            padding-top: 2rem;
-            border-top: 1px solid #e0e0e0;
-            text-align: center;
-        }
-
-        @media (max-width: 768px) {
-            .blog-post-title {
-                font-size: 1.8rem;
-            }
-
-            .blog-post-excerpt {
-                font-size: 1.05rem;
-            }
-
-            .blog-post-body {
-                font-size: 1rem;
-            }
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -102,7 +35,12 @@
         <div class="container">
             <div class="nav-content">
                 <a href="/" class="logo">HOUSLER</a>
-                <div class="nav-links">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Меню">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="nav-links" id="navLinks">
                     <a href="/#services">Услуги</a>
                     <a href="/#pricing">Стоимость</a>
                     <a href="/blog">Блог</a>
@@ -148,6 +86,26 @@
             </div>
         </div>
     </footer>
+
+    <script>
+        // Мобильное меню
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const navLinks = document.getElementById('navLinks');
+
+        if (mobileMenuBtn && navLinks) {
+            mobileMenuBtn.addEventListener('click', function() {
+                navLinks.classList.toggle('active');
+            });
+
+            // Закрыть меню при клике вне его
+            document.addEventListener('click', function(event) {
+                const isClickInside = mobileMenuBtn.contains(event.target) || navLinks.contains(event.target);
+                if (!isClickInside && navLinks.classList.contains('active')) {
+                    navLinks.classList.remove('active');
+                }
+            });
+        }
+    </script>
 
     {% include '_metrika.html' %}
 </body>
