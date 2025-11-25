@@ -54,6 +54,7 @@ echo -e "${CYAN}[2/9] Копирование файлов на сервер...${
 ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "mkdir -p $APP_DIR/backups"
 
 # Список файлов для деплоя (исключаем venv, cache, и т.д.)
+# ВАЖНО: blog.db НЕ копируется чтобы не затереть статьи на сервере!
 rsync -avz --progress -e "ssh -i ~/.ssh/id_housler" \
     --exclude 'venv/' \
     --exclude 'venv_dashboard/' \
@@ -64,6 +65,7 @@ rsync -avz --progress -e "ssh -i ~/.ssh/id_housler" \
     --exclude 'test_*' \
     --exclude '*.log' \
     --exclude 'sessions.db' \
+    --exclude 'blog.db' \
     --exclude '.env' \
     ./ "$SERVER_USER@$SERVER_IP:$APP_DIR/"
 
