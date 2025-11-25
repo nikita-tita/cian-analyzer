@@ -60,7 +60,7 @@ cd housler
 cat > .env << EOF
 REDIS_ENABLED=true
 REDIS_HOST=redis
-REDIS_PORT=6379
+REDIS_PORT=6380
 EOF
 
 # 3. Запускаем
@@ -88,7 +88,7 @@ pip install -r requirements.txt
 playwright install chromium
 
 # 4. (Опционально) Запускаем Redis
-docker run -d -p 6379:6379 redis:7-alpine
+docker run -d -p 6380:6380 redis:7-alpine
 
 # 5. Создаем .env
 cat > .env << EOF

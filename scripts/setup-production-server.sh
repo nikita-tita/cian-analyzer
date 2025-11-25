@@ -170,7 +170,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
 # Redis Configuration
 REDIS_ENABLED=true
 REDIS_HOST=redis
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_DB=0
 REDIS_PASSWORD=$(openssl rand -base64 32)
 REDIS_NAMESPACE=housler_prod
@@ -186,7 +186,7 @@ TIMEOUT=300
 BIND=0.0.0.0:5000
 
 # Rate Limiting
-RATELIMIT_STORAGE_URL=redis://redis:6379/1
+RATELIMIT_STORAGE_URL=redis://redis:6380/1
 
 # Domain
 DOMAIN=$DOMAIN

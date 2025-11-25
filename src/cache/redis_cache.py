@@ -32,7 +32,7 @@ class PropertyCache:
     def __init__(
         self,
         host: str = 'localhost',
-        port: int = 6379,
+        port: int = 6380,
         db: int = 0,
         password: Optional[str] = None,
         namespace: str = 'cian',
@@ -420,7 +420,7 @@ def get_cache() -> PropertyCache:
 
 def init_cache(
     host: str = 'localhost',
-    port: int = 6379,
+    port: int = 6380,
     db: int = 0,
     password: Optional[str] = None,
     namespace: str = 'cian',

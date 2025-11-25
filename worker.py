@@ -6,10 +6,10 @@ RQ Worker для обработки асинхронных задач Housler
     python worker.py
 
 Или с настройками:
-    REDIS_URL=redis://localhost:6379/0 python worker.py
+    REDIS_URL=redis://localhost:6380/0 python worker.py
 
 В продакшене запускается через systemd или supervisor:
-    rq worker housler-tasks --url redis://localhost:6379/0
+    rq worker housler-tasks --url redis://localhost:6380/0
 """
 import os
 import sys
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Запуск RQ воркера"""
     # Получаем URL Redis из переменной окружения
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6380/0')
 
     logger.info(f"Starting RQ worker...")
     logger.info(f"Redis URL: {redis_url}")

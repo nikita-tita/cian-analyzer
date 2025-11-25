@@ -216,7 +216,7 @@ SSH_PRIVATE_KEY  = -----BEGIN OPENSSH PRIVATE KEY-----
 - **Application:** http://localhost:5000
 - **Health Check:** http://localhost:5000/health
 - **Metrics:** http://localhost:5000/metrics
-- **Redis:** localhost:6379
+- **Redis:** localhost:6380
 
 #### Production режим (+ Nginx):
 - **Application:** http://localhost:80

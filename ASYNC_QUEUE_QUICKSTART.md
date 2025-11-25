@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 ```bash
 # Docker (рекомендуется)
-docker run -d -p 6379:6379 --name redis redis:7-alpine
+docker run -d -p 6380:6380 --name redis redis:7-alpine
 
 # Или Homebrew на macOS
 brew install redis
@@ -136,7 +136,7 @@ curl http://localhost:5000/api/tasks/queue-stats
 sudo systemctl status redis
 
 # Проверить подключение
-redis-cli -h localhost -p 6379 ping
+redis-cli -h localhost -p 6380 ping
 ```
 
 ## Интеграция с Frontend

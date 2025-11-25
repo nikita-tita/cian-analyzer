@@ -90,9 +90,9 @@ if ! grep -q "REDIS_URL" /etc/systemd/system/housler.service; then
     sed -i '/Environment="PATH=/a\
 Environment="REDIS_ENABLED=true"\
 Environment="REDIS_HOST=localhost"\
-Environment="REDIS_PORT=6379"\
+Environment="REDIS_PORT=6380"\
 Environment="REDIS_DB=0"\
-Environment="REDIS_URL=redis://localhost:6379/0"' /etc/systemd/system/housler.service
+Environment="REDIS_URL=redis://localhost:6380/0"' /etc/systemd/system/housler.service
 
     systemctl daemon-reload
     echo "   ✅ Redis конфигурация добавлена"

@@ -187,7 +187,7 @@ API_FIRST → BROWSER_LIGHT → BROWSER_HEAVY → PROXY_ROTATION
 ```python
 from src.cache.redis_cache import PropertyCache
 
-cache = PropertyCache(redis_url='redis://localhost:6379')
+cache = PropertyCache(redis_url='redis://localhost:6380')
 orchestrator = AdaptiveParserOrchestrator(cache=cache)
 ```
 

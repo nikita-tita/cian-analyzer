@@ -380,10 +380,10 @@ SECRET_KEY=<random-hex-32>
 FLASK_ENV=production
 
 # Redis
-REDIS_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6380/0
 REDIS_ENABLED=true
 REDIS_HOST=localhost
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_DB=0
 REDIS_PASSWORD=<optional>
 

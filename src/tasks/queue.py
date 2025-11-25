@@ -32,7 +32,7 @@ def init_task_queue(redis_url: Optional[str] = None) -> Queue:
 
     # Получаем URL Redis
     if redis_url is None:
-        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6380/0')
 
     try:
         # Подключаемся к Redis

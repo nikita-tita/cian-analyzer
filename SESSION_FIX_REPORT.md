@@ -64,9 +64,9 @@ INFO:src.utils.session_storage:No REDIS_URL found, using in-memory storage
    ```ini
    Environment="REDIS_ENABLED=true"
    Environment="REDIS_HOST=localhost"
-   Environment="REDIS_PORT=6379"
+   Environment="REDIS_PORT=6380"
    Environment="REDIS_DB=0"
-   Environment="REDIS_URL=redis://localhost:6379/0"
+   Environment="REDIS_URL=redis://localhost:6380/0"
    ```
 
 3. **Перезапущен сервис:**
@@ -78,7 +78,7 @@ INFO:src.utils.session_storage:No REDIS_URL found, using in-memory storage
 ### Логи после исправления
 
 ```bash
-INFO:src.cache.redis_cache:✅ Redis cache connected: localhost:6379/0
+INFO:src.cache.redis_cache:✅ Redis cache connected: localhost:6380/0
 INFO:src.utils.session_storage:✅ Connected to Redis successfully
 ```
 
@@ -147,9 +147,9 @@ INFO:src.utils.session_storage:✅ Connected to Redis successfully
 Environment="PATH=/var/www/housler/venv/bin"
 + Environment="REDIS_ENABLED=true"
 + Environment="REDIS_HOST=localhost"
-+ Environment="REDIS_PORT=6379"
++ Environment="REDIS_PORT=6380"
 + Environment="REDIS_DB=0"
-+ Environment="REDIS_URL=redis://localhost:6379/0"
++ Environment="REDIS_URL=redis://localhost:6380/0"
 ```
 
 ### Как работает Session Storage
@@ -211,7 +211,7 @@ $ curl https://housler.ru/health | jq .components.session_storage
 
 Redis по умолчанию:
 - Хост: `localhost`
-- Порт: `6379`
+- Порт: `6380`
 - DB: `0`
 - Namespace: `housler` (изоляция данных)
 

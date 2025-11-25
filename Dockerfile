@@ -78,7 +78,7 @@ ENV PYTHONUNBUFFERED=1 \
     FLASK_APP=app_new.py \
     # Redis настройки (можно переопределить)
     REDIS_HOST=redis \
-    REDIS_PORT=6379 \
+    REDIS_PORT=6380 \
     REDIS_DB=0 \
     REDIS_ENABLED=true \
     REDIS_NAMESPACE=housler \

@@ -403,7 +403,7 @@ class TestSessionStorageWithRedis:
     @pytest.fixture
     def redis_storage(self):
         """Create storage with Redis if available"""
-        with patch.dict('os.environ', {'REDIS_URL': 'redis://localhost:6379/1'}):
+        with patch.dict('os.environ', {'REDIS_URL': 'redis://localhost:6380/1'}):
             try:
                 storage = SessionStorage()
                 if storage.redis_client:

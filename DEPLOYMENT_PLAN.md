@@ -142,7 +142,7 @@ SECRET_KEY=<СГЕНЕРИРОВАТЬ!>  # См. ниже
 # Redis (обязательно для production!)
 REDIS_ENABLED=true
 REDIS_HOST=redis
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_DB=0
 REDIS_PASSWORD=<СЛУЧАЙНЫЙ_ПАРОЛЬ>
 REDIS_NAMESPACE=housler
@@ -395,7 +395,7 @@ curl -X POST https://housler.ru/api/parse \
 # Тест 4: API парсинг (с невалидным URL - должен блокироваться)
 curl -X POST https://housler.ru/api/parse \
   -H "Content-Type: application/json" \
-  -d '{"url": "http://localhost:6379/"}'
+  -d '{"url": "http://localhost:6380/"}'
 # Expected: {"status": "error", "message": "Домен localhost не разрешен"}
 
 # Тест 5: Rate limiting
@@ -771,7 +771,7 @@ server {
 ```bash
 # На сервере Redis
 REDIS_HOST=redis.internal.domain.com
-REDIS_PORT=6379
+REDIS_PORT=6380
 ```
 
 3. **Shared Storage** (для session persistence)
