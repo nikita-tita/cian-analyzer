@@ -22,11 +22,11 @@
     <link rel="canonical" href="https://housler.ru/blog">
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <!-- Единая минималистичная система дизайна -->
-    <link rel="stylesheet" href="/static/css/unified-minimal.css">
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -34,20 +34,32 @@
         <div class="container">
             <div class="nav-content">
                 <a href="/" class="logo">HOUSLER</a>
-                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Меню">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <div class="nav-links" id="navLinks">
+                <div class="nav-links">
                     <a href="/#services">Услуги</a>
                     <a href="/#pricing">Стоимость</a>
                     <a href="/blog">Блог</a>
                     <a href="/#contact">Контакты</a>
                 </div>
+                <button class="mobile-menu-toggle" aria-label="Меню">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </div>
         </div>
     </nav>
+
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-menu-overlay"></div>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <a href="/">Главная</a>
+        <a href="/#services">Услуги</a>
+        <a href="/#pricing">Стоимость</a>
+        <a href="/blog">Блог</a>
+        <a href="/#contact">Контакты</a>
+    </div>
 
     <!-- Blog Section -->
     <section class="section">
@@ -56,17 +68,15 @@
             <div class="blog-listing">
                 {% if posts %}
                     {% for post in posts %}
-                    <article class="blog-entry">
-                        <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
-                        <h3 class="blog-entry-title">
-                            <a href="/blog/{{ post.slug }}" style="color: inherit; text-decoration: none;">
-                                {{ post.title }}
-                            </a>
-                        </h3>
-                        {% if post.excerpt %}
-                        <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
-                        {% endif %}
-                    </article>
+                    <a href="/blog/{{ post.slug }}" class="blog-entry-link">
+                        <article class="blog-entry">
+                            <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
+                            <h3 class="blog-entry-title">{{ post.title }}</h3>
+                            {% if post.excerpt %}
+                            <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                            {% endif %}
+                        </article>
+                    </a>
                     {% endfor %}
                 {% else %}
                     <p style="text-align: center; color: #666; padding: 4rem 0;">
@@ -87,26 +97,29 @@
         </div>
     </footer>
 
-    <script>
-        // Мобильное меню
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
-
-        if (mobileMenuBtn && navLinks) {
-            mobileMenuBtn.addEventListener('click', function() {
-                navLinks.classList.toggle('active');
-            });
-
-            // Закрыть меню при клике вне его
-            document.addEventListener('click', function(event) {
-                const isClickInside = mobileMenuBtn.contains(event.target) || navLinks.contains(event.target);
-                if (!isClickInside && navLinks.classList.contains('active')) {
-                    navLinks.classList.remove('active');
-                }
-            });
-        }
-    </script>
-
     {% include '_metrika.html' %}
+
+    <script>
+        // Mobile menu toggle
+        const menuToggle = document.querySelector('.mobile-menu-toggle');
+        const mobileMenu = document.querySelector('.mobile-menu');
+        const menuOverlay = document.querySelector('.mobile-menu-overlay');
+        const body = document.body;
+
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            mobileMenu.classList.toggle('active');
+            menuOverlay.classList.toggle('active');
+            body.style.overflow = mobileMenu.classList.contains('active') ? 'hidden' : '';
+        }
+
+        menuToggle.addEventListener('click', toggleMenu);
+        menuOverlay.addEventListener('click', toggleMenu);
+
+        // Close menu when clicking on a link
+        mobileMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', toggleMenu);
+        });
+    </script>
 </body>
 </html>

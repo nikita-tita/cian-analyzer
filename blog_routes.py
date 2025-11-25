@@ -6,6 +6,7 @@ from flask import render_template, abort, Response
 from blog_database import BlogDatabase
 from datetime import datetime
 import logging
+import markdown2
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,13 @@ def register_blog_routes(app):
                 blog_db.increment_view_count(slug)
             except Exception as e:
                 logger.warning(f"Could not increment view count for {slug}: {e}")
+
+            # Convert markdown to HTML
+            if post.get('content'):
+                post['content_html'] = markdown2.markdown(
+                    post['content'],
+                    extras=['fenced-code-blocks', 'tables', 'break-on-newline', 'target-blank-links']
+                )
 
             # Get recent posts for sidebar
             recent_posts = blog_db.get_recent_posts(limit=5)
