@@ -294,7 +294,7 @@ ssh -i ~/.ssh/id_housler root@91.229.8.221 'cd /var/www/housler && source venv/b
 
 ### Q: Сколько статей парсить каждый день автоматически?
 
-**A:** По умолчанию **3 статьи** каждый день в 10:00 (настроено в cron job).
+**A:** По умолчанию **10 статей** каждый день в 10:00 (настроено в cron job).
 
 Чтобы изменить:
 ```bash
@@ -305,7 +305,13 @@ ssh -i ~/.ssh/id_housler root@91.229.8.221
 nano /var/www/housler/cron_parse_blog.sh
 
 # Измените число:
-python3 blog_cli.py parse -n 5  # ← изменить на 5 статей
+python3 blog_cli.py parse -n 20  # ← изменить на 20 статей
+```
+
+**Альтернативные источники:**
+Если CIAN Magazine не дает достаточно новых статей, можно использовать RBC Realty:
+```bash
+ssh -i ~/.ssh/id_housler root@91.229.8.221 'cd /var/www/housler && source venv/bin/activate && python3 auto_blog_daemon.py --source rbc'
 ```
 
 ---

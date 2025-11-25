@@ -297,7 +297,7 @@ cat > /var/www/housler/cron_parse_blog.sh << 'CRONSCRIPT'
 #!/bin/bash
 cd /var/www/housler
 source venv/bin/activate
-python3 blog_cli.py parse -n 3 >> /var/log/housler/blog_parser_cron.log 2>&1
+python3 blog_cli.py parse -n 10 >> /var/log/housler/blog_parser_cron.log 2>&1
 CRONSCRIPT
 
 chmod +x /var/www/housler/cron_parse_blog.sh
