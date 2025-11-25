@@ -204,11 +204,12 @@ a:link {
 
 .btn-primary {
     background: var(--color-text);
-    color: var(--color-bg);
+    color: #FFFFFF;
 }
 
 .btn-primary:hover {
     background: #000000;
+    color: #FFFFFF;
 }
 
 .btn-secondary {

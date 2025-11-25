@@ -7,6 +7,9 @@ from flask import Flask, render_template, request, jsonify, session
 import os
 import uuid
 import logging
+import urllib.request
+import urllib.parse
+import json
 from typing import Dict, List
 from datetime import datetime
 from flask_limiter import Limiter
@@ -2150,6 +2153,138 @@ def contact_request():
         # - Сохранение в базу данных
 
         # Пока просто возвращаем успех
+        return jsonify({
+            'success': True,
+            'message': 'Заявка принята'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
+
+# Telegram Bot configuration for client requests
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8107613087:AAH6CZ7b1mHVfCoa8vZOwrpLRSoCbILHqV0')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')  # Will be set on first message
+
+
+def send_telegram_message(text: str) -> bool:
+    """
+    Отправляет сообщение в Telegram бота
+    """
+    try:
+        # Получаем chat_id из последнего сообщения боту (если не задан)
+        chat_id = TELEGRAM_CHAT_ID
+        if not chat_id:
+            # Пробуем получить chat_id из getUpdates
+            updates_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+            try:
+                req = urllib.request.Request(updates_url)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    if data.get('ok') and data.get('result'):
+                        # Берем chat_id из последнего сообщения
+                        for update in reversed(data['result']):
+                            if 'message' in update:
+                                chat_id = str(update['message']['chat']['id'])
+                                break
+            except Exception as e:
+                logger.warning(f"Не удалось получить chat_id: {e}")
+                return False
+
+        if not chat_id:
+            logger.error("Chat ID не найден. Напишите боту /start чтобы активировать.")
+            return False
+
+        # Отправляем сообщение
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            'chat_id': chat_id,
+            'text': text,
+            'parse_mode': 'HTML'
+        }
+
+        data = urllib.parse.urlencode(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST')
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            return result.get('ok', False)
+
+    except Exception as e:
+        logger.error(f"Ошибка отправки в Telegram: {e}")
+        return False
+
+
+@app.route('/api/client-request', methods=['POST'])
+def client_request():
+    """
+    Обработка заявки от клиента (вариативная форма)
+    Отправляет данные в Telegram бота
+    """
+    try:
+        data = request.get_json()
+
+        operation = data.get('operation', '').strip()
+        property_type = data.get('property_type', '').strip()
+        name = data.get('name', '').strip()
+        phone = data.get('phone', '').strip()
+        contact_method = data.get('contact_method', '').strip()
+
+        # Валидация обязательных полей
+        if not operation or not property_type or not name or not phone or not contact_method:
+            return jsonify({'error': 'Заполните все поля'}), 400
+
+        # Маппинг значений для читаемости
+        operation_map = {
+            'buy': 'Купить',
+            'sell': 'Продать',
+            'rent': 'Сдать в аренду'
+        }
+        property_map = {
+            'residential': 'Жилая недвижимость',
+            'commercial': 'Коммерческая недвижимость'
+        }
+        contact_map = {
+            'call': 'Позвонить',
+            'whatsapp': 'WhatsApp',
+            'telegram': 'Telegram'
+        }
+
+        operation_text = operation_map.get(operation, operation)
+        property_text = property_map.get(property_type, property_type)
+        contact_text = contact_map.get(contact_method, contact_method)
+
+        # Логируем заявку
+        logger.info(f"=== НОВАЯ ЗАЯВКА ОТ КЛИЕНТА ===")
+        logger.info(f"Операция: {operation_text}")
+        logger.info(f"Тип недвижимости: {property_text}")
+        logger.info(f"Имя: {name}")
+        logger.info(f"Телефон: {phone}")
+        logger.info(f"Способ связи: {contact_text}")
+        logger.info(f"================================")
+
+        # Формируем сообщение для Telegram
+        timestamp = datetime.now().strftime('%d.%m.%Y %H:%M')
+        telegram_message = f"""🏠 <b>Новая заявка с сайта HOUSLER</b>
+
+<b>Операция:</b> {operation_text}
+<b>Тип недвижимости:</b> {property_text}
+
+<b>Контактные данные:</b>
+• Имя: {name}
+• Телефон: {phone}
+• Связаться через: {contact_text}
+
+<i>📅 {timestamp}</i>"""
+
+        # Отправляем в Telegram
+        telegram_sent = send_telegram_message(telegram_message)
+
+        if not telegram_sent:
+            logger.warning("Заявка не была отправлена в Telegram")
+            # Все равно возвращаем успех - заявка залогирована
+
         return jsonify({
             'success': True,
             'message': 'Заявка принята'
