@@ -559,6 +559,12 @@ def index():
     return render_template('index.html', recent_posts=recent_posts)
 
 
+@app.route('/consent')
+def consent():
+    """Consent page for receiving promotional materials"""
+    return render_template('consent.html')
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
