@@ -30,7 +30,7 @@ class CianMagazineParserPlaywright:
                 page = browser.new_page()
 
                 logger.info(f"Navigating to {self.magazine_url}")
-                page.goto(self.magazine_url, wait_until='networkidle', timeout=30000)
+                page.goto(self.magazine_url, wait_until='domcontentloaded', timeout=30000)
 
                 # Даем странице время на загрузку JS-контента
                 time.sleep(3)
@@ -118,7 +118,7 @@ class CianMagazineParserPlaywright:
                 page = browser.new_page()
 
                 logger.info(f"Parsing article: {url}")
-                page.goto(url, wait_until='networkidle', timeout=30000)
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 time.sleep(2)
 
                 html = page.content()
