@@ -28,14 +28,11 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/static/images/favicon-192.png">
     <link rel="manifest" href="/static/manifest.json">
 
-    <link rel="stylesheet" href="/static/css/landing.css">
-    <link rel="stylesheet" href="/static/css/pricing-improvements.css?v=20251108">
-    <link rel="stylesheet" href="/static/css/pricing-unified.css">
-    <link rel="stylesheet" href="/static/css/blog-minimal.css">
-    <link rel="stylesheet" href="/static/css/advice-ticker.css?v=20251108210930">
+    <!-- Единая минималистичная система дизайна -->
+    <link rel="stylesheet" href="/static/css/unified-minimal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -43,10 +40,15 @@
         <div class="container">
             <div class="nav-content">
                 <div class="logo">HOUSLER</div>
-                <div class="nav-links">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Меню">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="nav-links" id="navLinks">
                     <a href="#services">Услуги</a>
                     <a href="#pricing">Стоимость</a>
-                    <a href="#blog">Блог</a>
+                    <a href="/blog">Блог</a>
                     <a href="#contact">Контакты</a>
                 </div>
             </div>
@@ -240,6 +242,7 @@
     <script src="/static/js/advice-ticker.js?v=20251108210930"></script>
     <script>
         // Smooth scroll
+        // Плавная прокрутка к якорям
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -247,8 +250,31 @@
                 if (target) {
                     target.scrollIntoView({ behavior: 'smooth' });
                 }
+                // Закрыть мобильное меню после клика
+                const navLinks = document.getElementById('navLinks');
+                if (navLinks && navLinks.classList.contains('active')) {
+                    navLinks.classList.remove('active');
+                }
             });
         });
+
+        // Мобильное меню
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const navLinks = document.getElementById('navLinks');
+
+        if (mobileMenuBtn && navLinks) {
+            mobileMenuBtn.addEventListener('click', function() {
+                navLinks.classList.toggle('active');
+            });
+
+            // Закрыть меню при клике вне его
+            document.addEventListener('click', function(event) {
+                const isClickInside = mobileMenuBtn.contains(event.target) || navLinks.contains(event.target);
+                if (!isClickInside && navLinks.classList.contains('active')) {
+                    navLinks.classList.remove('active');
+                }
+            });
+        }
     </script>
 
     {% include '_metrika.html' %}

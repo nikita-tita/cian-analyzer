@@ -22,11 +22,11 @@
     <link rel="canonical" href="https://housler.ru/blog">
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/landing.css">
-    <link rel="stylesheet" href="/static/css/blog-minimal.css">
+    <!-- Единая минималистичная система дизайна -->
+    <link rel="stylesheet" href="/static/css/unified-minimal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -34,7 +34,12 @@
         <div class="container">
             <div class="nav-content">
                 <a href="/" class="logo">HOUSLER</a>
-                <div class="nav-links">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Меню">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="nav-links" id="navLinks">
                     <a href="/#services">Услуги</a>
                     <a href="/#pricing">Стоимость</a>
                     <a href="/blog">Блог</a>
@@ -81,6 +86,26 @@
             </div>
         </div>
     </footer>
+
+    <script>
+        // Мобильное меню
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const navLinks = document.getElementById('navLinks');
+
+        if (mobileMenuBtn && navLinks) {
+            mobileMenuBtn.addEventListener('click', function() {
+                navLinks.classList.toggle('active');
+            });
+
+            // Закрыть меню при клике вне его
+            document.addEventListener('click', function(event) {
+                const isClickInside = mobileMenuBtn.contains(event.target) || navLinks.contains(event.target);
+                if (!isClickInside && navLinks.classList.contains('active')) {
+                    navLinks.classList.remove('active');
+                }
+            });
+        }
+    </script>
 
     {% include '_metrika.html' %}
 </body>
