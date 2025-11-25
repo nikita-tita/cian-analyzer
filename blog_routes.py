@@ -73,6 +73,14 @@ def register_blog_routes(app):
             xml.append('    <priority>0.5</priority>')
             xml.append('  </url>')
 
+            # Privacy policy
+            xml.append('  <url>')
+            xml.append('    <loc>https://housler.ru/doc/clients/politiki/</loc>')
+            xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
+            xml.append('    <changefreq>monthly</changefreq>')
+            xml.append('    <priority>0.5</priority>')
+            xml.append('  </url>')
+
             # Blog index
             xml.append('  <url>')
             xml.append('    <loc>https://housler.ru/blog</loc>')

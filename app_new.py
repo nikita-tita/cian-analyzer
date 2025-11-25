@@ -565,6 +565,13 @@ def consent():
     return render_template('consent.html')
 
 
+@app.route('/doc/clients/politiki/')
+@app.route('/doc/clients/politiki')
+def privacy_policy():
+    """Privacy policy page"""
+    return render_template('privacy_policy.html')
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
