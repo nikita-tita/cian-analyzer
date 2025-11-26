@@ -518,11 +518,11 @@ def set_security_headers(response):
     # Content Security Policy - защита от XSS
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mc.yandex.ru; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mc.yandex.ru https://yastatic.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
         "img-src 'self' data: https: http:; "
         "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
-        "connect-src 'self' https://mc.yandex.ru; "
+        "connect-src 'self' https://mc.yandex.ru https://mc.yandex.md https://adstat.yandex.ru https://yandex.ru; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "
         "form-action 'self';"
