@@ -1,0 +1,21 @@
+# Robots.txt for housler.ru
+# https://housler.ru/robots.txt
+
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /blog/
+Disallow: /api/
+Disallow: /metrics
+Disallow: /health
+Disallow: /static/js/
+
+# Crawl-delay for Yandex
+User-agent: Yandex
+Crawl-delay: 0.5
+
+# Sitemap location
+Sitemap: https://housler.ru/sitemap.xml
+
+# Host directive for Yandex
+Host: https://housler.ru

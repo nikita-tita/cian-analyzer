@@ -143,3 +143,32 @@ class BlogDatabase:
         conn.close()
 
         return result is not None
+
+    def count_posts(self) -> int:
+        """Count total published posts"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('SELECT COUNT(*) FROM blog_posts WHERE is_published = 1')
+        count = c.fetchone()[0]
+        conn.close()
+
+        return count
+
+    def get_posts_paginated(self, page: int = 1, per_page: int = 20) -> Dict:
+        """Get paginated posts with metadata"""
+        total = self.count_posts()
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+        offset = (page - 1) * per_page
+
+        posts = self.get_all_posts(limit=per_page, offset=offset)
+
+        return {
+            'posts': posts,
+            'page': page,
+            'per_page': per_page,
+            'total': total,
+            'total_pages': total_pages,
+            'has_prev': page > 1,
+            'has_next': page < total_pages
+        }

@@ -3,23 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOUSLER — Агентство недвижимости в Санкт-Петербурге</title>
-    <meta name="description" content="Продажа недвижимости в Санкт-Петербурге. Вы получаете результат, мы делаем работу.">
+    <title>Продать квартиру в СПб — Агентство недвижимости HOUSLER</title>
+    <meta name="description" content="Продажа квартиры в Санкт-Петербурге с полным сопровождением сделки. Проверка документов, профессиональная фотосъёмка, оценка по аналогам, безопасные расчёты. Комиссия 2%, оплата по результату.">
+    <meta name="keywords" content="продать квартиру СПб, агентство недвижимости Санкт-Петербург, продажа квартиры, проверка квартиры, оценка недвижимости, сделка купли-продажи">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="HOUSLER — Агентство недвижимости в Санкт-Петербурге">
-    <meta property="og:description" content="Продажа недвижимости в Санкт-Петербурге. Вы получаете результат, мы делаем работу.">
+    <meta property="og:title" content="Продать квартиру в СПб — Агентство HOUSLER">
+    <meta property="og:description" content="Продажа квартиры в Санкт-Петербурге с полным сопровождением. Проверка документов, фотосъёмка, оценка, сделка под ключ. Комиссия 2%.">
+    <meta property="og:image" content="https://housler.ru/static/images/og-image.png">
     <meta property="og:url" content="https://housler.ru">
     <meta property="og:site_name" content="HOUSLER">
 
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="HOUSLER — Агентство недвижимости в Санкт-Петербурге">
-    <meta name="twitter:description" content="Продажа недвижимости в Санкт-Петербурге. Вы получаете результат, мы делаем работу.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Продать квартиру в СПб — Агентство HOUSLER">
+    <meta name="twitter:description" content="Продажа квартиры в Санкт-Петербурге с полным сопровождением. Комиссия 2%, оплата по результату.">
+    <meta name="twitter:image" content="https://housler.ru/static/images/og-image.png">
 
     <!-- Canonical URL -->
     <link rel="canonical" href="https://housler.ru">
+
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        "name": "HOUSLER",
+        "alternateName": "Хауслер",
+        "description": "Агентство недвижимости в Санкт-Петербурге. Продажа квартир с полным сопровождением сделки: проверка документов, фотосъёмка, оценка, переговоры, безопасные расчёты.",
+        "url": "https://housler.ru",
+        "logo": "https://housler.ru/static/images/favicon-512.png",
+        "image": "https://housler.ru/static/images/favicon-512.png",
+        "telephone": "+7-911-029-55-20",
+        "email": "hello@housler.ru",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Санкт-Петербург",
+            "addressRegion": "Санкт-Петербург",
+            "addressCountry": "RU"
+        },
+        "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "59.9343",
+            "longitude": "30.3351"
+        },
+        "areaServed": {
+            "@type": "City",
+            "name": "Санкт-Петербург"
+        },
+        "priceRange": "2% от стоимости",
+        "openingHoursSpecification": {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            "opens": "09:00",
+            "closes": "21:00"
+        },
+        "sameAs": [
+            "https://t.me/housler_spb"
+        ],
+        "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Услуги агентства недвижимости",
+            "itemListElement": [
+                {
+                    "@type": "Offer",
+                    "itemOffered": {
+                        "@type": "Service",
+                        "name": "Продажа квартиры",
+                        "description": "Полное сопровождение продажи квартиры: оценка, фотосъёмка, маркетинг, показы, переговоры, сделка"
+                    }
+                },
+                {
+                    "@type": "Offer",
+                    "itemOffered": {
+                        "@type": "Service",
+                        "name": "Проверка квартиры",
+                        "description": "Юридическая проверка квартиры перед покупкой: ЕГРН, история собственников, обременения"
+                    }
+                },
+                {
+                    "@type": "Offer",
+                    "itemOffered": {
+                        "@type": "Service",
+                        "name": "Оценка недвижимости",
+                        "description": "Рыночная оценка стоимости квартиры на основе аналогов и аналитики района"
+                    }
+                }
+            ]
+        }
+    }
+    </script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
@@ -74,7 +148,8 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1>Мы делаем недвижимость<br>желанной.</h1>
+            <h1>Продажа квартир в Санкт-Петербурге</h1>
+            <p class="hero-tagline">Мы делаем недвижимость желанной.</p>
             <p class="hero-subtitle">Чистые документы, сильная подача, правильные покупатели — без лишнего шума.</p>
             <div class="hero-cta">
                 <a href="/calculator?reset=1" class="btn btn-primary">Оценить стоимость</a>
