@@ -159,7 +159,7 @@
                     <div class="blog-cta-links">
                         <a href="/" class="blog-cta-link">Узнать об услугах</a>
                         <a href="/calculator?reset=1" class="blog-cta-link">Оценить квартиру</a>
-                        <button class="blog-cta-link" id="openRequestPopup" onclick="document.getElementById('requestPopup').classList.add('active'); document.body.style.overflow='hidden';">Связаться</button>
+                        <button type="button" class="blog-cta-link" id="openRequestPopup">Связаться</button>
                     </div>
                 </div>
             </div>
@@ -359,6 +359,15 @@
                 popup.classList.remove('active');
                 document.body.style.overflow = '';
                 setTimeout(resetForm, 300);
+            }
+
+            // Open popup button
+            const openBtn = document.getElementById('openRequestPopup');
+            if (openBtn) {
+                openBtn.addEventListener('click', () => {
+                    popup.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
             }
 
             closeBtn.addEventListener('click', closePopup);
