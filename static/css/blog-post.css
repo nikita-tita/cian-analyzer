@@ -365,20 +365,29 @@
     flex-wrap: wrap;
 }
 
-.blog-cta-link {
+.blog-cta-link,
+a.blog-cta-link,
+a.blog-cta-link:link,
+a.blog-cta-link:visited,
+button.blog-cta-link {
     display: inline-block;
     padding: 10px 20px;
     background: #000;
-    color: #fff;
+    color: #fff !important;
     text-decoration: none;
     border-radius: 4px;
     font-size: 0.9rem;
     font-weight: 500;
     transition: all 0.2s;
+    border: none;
+    cursor: pointer;
 }
 
-.blog-cta-link:hover {
+.blog-cta-link:hover,
+a.blog-cta-link:hover,
+button.blog-cta-link:hover {
     background: #333;
+    color: #fff !important;
 }
 
 @media (max-width: 768px) {

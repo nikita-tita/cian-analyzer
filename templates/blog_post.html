@@ -82,9 +82,10 @@
     </script>
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/landing.css">
-    <link rel="stylesheet" href="/static/css/blog-minimal.css">
-    <link rel="stylesheet" href="/static/css/blog-post.css">
+    <link rel="stylesheet" href="/static/css/landing.css?v=20251126">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css?v=20251126">
+    <link rel="stylesheet" href="/static/css/blog-post.css?v=20251126">
+    <link rel="stylesheet" href="/static/css/request-form.css?v=20251126">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -158,7 +159,7 @@
                     <div class="blog-cta-links">
                         <a href="/" class="blog-cta-link">Узнать об услугах</a>
                         <a href="/calculator?reset=1" class="blog-cta-link">Оценить квартиру</a>
-                        <a href="/#contact" class="blog-cta-link">Связаться</a>
+                        <button class="blog-cta-link" id="openRequestPopup" onclick="document.getElementById('requestPopup').classList.add('active'); document.body.style.overflow='hidden';">Связаться</button>
                     </div>
                 </div>
             </div>
@@ -184,6 +185,123 @@
             {% endif %}
         </div>
     </section>
+
+    <!-- Request Popup -->
+    <div class="request-popup-overlay" id="requestPopup">
+        <div class="request-popup">
+            <div class="request-popup-header">
+                <h2>Оставить заявку</h2>
+                <button class="request-popup-close" id="closeRequestPopup">&times;</button>
+            </div>
+            <div class="request-popup-body">
+                <div class="request-steps">
+                    <div class="request-step-dot active" data-step="1"></div>
+                    <div class="request-step-dot" data-step="2"></div>
+                    <div class="request-step-dot" data-step="3"></div>
+                </div>
+                <div class="request-error" id="requestError"></div>
+                <div class="request-form-step active" data-step="1">
+                    <div class="request-step-title">Что вас интересует?</div>
+                    <div class="request-options">
+                        <label class="request-option">
+                            <input type="radio" name="operation" value="buy">
+                            <span class="request-option-radio"></span>
+                            <span class="request-option-content">
+                                <span class="request-option-label">Купить</span>
+                                <span class="request-option-desc">Ищу недвижимость для покупки</span>
+                            </span>
+                        </label>
+                        <label class="request-option">
+                            <input type="radio" name="operation" value="sell">
+                            <span class="request-option-radio"></span>
+                            <span class="request-option-content">
+                                <span class="request-option-label">Продать</span>
+                                <span class="request-option-desc">Хочу продать свою недвижимость</span>
+                            </span>
+                        </label>
+                        <label class="request-option">
+                            <input type="radio" name="operation" value="rent">
+                            <span class="request-option-radio"></span>
+                            <span class="request-option-content">
+                                <span class="request-option-label">Сдать</span>
+                                <span class="request-option-desc">Хочу сдать в аренду</span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="request-nav">
+                        <button class="request-btn request-btn-next" id="toStep2" disabled>Далее</button>
+                    </div>
+                </div>
+                <div class="request-form-step" data-step="2">
+                    <div class="request-step-title">Тип недвижимости</div>
+                    <div class="request-options">
+                        <label class="request-option">
+                            <input type="radio" name="property_type" value="residential">
+                            <span class="request-option-radio"></span>
+                            <span class="request-option-content">
+                                <span class="request-option-label">Жилая</span>
+                                <span class="request-option-desc">Квартира, дом, комната</span>
+                            </span>
+                        </label>
+                        <label class="request-option">
+                            <input type="radio" name="property_type" value="commercial">
+                            <span class="request-option-radio"></span>
+                            <span class="request-option-content">
+                                <span class="request-option-label">Коммерческая</span>
+                                <span class="request-option-desc">Офис, магазин, склад</span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="request-nav">
+                        <button class="request-btn request-btn-back" data-to="1">Назад</button>
+                        <button class="request-btn request-btn-next" id="toStep3" disabled>Далее</button>
+                    </div>
+                </div>
+                <div class="request-form-step" data-step="3">
+                    <div class="request-step-title">Ваши контакты</div>
+                    <div class="request-input-group">
+                        <label for="requestName">Имя</label>
+                        <input type="text" id="requestName" name="name" placeholder="Как к вам обращаться?" autocomplete="name">
+                    </div>
+                    <div class="request-input-group">
+                        <label for="requestPhone">Телефон</label>
+                        <input type="tel" id="requestPhone" name="phone" placeholder="+7 (999) 123-45-67" autocomplete="tel">
+                    </div>
+                    <div class="request-step-title" style="margin-top: 24px;">Удобный способ связи</div>
+                    <div class="request-contact-options">
+                        <label class="request-contact-option">
+                            <input type="radio" name="contact_method" value="call">
+                            <div class="request-contact-icon">📞</div>
+                            <div class="request-contact-label">Позвонить</div>
+                        </label>
+                        <label class="request-contact-option">
+                            <input type="radio" name="contact_method" value="whatsapp">
+                            <div class="request-contact-icon">💬</div>
+                            <div class="request-contact-label">WhatsApp</div>
+                        </label>
+                        <label class="request-contact-option">
+                            <input type="radio" name="contact_method" value="telegram">
+                            <div class="request-contact-icon">✈️</div>
+                            <div class="request-contact-label">Telegram</div>
+                        </label>
+                    </div>
+                    <div class="request-nav">
+                        <button class="request-btn request-btn-back" data-to="2">Назад</button>
+                        <button class="request-btn request-btn-next" id="submitRequest" disabled>Отправить</button>
+                    </div>
+                </div>
+                <div class="request-success" id="requestSuccess">
+                    <div class="request-success-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h3>Заявка отправлена!</h3>
+                    <p>Мы свяжемся с вами в ближайшее время выбранным способом.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -218,6 +336,190 @@
         mobileMenu.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', toggleMenu);
         });
+
+        // Request Form Logic
+        (function() {
+            const popup = document.getElementById('requestPopup');
+            const closeBtn = document.getElementById('closeRequestPopup');
+            const steps = document.querySelectorAll('.request-form-step');
+            const stepDots = document.querySelectorAll('.request-step-dot');
+            const successEl = document.getElementById('requestSuccess');
+            const errorEl = document.getElementById('requestError');
+
+            let currentStep = 1;
+            const formData = {
+                operation: null,
+                property_type: null,
+                name: '',
+                phone: '',
+                contact_method: null
+            };
+
+            function closePopup() {
+                popup.classList.remove('active');
+                document.body.style.overflow = '';
+                setTimeout(resetForm, 300);
+            }
+
+            closeBtn.addEventListener('click', closePopup);
+            popup.addEventListener('click', (e) => {
+                if (e.target === popup) closePopup();
+            });
+
+            function resetForm() {
+                currentStep = 1;
+                formData.operation = null;
+                formData.property_type = null;
+                formData.name = '';
+                formData.phone = '';
+                formData.contact_method = null;
+
+                document.querySelectorAll('.request-option, .request-contact-option').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                document.querySelectorAll('input[type="radio"]').forEach(el => {
+                    el.checked = false;
+                });
+                document.getElementById('requestName').value = '';
+                document.getElementById('requestPhone').value = '';
+
+                updateSteps();
+                successEl.classList.remove('active');
+                errorEl.classList.remove('active');
+                document.querySelector('.request-steps').style.display = '';
+            }
+
+            function updateSteps() {
+                steps.forEach(step => {
+                    step.classList.remove('active');
+                    if (parseInt(step.dataset.step) === currentStep) {
+                        step.classList.add('active');
+                    }
+                });
+
+                stepDots.forEach(dot => {
+                    const dotStep = parseInt(dot.dataset.step);
+                    dot.classList.remove('active', 'completed');
+                    if (dotStep === currentStep) {
+                        dot.classList.add('active');
+                    } else if (dotStep < currentStep) {
+                        dot.classList.add('completed');
+                    }
+                });
+
+                updateButtons();
+            }
+
+            function updateButtons() {
+                document.getElementById('toStep2').disabled = !formData.operation;
+                document.getElementById('toStep3').disabled = !formData.property_type;
+
+                const canSubmit = formData.name.trim() &&
+                                  formData.phone.trim() &&
+                                  formData.contact_method;
+                document.getElementById('submitRequest').disabled = !canSubmit;
+            }
+
+            document.querySelectorAll('.request-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const input = option.querySelector('input');
+                    const name = input.name;
+                    const value = input.value;
+
+                    option.closest('.request-options').querySelectorAll('.request-option').forEach(o => {
+                        o.classList.remove('selected');
+                    });
+                    option.classList.add('selected');
+                    input.checked = true;
+
+                    formData[name] = value;
+                    updateButtons();
+                });
+            });
+
+            document.querySelectorAll('.request-contact-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const input = option.querySelector('input');
+
+                    document.querySelectorAll('.request-contact-option').forEach(o => {
+                        o.classList.remove('selected');
+                    });
+                    option.classList.add('selected');
+                    input.checked = true;
+
+                    formData.contact_method = input.value;
+                    updateButtons();
+                });
+            });
+
+            document.getElementById('requestName').addEventListener('input', (e) => {
+                formData.name = e.target.value;
+                updateButtons();
+            });
+
+            document.getElementById('requestPhone').addEventListener('input', (e) => {
+                formData.phone = e.target.value;
+                updateButtons();
+            });
+
+            document.getElementById('toStep2').addEventListener('click', () => {
+                currentStep = 2;
+                updateSteps();
+            });
+
+            document.getElementById('toStep3').addEventListener('click', () => {
+                currentStep = 3;
+                updateSteps();
+            });
+
+            document.querySelectorAll('.request-btn-back').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentStep = parseInt(btn.dataset.to);
+                    updateSteps();
+                });
+            });
+
+            document.getElementById('submitRequest').addEventListener('click', async () => {
+                const submitBtn = document.getElementById('submitRequest');
+                submitBtn.classList.add('loading');
+                submitBtn.disabled = true;
+                errorEl.classList.remove('active');
+
+                try {
+                    const response = await fetch('/api/client-request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        steps.forEach(s => s.classList.remove('active'));
+                        document.querySelector('.request-steps').style.display = 'none';
+                        successEl.classList.add('active');
+
+                        setTimeout(closePopup, 3000);
+                    } else {
+                        throw new Error(result.error || 'Ошибка отправки');
+                    }
+                } catch (error) {
+                    errorEl.textContent = error.message || 'Произошла ошибка. Попробуйте позже.';
+                    errorEl.classList.add('active');
+                } finally {
+                    submitBtn.classList.remove('loading');
+                    updateButtons();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && popup.classList.contains('active')) {
+                    closePopup();
+                }
+            });
+        })();
     </script>
 </body>
 </html>
