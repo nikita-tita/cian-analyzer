@@ -1,7 +1,7 @@
 {
   "name": "Housler — Агентство недвижимости",
   "short_name": "Housler",
-  "description": "Интеллектуальный анализ недвижимости в Санкт-Петербурге",
+  "description": "Интеллектуальный анализ недвижимости в Москве и Санкт-Петербурге",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
