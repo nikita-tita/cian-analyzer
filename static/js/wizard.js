@@ -1629,43 +1629,53 @@ const screen3 = {
                     </div>
                 </div>
 
-                <!-- Варианты оплаты -->
+                <!-- Стоимость услуг - единый компонент -->
                 <div style="margin-bottom: var(--spacing-xl);">
-                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-xs); font-weight: 500;">
-                        Выберите удобный вариант
+                    <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-lg); font-weight: 500;">
+                        Стоимость услуг
                     </div>
-                    <div style="font-size: var(--text-sm); color: var(--gray-600); margin-bottom: var(--spacing-lg);">
-                        Ваш объект: <strong style="color: var(--black);">${price_tier.range}</strong>
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--spacing-lg);">
 
-                        <!-- Опция A -->
-                        <div style="border: 1px solid var(--gray-300); padding: var(--spacing-xl); transition: all var(--transition-base); cursor: pointer;"
-                             onmouseover="this.style.borderColor='var(--black)'; this.style.boxShadow='var(--shadow-md)'"
-                             onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none'">
-                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-lg); font-weight: 500;">
-                                Опция A — Комиссия
+                    <div style="border: 2px solid var(--black); padding: var(--spacing-xl);">
+                        <div style="text-align: center; margin-bottom: var(--spacing-xl);">
+                            <div style="font-size: 56px; font-weight: 300; letter-spacing: -0.02em; color: var(--black);">2%</div>
+                            <div style="font-size: var(--text-sm); color: var(--gray-600); margin-top: var(--spacing-xs);">от стоимости продажи</div>
+                            <div style="font-size: var(--text-base); color: var(--black); font-weight: 500; margin-top: var(--spacing-sm);">Эксклюзивный договор, оплата по результату</div>
+                        </div>
+
+                        <div style="border-top: 1px solid var(--gray-300); padding-top: var(--spacing-lg); margin-bottom: var(--spacing-lg);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="font-size: var(--text-sm);">Никаких авансов и предоплат</span>
                             </div>
-                            <div style="font-size: 40px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: var(--spacing-lg); color: var(--black);">
-                                ${commission_option.value}
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="font-size: var(--text-sm);">Оплата после успешной сделки</span>
                             </div>
-                            <div style="font-size: var(--text-sm); color: var(--gray-600); line-height: var(--leading-relaxed);">
-                                ${commission_option.description}
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="font-size: var(--text-sm);">Полное сопровождение до ключей</span>
                             </div>
                         </div>
 
-                        <!-- Опция B -->
-                        <div style="border: 1px solid var(--gray-300); padding: var(--spacing-xl); transition: all var(--transition-base); cursor: pointer;"
-                             onmouseover="this.style.borderColor='var(--black)'; this.style.boxShadow='var(--shadow-md)'"
-                             onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none'">
-                            <div style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); margin-bottom: var(--spacing-lg); font-weight: 500;">
-                                Опция B — Предоплата + успех
-                            </div>
-                            <div style="font-size: 40px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: var(--spacing-lg); color: var(--black);">
-                                ${prepay_option.prepay}
-                            </div>
-                            <div style="font-size: var(--text-sm); color: var(--gray-600); line-height: var(--leading-relaxed);">
-                                ${prepay_option.description}
+                        <div style="border-top: 1px solid var(--gray-300); padding-top: var(--spacing-lg);">
+                            <div style="font-weight: 500; margin-bottom: var(--spacing-md); font-size: var(--text-sm);">Что входит в стоимость</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md);">
+                                <div style="background: var(--gray-100); padding: var(--spacing-md);">
+                                    <div style="font-weight: 500; font-size: var(--text-sm);">Подготовка</div>
+                                    <div style="color: var(--gray-600); font-size: var(--text-xs);">Фотосъёмка, видео, 3D-тур</div>
+                                </div>
+                                <div style="background: var(--gray-100); padding: var(--spacing-md);">
+                                    <div style="font-weight: 500; font-size: var(--text-sm);">Аналитика</div>
+                                    <div style="color: var(--gray-600); font-size: var(--text-xs);">Оценка, аналоги, цена</div>
+                                </div>
+                                <div style="background: var(--gray-100); padding: var(--spacing-md);">
+                                    <div style="font-weight: 500; font-size: var(--text-sm);">Маркетинг</div>
+                                    <div style="color: var(--gray-600); font-size: var(--text-xs);">Площадки, продвижение</div>
+                                </div>
+                                <div style="background: var(--gray-100); padding: var(--spacing-md);">
+                                    <div style="font-weight: 500; font-size: var(--text-sm);">Сделка</div>
+                                    <div style="color: var(--gray-600); font-size: var(--text-xs);">Показы, переговоры, оформление</div>
+                                </div>
                             </div>
                         </div>
                     </div>
