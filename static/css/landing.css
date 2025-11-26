@@ -181,7 +181,6 @@ a:link {
 .hero-tagline {
     font-size: 28px;
     font-weight: 300;
-    font-style: italic;
     color: var(--color-text);
     margin-bottom: 24px;
     letter-spacing: -0.01em;

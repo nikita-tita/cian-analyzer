@@ -72,3 +72,6 @@ cookies.txt
 *.cookie
 *.cookies
 session_*.txt
+
+# Production database - should not be overwritten by deploys
+blog.db
