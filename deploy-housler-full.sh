@@ -50,8 +50,19 @@ echo -e "${GREEN}✅ Подключение к серверу установле
 echo ""
 echo -e "${CYAN}[2/9] Копирование файлов на сервер...${NC}"
 
-# Создаем директорию на сервере
-ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "mkdir -p $APP_DIR/backups"
+# Создаем директории на сервере
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" "mkdir -p $APP_DIR/backups /var/www/housler_data"
+
+# Миграция blog.db в защищённую директорию (если ещё не перенесена)
+ssh -i ~/.ssh/id_housler "$SERVER_USER@$SERVER_IP" bash << 'MIGRATE_DB'
+if [ -f "/var/www/housler/blog.db" ] && [ ! -f "/var/www/housler_data/blog.db" ]; then
+    echo "Миграция blog.db в защищённую директорию..."
+    mv /var/www/housler/blog.db /var/www/housler_data/blog.db
+    echo "✅ blog.db перенесена в /var/www/housler_data/"
+elif [ -f "/var/www/housler_data/blog.db" ]; then
+    echo "✅ blog.db уже находится в защищённой директории"
+fi
+MIGRATE_DB
 
 # Список файлов для деплоя (исключаем venv, cache, и т.д.)
 # ВАЖНО: blog.db НЕ копируется чтобы не затереть статьи на сервере!
@@ -156,6 +167,7 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/housler
 Environment="PATH=/var/www/housler/venv/bin"
+Environment="BLOG_DB_PATH=/var/www/housler_data/blog.db"
 ExecStart=/var/www/housler/venv/bin/python /var/www/housler/app_new.py
 Restart=always
 RestartSec=10
@@ -294,30 +306,61 @@ fi
 # Настройка cron job для автоматического парсинга блога
 echo "Настройка cron job для blog parser..."
 
-# Создаём скрипт для cron
+# Создаём скрипт для cron (с правильным путём к БД)
 cat > /var/www/housler/cron_parse_blog.sh << 'CRONSCRIPT'
 #!/bin/bash
 cd /var/www/housler
 source venv/bin/activate
+export BLOG_DB_PATH=/var/www/housler_data/blog.db
 python3 blog_cli.py parse -n 10 >> /var/log/housler/blog_parser_cron.log 2>&1
 CRONSCRIPT
 
 chmod +x /var/www/housler/cron_parse_blog.sh
 
-# Добавляем в crontab (запуск каждый день в 10:00)
-CRON_JOB="0 10 * * * /var/www/housler/cron_parse_blog.sh"
+# Создаём скрипт для ежедневного бэкапа blog.db
+cat > /var/www/housler/cron_backup_blog.sh << 'BACKUPSCRIPT'
+#!/bin/bash
+# Ежедневный бэкап blog.db (хранится 7 последних копий)
+BACKUP_DIR="/var/www/housler_data/backups"
+SOURCE_DB="/var/www/housler_data/blog.db"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# Проверяем есть ли уже этот cron job
+mkdir -p "$BACKUP_DIR"
+
+if [ -f "$SOURCE_DB" ]; then
+    cp "$SOURCE_DB" "$BACKUP_DIR/blog_${TIMESTAMP}.db"
+    echo "[$(date)] Backup created: blog_${TIMESTAMP}.db" >> /var/log/housler/blog_backup.log
+
+    # Удаляем бэкапы старше 7 дней
+    find "$BACKUP_DIR" -name "blog_*.db" -mtime +7 -delete
+fi
+BACKUPSCRIPT
+
+chmod +x /var/www/housler/cron_backup_blog.sh
+
+# Добавляем в crontab (парсинг в 10:00, бэкап в 03:00)
+CRON_PARSE="0 10 * * * /var/www/housler/cron_parse_blog.sh"
+CRON_BACKUP="0 3 * * * /var/www/housler/cron_backup_blog.sh"
+
+# Проверяем и добавляем cron jobs
 if ! crontab -l 2>/dev/null | grep -q "cron_parse_blog.sh"; then
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    (crontab -l 2>/dev/null; echo "$CRON_PARSE") | crontab -
     echo "✅ Cron job для blog parser добавлен (ежедневно в 10:00)"
 else
     echo "✅ Cron job для blog parser уже существует"
 fi
 
+if ! crontab -l 2>/dev/null | grep -q "cron_backup_blog.sh"; then
+    (crontab -l 2>/dev/null; echo "$CRON_BACKUP") | crontab -
+    echo "✅ Cron job для backup добавлен (ежедневно в 03:00)"
+else
+    echo "✅ Cron job для backup уже существует"
+fi
+
 # Инициализируем блог seed данными если база пустая
 cd /var/www/housler
-POSTS_COUNT=$(source venv/bin/activate && python3 -c "from blog_database import BlogDatabase; db = BlogDatabase(); print(len(db.get_all_posts()))")
+export BLOG_DB_PATH=/var/www/housler_data/blog.db
+POSTS_COUNT=$(source venv/bin/activate && python3 -c "import os; os.environ['BLOG_DB_PATH']='/var/www/housler_data/blog.db'; from blog_database import BlogDatabase; db = BlogDatabase(); print(len(db.get_all_posts()))")
 if [ "$POSTS_COUNT" = "0" ]; then
     echo "База блога пустая, добавляем seed данные..."
     source venv/bin/activate

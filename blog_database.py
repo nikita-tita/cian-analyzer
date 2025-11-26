@@ -3,16 +3,29 @@ Database for Blog Posts
 SQLite storage for parsed and rewritten articles
 """
 
+import os
 import sqlite3
 import json
 from datetime import datetime
 from typing import List, Optional, Dict
 from pathlib import Path
 
+# Blog database path - use environment variable or default to protected location
+# In production: /var/www/housler_data/blog.db (outside git repo)
+# In development: ./blog.db (local)
+DEFAULT_BLOG_DB_PATH = os.environ.get(
+    'BLOG_DB_PATH',
+    '/var/www/housler_data/blog.db' if os.path.exists('/var/www/housler_data') else 'blog.db'
+)
+
 
 class BlogDatabase:
-    def __init__(self, db_path: str = "blog.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or DEFAULT_BLOG_DB_PATH
+        # Ensure directory exists
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
         self.init_db()
 
     def init_db(self):
