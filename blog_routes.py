@@ -2,8 +2,9 @@
 Blog Routes for Flask App
 """
 
-from flask import render_template, abort, Response
+from flask import render_template, abort, Response, send_from_directory, request
 from blog_database import BlogDatabase
+import os
 from datetime import datetime
 import logging
 import markdown2
@@ -18,11 +19,21 @@ def register_blog_routes(app):
     """Register blog routes with Flask app"""
 
     @app.route('/blog')
-    def blog_index():
-        """Blog index page with all posts"""
+    @app.route('/blog/page/<int:page>')
+    def blog_index(page=1):
+        """Blog index page with paginated posts"""
         try:
-            posts = blog_db.get_all_posts()
-            return render_template('blog_index.html', posts=posts)
+            per_page = 20  # Posts per page
+            pagination = blog_db.get_posts_paginated(page=page, per_page=per_page)
+
+            if page > pagination['total_pages'] and page > 1:
+                abort(404)
+
+            return render_template(
+                'blog_index.html',
+                posts=pagination['posts'],
+                pagination=pagination
+            )
         except Exception as e:
             logger.error(f"Error loading blog index: {e}")
             abort(500)
@@ -57,11 +68,41 @@ def register_blog_routes(app):
             abort(500)
 
     @app.route('/sitemap.xml')
-    def sitemap():
-        """Generate dynamic sitemap"""
+    def sitemap_index():
+        """Generate sitemap index for large sites"""
         try:
             posts = blog_db.get_all_posts()
+            total_posts = len(posts)
+            posts_per_sitemap = 1000  # Google recommends max 50,000 URLs per sitemap
 
+            xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+            xml.append('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+
+            # Main sitemap (static pages)
+            xml.append('  <sitemap>')
+            xml.append('    <loc>https://housler.ru/sitemap-main.xml</loc>')
+            xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
+            xml.append('  </sitemap>')
+
+            # Blog sitemaps (paginated)
+            num_sitemaps = (total_posts + posts_per_sitemap - 1) // posts_per_sitemap
+            for i in range(max(1, num_sitemaps)):
+                xml.append('  <sitemap>')
+                xml.append(f'    <loc>https://housler.ru/sitemap-blog-{i + 1}.xml</loc>')
+                xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
+                xml.append('  </sitemap>')
+
+            xml.append('</sitemapindex>')
+
+            return Response('\n'.join(xml), mimetype='application/xml')
+        except Exception as e:
+            logger.error(f"Error generating sitemap index: {e}")
+            abort(500)
+
+    @app.route('/sitemap-main.xml')
+    def sitemap_main():
+        """Static pages sitemap"""
+        try:
             xml = ['<?xml version="1.0" encoding="UTF-8"?>']
             xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
 
@@ -71,6 +112,22 @@ def register_blog_routes(app):
             xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
             xml.append('    <changefreq>weekly</changefreq>')
             xml.append('    <priority>1.0</priority>')
+            xml.append('  </url>')
+
+            # Blog index
+            xml.append('  <url>')
+            xml.append('    <loc>https://housler.ru/blog</loc>')
+            xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
+            xml.append('    <changefreq>daily</changefreq>')
+            xml.append('    <priority>0.9</priority>')
+            xml.append('  </url>')
+
+            # Calculator
+            xml.append('  <url>')
+            xml.append('    <loc>https://housler.ru/calculator</loc>')
+            xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
+            xml.append('    <changefreq>monthly</changefreq>')
+            xml.append('    <priority>0.8</priority>')
             xml.append('  </url>')
 
             # Consent page
@@ -89,24 +146,42 @@ def register_blog_routes(app):
             xml.append('    <priority>0.5</priority>')
             xml.append('  </url>')
 
-            # Blog index
-            xml.append('  <url>')
-            xml.append('    <loc>https://housler.ru/blog</loc>')
-            xml.append(f'    <lastmod>{datetime.now().date().isoformat()}</lastmod>')
-            xml.append('    <changefreq>daily</changefreq>')
-            xml.append('    <priority>0.9</priority>')
-            xml.append('  </url>')
+            xml.append('</urlset>')
 
-            # Blog posts
-            for post in posts:
+            return Response('\n'.join(xml), mimetype='application/xml')
+        except Exception as e:
+            logger.error(f"Error generating main sitemap: {e}")
+            abort(500)
+
+    @app.route('/sitemap-blog-<int:page>.xml')
+    def sitemap_blog(page):
+        """Paginated blog sitemap"""
+        try:
+            posts_per_sitemap = 1000
+            offset = (page - 1) * posts_per_sitemap
+
+            posts = blog_db.get_all_posts()
+            paginated_posts = posts[offset:offset + posts_per_sitemap]
+
+            if not paginated_posts and page > 1:
+                abort(404)
+
+            xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+            xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+
+            for post in paginated_posts:
                 xml.append('  <url>')
                 xml.append(f'    <loc>https://housler.ru/blog/{post["slug"]}</loc>')
-                # Parse published_at date
+                # Use updated_at if available, otherwise published_at
                 try:
-                    pub_date = datetime.fromisoformat(post['published_at']).date().isoformat()
+                    mod_date = post.get('updated_at') or post.get('published_at')
+                    if mod_date:
+                        mod_date = datetime.fromisoformat(mod_date.replace('Z', '+00:00')).date().isoformat()
+                    else:
+                        mod_date = datetime.now().date().isoformat()
                 except:
-                    pub_date = datetime.now().date().isoformat()
-                xml.append(f'    <lastmod>{pub_date}</lastmod>')
+                    mod_date = datetime.now().date().isoformat()
+                xml.append(f'    <lastmod>{mod_date}</lastmod>')
                 xml.append('    <changefreq>monthly</changefreq>')
                 xml.append('    <priority>0.8</priority>')
                 xml.append('  </url>')
@@ -115,7 +190,12 @@ def register_blog_routes(app):
 
             return Response('\n'.join(xml), mimetype='application/xml')
         except Exception as e:
-            logger.error(f"Error generating sitemap: {e}")
+            logger.error(f"Error generating blog sitemap page {page}: {e}")
             abort(500)
+
+    @app.route('/robots.txt')
+    def robots_txt():
+        """Serve robots.txt for SEO"""
+        return send_from_directory('static', 'robots.txt', mimetype='text/plain')
 
     logger.info("Blog routes registered")

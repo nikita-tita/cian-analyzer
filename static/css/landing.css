@@ -175,7 +175,16 @@ a:link {
     font-weight: 600;
     letter-spacing: -0.03em;
     line-height: 1.1;
-    margin-bottom: 32px;
+    margin-bottom: 16px;
+}
+
+.hero-tagline {
+    font-size: 28px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--color-text);
+    margin-bottom: 24px;
+    letter-spacing: -0.01em;
 }
 
 .hero-subtitle {
@@ -202,14 +211,18 @@ a:link {
     transition: all 0.2s;
 }
 
-.btn-primary {
+.btn-primary,
+a.btn-primary,
+a.btn-primary:link,
+a.btn-primary:visited {
     background: var(--color-text);
-    color: #FFFFFF;
+    color: #FFFFFF !important;
 }
 
-.btn-primary:hover {
+.btn-primary:hover,
+a.btn-primary:hover {
     background: #000000;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
 }
 
 .btn-secondary {

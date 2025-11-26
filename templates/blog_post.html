@@ -22,6 +22,65 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://housler.ru/blog/{{ post.slug }}">
 
+    <!-- Schema.org Article structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "{{ post.title }}",
+        "description": "{{ post.excerpt or post.content[:200] | e }}",
+        "datePublished": "{{ post.published_at }}",
+        "dateModified": "{{ post.updated_at or post.published_at }}",
+        "author": {
+            "@type": "Organization",
+            "name": "HOUSLER",
+            "url": "https://housler.ru"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "HOUSLER",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://housler.ru/static/images/favicon-512.png"
+            }
+        },
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://housler.ru/blog/{{ post.slug }}"
+        },
+        "articleSection": "Недвижимость",
+        "inLanguage": "ru-RU"
+    }
+    </script>
+
+    <!-- BreadcrumbList structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Главная",
+                "item": "https://housler.ru"
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Блог",
+                "item": "https://housler.ru/blog"
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "{{ post.title }}",
+                "item": "https://housler.ru/blog/{{ post.slug }}"
+            }
+        ]
+    }
+    </script>
+
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/landing.css">
     <link rel="stylesheet" href="/static/css/blog-minimal.css">
@@ -66,6 +125,15 @@
     <!-- Blog Post -->
     <section class="section">
         <div class="container">
+            <!-- Breadcrumbs -->
+            <nav class="breadcrumbs" aria-label="Навигация">
+                <a href="/">Главная</a>
+                <span class="breadcrumb-sep">→</span>
+                <a href="/blog">Блог</a>
+                <span class="breadcrumb-sep">→</span>
+                <span class="breadcrumb-current">{{ post.title[:50] }}{% if post.title|length > 50 %}...{% endif %}</span>
+            </nav>
+
             <div class="blog-post-content">
                 <div class="blog-post-header">
                     <div class="blog-post-meta">{{ post.published_at[:10] }}</div>
@@ -80,7 +148,18 @@
                 </div>
 
                 <div class="blog-post-footer">
-                    <a href="/blog" style="color: #000; text-decoration: none; font-weight: 500;">← Все статьи</a>
+                    <a href="/blog" class="back-to-blog">← Все статьи</a>
+                </div>
+
+                <!-- CTA Block for internal linking -->
+                <div class="blog-cta-block">
+                    <h3>Нужна помощь с недвижимостью?</h3>
+                    <p>HOUSLER — агентство недвижимости в Санкт-Петербурге с полным сопровождением сделки</p>
+                    <div class="blog-cta-links">
+                        <a href="/" class="blog-cta-link">Узнать об услугах</a>
+                        <a href="/calculator?reset=1" class="blog-cta-link">Оценить квартиру</a>
+                        <a href="/#contact" class="blog-cta-link">Связаться</a>
+                    </div>
                 </div>
             </div>
 
