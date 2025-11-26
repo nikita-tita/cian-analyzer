@@ -518,7 +518,7 @@ def set_security_headers(response):
     # Content Security Policy - защита от XSS
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mc.yandex.ru; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
         "img-src 'self' data: https: http:; "
         "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
