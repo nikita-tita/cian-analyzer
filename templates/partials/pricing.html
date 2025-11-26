@@ -1,0 +1,96 @@
+{# Единый компонент стоимости услуг Housler #}
+{# Используется на главной странице и в PDF отчёте #}
+
+{% macro pricing_block(context='page') %}
+{# context: 'page' для главной страницы, 'report' для PDF отчёта #}
+
+{% if context == 'report' %}
+<div style="margin-bottom: 25px;">
+    <h3 style="font-size: 18px; font-weight: 600; margin: 20px 0 15px 0;">Стоимость услуг</h3>
+
+    <div style="background: #f8f9fa; padding: 25px; border-radius: 8px; border: 2px solid #000;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 48px; font-weight: bold; color: #000;">2%</div>
+            <div style="color: #666; margin-top: 5px;">от стоимости продажи</div>
+            <div style="color: #333; font-weight: 500; margin-top: 10px;">Эксклюзивный договор, оплата по результату</div>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span style="color: #28a745;">✓</span>
+                <span>Никаких авансов и предоплат</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span style="color: #28a745;">✓</span>
+                <span>Оплата после успешной сделки</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="color: #28a745;">✓</span>
+                <span>Полное сопровождение до ключей</span>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 15px;">
+            <div style="font-weight: 600; margin-bottom: 12px;">Что входит в стоимость</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                    <div style="font-weight: 600; font-size: 14px;">Подготовка</div>
+                    <div style="color: #666; font-size: 13px;">Фотосъёмка, видео, 3D-тур</div>
+                </div>
+                <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                    <div style="font-weight: 600; font-size: 14px;">Аналитика</div>
+                    <div style="color: #666; font-size: 13px;">Оценка, аналоги, цена</div>
+                </div>
+                <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                    <div style="font-weight: 600; font-size: 14px;">Маркетинг</div>
+                    <div style="color: #666; font-size: 13px;">Площадки, продвижение</div>
+                </div>
+                <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                    <div style="font-weight: 600; font-size: 14px;">Сделка</div>
+                    <div style="color: #666; font-size: 13px;">Показы, переговоры, оформление</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+{# Версия для главной страницы - использует CSS классы #}
+<div class="pricing-unified">
+    <div class="pricing-main-block">
+        <div class="pricing-rate">
+            <div class="rate-amount">2%</div>
+            <div class="rate-description">от стоимости продажи</div>
+            <div class="rate-subtitle">Эксклюзивный договор, оплата по результату</div>
+        </div>
+
+        <div class="pricing-conditions">
+            <div class="condition-item">Никаких авансов и предоплат</div>
+            <div class="condition-item">Оплата после успешной сделки</div>
+            <div class="condition-item">Полное сопровождение до ключей</div>
+        </div>
+    </div>
+
+    <div class="pricing-scope">
+        <div class="scope-title">Что входит в стоимость</div>
+        <div class="scope-grid">
+            <div class="scope-item">
+                <div class="scope-item-title">Подготовка</div>
+                <div class="scope-item-text">Фотосъёмка, видео, 3D-тур</div>
+            </div>
+            <div class="scope-item">
+                <div class="scope-item-title">Аналитика</div>
+                <div class="scope-item-text">Оценка, аналоги, цена</div>
+            </div>
+            <div class="scope-item">
+                <div class="scope-item-title">Маркетинг</div>
+                <div class="scope-item-text">Площадки, продвижение</div>
+            </div>
+            <div class="scope-item">
+                <div class="scope-item-title">Сделка</div>
+                <div class="scope-item-text">Показы, переговоры, оформление</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

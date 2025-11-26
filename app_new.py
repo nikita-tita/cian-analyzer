@@ -2040,26 +2040,53 @@ def export_report(session_id):
             logger.warning("Playwright не доступен, возвращаем markdown")
             return _export_markdown_fallback(session_id, session_data)
 
-        # Создаем URL для HTML отчета
-        base_url = request.url_root.rstrip('/')
-        report_url = f"{base_url}/report/{session_id}"
+        # Генерируем PDF напрямую из HTML (без HTTP запроса)
+        try:
+            # Рендерим HTML шаблон напрямую
+            analysis = session_data['analysis']
+            target = session_data.get('target_property', {})
+            comparables = session_data.get('comparables', [])
+            comparables = [c for c in comparables if not c.get('excluded', False)]
 
-        # Генерируем PDF
-        pdf_bytes = asyncio.run(_generate_pdf_from_page(report_url))
+            housler_offer = generate_housler_offer(
+                analysis=analysis,
+                property_info=target,
+                recommendations=analysis.get('recommendations', [])
+            )
 
-        # Возвращаем PDF файл
-        from flask import Response
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"housler_report_{session_id[:8]}_{timestamp}.pdf"
-
-        return Response(
-            pdf_bytes,
-            mimetype='application/pdf',
-            headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
-                'Content-Type': 'application/pdf'
+            template_data = {
+                'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'property_info': target,
+                'comparables': comparables,
+                'fair_price_analysis': analysis.get('fair_price_analysis', {}),
+                'market_statistics': analysis.get('market_statistics', {}),
+                'recommendations': analysis.get('recommendations', []),
+                'price_scenarios': analysis.get('price_scenarios', []),
+                'time_forecast': analysis.get('time_forecast', {}),
+                'attractiveness_index': analysis.get('attractiveness_index', {}),
+                'strengths_weaknesses': analysis.get('strengths_weaknesses', {}),
+                'housler_offer': housler_offer
             }
-        )
+
+            html_content = render_template('report.html', **template_data)
+            pdf_bytes = asyncio.run(_generate_pdf_from_html(html_content))
+
+            # Возвращаем PDF файл
+            from flask import Response
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"housler_report_{session_id[:8]}_{timestamp}.pdf"
+
+            return Response(
+                pdf_bytes,
+                mimetype='application/pdf',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Type': 'application/pdf'
+                }
+            )
+        except Exception as pdf_error:
+            logger.warning(f"PDF генерация не удалась ({pdf_error}), переключаемся на markdown")
+            return _export_markdown_fallback(session_id, session_data)
 
     except Exception as e:
         logger.error(f"Ошибка экспорта отчета: {e}", exc_info=True)
@@ -2295,9 +2322,9 @@ def client_request():
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
-async def _generate_pdf_from_page(url: str) -> bytes:
+async def _generate_pdf_from_html(html_content: str) -> bytes:
     """
-    Генерирует PDF из HTML страницы используя Playwright
+    Генерирует PDF из HTML строки используя Playwright (без HTTP запроса)
     """
     from playwright.async_api import async_playwright
 
@@ -2305,17 +2332,11 @@ async def _generate_pdf_from_page(url: str) -> bytes:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
-        # Загружаем страницу
-        logger.info(f"Загружаем страницу для PDF: {url}")
-        await page.goto(url, wait_until='networkidle', timeout=60000)
+        # Загружаем HTML напрямую
+        logger.info("Загружаем HTML для PDF...")
+        await page.set_content(html_content, wait_until='networkidle', timeout=60000)
 
-        # Ждем загрузки контента (report-container вместо analysis-results)
-        try:
-            await page.wait_for_selector('.report-container', timeout=10000)
-        except Exception as e:
-            logger.warning(f"Не дождались report-container: {e}, продолжаем...")
-
-        # Даем время на загрузку шрифтов и стилей
+        # Даем время на загрузку шрифтов и стилей из CDN
         await page.wait_for_timeout(2000)
 
         # Генерируем PDF

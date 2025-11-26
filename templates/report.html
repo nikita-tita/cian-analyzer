@@ -624,33 +624,52 @@
                 </p>
             </div>
 
-            <!-- Варианты оплаты -->
+            <!-- Стоимость услуг - единый компонент -->
             <div style="margin-bottom: 25px;">
-                <h3 class="subsection-title">💳 Выберите удобный вариант оплаты</h3>
-                <p style="color: #6c757d; margin-bottom: 15px;">
-                    Ваш объект относится к диапазону: <strong>{{ housler_offer.price_tier.range }}</strong>
-                </p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <!-- Опция A: Комиссия -->
-                    <div style="background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 20px;">
-                        <h4 style="margin: 0 0 10px 0; color: #007bff;">Опция A — Комиссия</h4>
-                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
-                            {{ housler_offer.commission_option.value }}
-                        </div>
-                        <p style="margin: 0; color: #6c757d;">
-                            {{ housler_offer.commission_option.description }}
-                        </p>
+                <h3 class="subsection-title">Стоимость услуг</h3>
+
+                <div style="background: #f8f9fa; padding: 25px; border-radius: 8px; border: 2px solid #000;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="font-size: 48px; font-weight: bold; color: #000;">2%</div>
+                        <div style="color: #666; margin-top: 5px;">от стоимости продажи</div>
+                        <div style="color: #333; font-weight: 500; margin-top: 10px;">Эксклюзивный договор, оплата по результату</div>
                     </div>
 
-                    <!-- Опция B: Предоплата -->
-                    <div style="background: #fff; border: 2px solid #28a745; border-radius: 8px; padding: 20px;">
-                        <h4 style="margin: 0 0 10px 0; color: #28a745;">Опция B — Предоплата + успех</h4>
-                        <div style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #000;">
-                            {{ housler_offer.prepay_option.prepay }}
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span style="color: #28a745;">✓</span>
+                            <span>Никаких авансов и предоплат</span>
                         </div>
-                        <p style="margin: 0; color: #6c757d;">
-                            {{ housler_offer.prepay_option.description }}
-                        </p>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span style="color: #28a745;">✓</span>
+                            <span>Оплата после успешной сделки</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #28a745;">✓</span>
+                            <span>Полное сопровождение до ключей</span>
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 15px;">
+                        <div style="font-weight: 600; margin-bottom: 12px;">Что входит в стоимость</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                                <div style="font-weight: 600; font-size: 14px;">Подготовка</div>
+                                <div style="color: #666; font-size: 13px;">Фотосъёмка, видео, 3D-тур</div>
+                            </div>
+                            <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                                <div style="font-weight: 600; font-size: 14px;">Аналитика</div>
+                                <div style="color: #666; font-size: 13px;">Оценка, аналоги, цена</div>
+                            </div>
+                            <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                                <div style="font-weight: 600; font-size: 14px;">Маркетинг</div>
+                                <div style="color: #666; font-size: 13px;">Площадки, продвижение</div>
+                            </div>
+                            <div style="background: #fff; padding: 12px; border-radius: 6px;">
+                                <div style="font-weight: 600; font-size: 14px;">Сделка</div>
+                                <div style="color: #666; font-size: 13px;">Показы, переговоры, оформление</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
