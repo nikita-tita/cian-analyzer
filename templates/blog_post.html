@@ -528,6 +528,18 @@
                     closePopup();
                 }
             });
+
+            // Intercept links with "заявк" in text and open popup instead
+            document.querySelectorAll('.blog-post-body a').forEach(link => {
+                const text = link.textContent.toLowerCase();
+                if (text.includes('заявк') || text.includes('связат')) {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        popup.classList.add('active');
+                        document.body.style.overflow = 'hidden';
+                    });
+                }
+            });
         })();
     </script>
 </body>
