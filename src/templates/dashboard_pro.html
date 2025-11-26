@@ -1135,7 +1135,7 @@
             statusEl.textContent = '⏳ Парсим объявление...';
 
             try {
-                const response = await fetch('/api/parse-cian', {
+                const response = await fetch('/api/parse', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1145,9 +1145,12 @@
 
                 const data = await response.json();
 
-                if (data.success) {
+                if (data.status === 'success') {
+                    // Store session_id for later API calls
+                    window.currentSessionId = data.session_id;
+
                     // Fill form with parsed data
-                    const prop = data.target_property;
+                    const prop = data.data;
 
                     // Считаем сколько полей заполнили
                     let filledCount = 0;
@@ -1206,7 +1209,7 @@
                     // Scroll to form
                     document.querySelector('.input-section').scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    throw new Error(data.error || 'Ошибка парсинга');
+                    throw new Error(data.message || 'Ошибка парсинга');
                 }
             } catch (error) {
                 console.error('Parse error:', error);
@@ -1218,23 +1221,30 @@
         // Search comparables automatically
         async function searchComparables(targetProperty) {
             try {
-                const response = await fetch('/api/search-comparables', {
+                // Use session_id from parse response for find-similar API
+                if (!window.currentSessionId) {
+                    console.warn('No session_id available for search');
+                    return;
+                }
+
+                const response = await fetch('/api/find-similar', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        target_property: targetProperty,
-                        limit: 10
+                        session_id: window.currentSessionId,
+                        limit: 20,
+                        search_type: 'building'
                     })
                 });
 
                 const data = await response.json();
 
-                if (data.success && data.comparables.length > 0) {
+                if (data.status === 'success' && data.comparables && data.comparables.length > 0) {
                     // Сохраняем аналоги глобально
                     window.autoComparables = data.comparables;
-                    console.log(`✅ Найдено ${data.count} аналогов автоматически`);
+                    console.log(`✅ Найдено ${data.comparables.length} аналогов автоматически`);
 
                     // Показываем список аналогов
                     displayComparables(data.comparables);
