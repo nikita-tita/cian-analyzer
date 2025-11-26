@@ -2244,6 +2244,7 @@ def send_telegram_message(text: str) -> bool:
 
 
 @app.route('/api/client-request', methods=['POST'])
+@csrf.exempt  # Публичная форма, CSRF не требуется
 def client_request():
     """
     Обработка заявки от клиента (вариативная форма)
