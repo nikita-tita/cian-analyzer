@@ -198,4 +198,9 @@ def register_blog_routes(app):
         """Serve robots.txt for SEO"""
         return send_from_directory('static', 'robots.txt', mimetype='text/plain')
 
+    @app.route('/yandex_a22640ce66beb879.html')
+    def yandex_verification():
+        """Serve Yandex.Webmaster verification file"""
+        return send_from_directory('static', 'yandex_a22640ce66beb879.html')
+
     logger.info("Blog routes registered")
