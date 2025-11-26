@@ -711,9 +711,14 @@ a.btn-primary:hover {
 
 .calc-promo-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-bottom: 48px;
+    grid-template-columns: repeat(3, 280px);
+    gap: 32px;
+    margin-bottom: 64px;
+    justify-content: center;
+}
+
+.calc-promo-grid .service-card {
+    padding: 32px 28px;
 }
 
 .calc-step-num {
@@ -726,7 +731,9 @@ a.btn-primary:hover {
 
 .calc-promo-action {
     text-align: center;
-    padding-top: 16px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border);
+    margin-top: 16px;
 }
 
 .btn-large {
@@ -740,10 +747,20 @@ a.btn-primary:hover {
     color: var(--color-text-light);
 }
 
+@media (max-width: 968px) {
+    .calc-promo-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+}
+
 @media (max-width: 768px) {
     .calc-promo-grid {
         grid-template-columns: 1fr;
         gap: 16px;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .section-subtitle {
