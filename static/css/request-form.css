@@ -22,9 +22,10 @@
 }
 
 .request-popup-overlay.active {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 99999 !important;
 }
 
 /* Popup Container */
