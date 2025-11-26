@@ -141,14 +141,11 @@ class RecommendationEngine:
                 expected_result='Продажа за 2-4 месяца с вероятностью 75%',
                 category='pricing',
                 financial_impact={
-                    'current_scenario': 'Не продано 12+ месяцев',
-                    'with_action': 'Продано за 4 месяца',
-                    'time_saved_months': 8,
-                    'opportunity_cost_saved': savings,
-                    'opportunity_rate_percent': self.opportunity_rate * 100,
-                    'opportunity_rate_note': self.opportunity_rate_note,
-                    'opportunity_rate_source': (self.opportunity_metadata or {}).get('source'),
-                    'recommendation': f'Снизить на {abs(overpricing):.1f}%'
+                    'Текущий сценарий': 'Не продано 12+ месяцев',
+                    'После корректировки': 'Продано за 4 месяца',
+                    'Экономия времени': '8 мес.',
+                    'Экономия на упущенной выгоде': f'{savings:,.0f} ₽',
+                    'Рекомендация': f'Снизить на {abs(overpricing):.1f}%'
                 }
             ))
 
@@ -163,9 +160,9 @@ class RecommendationEngine:
                 expected_result='Увеличение вероятности продажи на 30-40%',
                 category='pricing',
                 financial_impact={
-                    'price_reduction': current_price * 0.07,
-                    'probability_increase': '30-40%',
-                    'expected_time_reduction': '2-3 месяца'
+                    'Снижение цены': f'{current_price * 0.07:,.0f} ₽',
+                    'Рост вероятности продажи': '30-40%',
+                    'Сокращение срока': '2-3 месяца'
                 }
             ))
 
@@ -192,8 +189,8 @@ class RecommendationEngine:
                 expected_result='Дополнительная прибыль при сохранении скорости продажи',
                 category='pricing',
                 financial_impact={
-                    'potential_gain': fair_price - current_price,
-                    'risk_level': 'Низкий'
+                    'Потенциальная выгода': f'{fair_price - current_price:,.0f} ₽',
+                    'Уровень риска': 'Низкий'
                 }
             ))
         else:
@@ -207,8 +204,8 @@ class RecommendationEngine:
                 expected_result='Продажа за 3-6 месяцев с высокой вероятностью',
                 category='pricing',
                 financial_impact={
-                    'торг_диапазон': f'{current_price * 0.93:,.0f} - {current_price:,.0f} ₽',
-                    'expected_time': '3-6 месяцев'
+                    'Диапазон торга': f'{current_price * 0.93:,.0f} - {current_price:,.0f} ₽',
+                    'Ожидаемый срок': '3-6 месяцев'
                 }
             ))
 
@@ -252,12 +249,11 @@ class RecommendationEngine:
                     roi=roi,
                     category='improvement',
                     financial_impact={
-                        'investment': cost,
-                        'cost_per_sqm': cost_per_sqm,
-                        'return': gain,
-                        'net_profit': gain - cost,
-                        'payback_period': 'При продаже',
-                        'note': 'Премиум-ремонт обычно добавляет 5-10% к стоимости'
+                        'Инвестиция': f'{cost:,.0f} ₽',
+                        'Стоимость за м²': f'{cost_per_sqm:,.0f} ₽/м²',
+                        'Прирост стоимости': f'{gain:,.0f} ₽',
+                        'Чистая прибыль': f'{gain - cost:,.0f} ₽',
+                        'Срок окупаемости': 'При продаже'
                     }
                 ))
             else:
@@ -272,10 +268,10 @@ class RecommendationEngine:
                     roi=roi,
                     category='improvement',
                     financial_impact={
-                        'investment': cost,
-                        'return': gain,
-                        'net_loss': cost - gain,
-                        'recommendation': 'Не делать дорогой ремонт перед продажей'
+                        'Инвестиция': f'{cost:,.0f} ₽',
+                        'Прирост стоимости': f'{gain:,.0f} ₽',
+                        'Чистый убыток': f'{cost - gain:,.0f} ₽',
+                        'Рекомендация': 'Не делать дорогой ремонт перед продажей'
                     }
                 ))
 
@@ -294,8 +290,8 @@ class RecommendationEngine:
                 expected_result='Увеличение привлекательности для покупателей на 40%',
                 category='improvement',
                 financial_impact={
-                    'value_increase': parking_premium,
-                    'liquidity_boost': '40%'
+                    'Прирост стоимости': f'{parking_premium:,.0f} ₽',
+                    'Рост ликвидности': '40%'
                 }
             ))
 
@@ -366,13 +362,12 @@ class RecommendationEngine:
                 roi=roi,
                 category='presentation',
                 financial_impact={
-                    'investment': cost,
-                    'views_increase_percent': views_increase,
-                    'conversion_boost_percent': conversion_increase,
-                    'time_saved_months': time_saved_months,
-                    'time_value_of_money': time_value,
-                    'net_benefit': time_value - cost,
-                    'note': 'Фотосессия ускоряет продажу, экономя альтернативные издержки'
+                    'Инвестиция': f'{cost:,.0f} ₽',
+                    'Рост просмотров': f'{views_increase}%',
+                    'Рост конверсии': f'{conversion_increase}%',
+                    'Экономия времени': f'{time_saved_months:.0f} мес.',
+                    'Экономия на упущенной выгоде': f'{time_value:,.0f} ₽',
+                    'Чистая выгода': f'{time_value - cost:,.0f} ₽'
                 }
             ))
 
@@ -400,8 +395,8 @@ class RecommendationEngine:
                 expected_result='Увеличение серьезных обращений на 60%',
                 category='presentation',
                 financial_impact={
-                    'investment': 30_000,
-                    'serious_inquiries_boost': '60%'
+                    'Инвестиция': '30 000 ₽',
+                    'Рост серьёзных обращений': '60%'
                 }
             ))
 
@@ -416,9 +411,9 @@ class RecommendationEngine:
                 expected_result='Увеличение количества просмотров и звонков на 30-40%',
                 category='presentation',
                 financial_impact={
-                    'cost': 'минимальная',
-                    'impact': 'высокий',
-                    'time_to_implement': '1-2 дня'
+                    'Затраты': 'минимальные',
+                    'Эффект': 'высокий',
+                    'Срок реализации': '1-2 дня'
                 }
             ))
 
@@ -464,11 +459,11 @@ class RecommendationEngine:
             ),
             category='strategy',
             financial_impact={
-                'scenario': best_name,
-                'expected_time_months': best_months,
-                'probability_percent': best_prob,
-                'net_profit': best_profit,
-                'expected_value': best_expected_value
+                'Сценарий': best_name,
+                'Ожидаемый срок': f'{best_months} мес.',
+                'Вероятность продажи': f'{best_prob}%',
+                'Чистая прибыль': f'{best_profit:,.0f} ₽',
+                'Ожидаемый доход': f'{best_expected_value:,.0f} ₽'
             }
         ))
 
@@ -494,14 +489,9 @@ class RecommendationEngine:
                     expected_result='Экономия времени и денег',
                     category='strategy',
                     financial_impact={
-                        'fast_scenario_expected': fast_expected,
-                        'max_scenario_expected': max_expected,
-                        'difference': diff,
-                        'explanation': (
-                            'Ожидаемый доход учитывает как размер прибыли, '
-                            'так и вероятность продажи. Быстрая продажа с высокой '
-                            'вероятностью часто выгоднее долгого ожидания.'
-                        )
+                        'Быстрая продажа (ожид. доход)': f'{fast_expected:,.0f} ₽',
+                        'Максимум (ожид. доход)': f'{max_expected:,.0f} ₽',
+                        'Разница': f'{diff:,.0f} ₽'
                     }
                 ))
 
@@ -528,9 +518,8 @@ class RecommendationEngine:
                     ),
                     category='strategy',
                     financial_impact={
-                        'expected_dom_months': expected_dom,
-                        'liquidity_index': liquidity_score,
-                        'context_notes': notes[:2]
+                        'Ожидаемый срок': f'{expected_dom or "?"} мес.',
+                        'Индекс ликвидности': f'{liquidity_score:.2f}'
                     }
                 ))
             elif liquidity_score > 1.1:
@@ -549,9 +538,8 @@ class RecommendationEngine:
                     ),
                     category='strategy',
                     financial_impact={
-                        'expected_dom_months': expected_dom,
-                        'liquidity_index': liquidity_score,
-                        'context_notes': notes[:2]
+                        'Ожидаемый срок': f'{expected_dom or "?"} мес.',
+                        'Индекс ликвидности': f'{liquidity_score:.2f}'
                     }
                 ))
 
@@ -632,9 +620,9 @@ class RecommendationEngine:
                         expected_result='Реальная цена может быть на 3-5% выше расчетной',
                         category='pricing',
                         financial_impact={
-                            'системный_штраф': f'{area_impact:.1f}%',
-                            'реальный_эффект': '+3-5% (ликвидность)',
-                            'объяснение': 'Компактность = преимущество в премиум-сегменте'
+                            'Системный штраф': f'{area_impact:.1f}%',
+                            'Реальный эффект': '+3-5% (ликвидность)',
+                            'Объяснение': 'Компактность = преимущество в премиум-сегменте'
                         }
                     ))
                 else:
@@ -667,8 +655,8 @@ class RecommendationEngine:
                             expected_result='Узкая аудитория покупателей',
                             category='pricing',
                             financial_impact={
-                                'системный_бонус': f'+{area_impact:.1f}%',
-                                'реальный_риск': 'Затянутая продажа на 2-4 месяца'
+                                'Системный бонус': f'+{area_impact:.1f}%',
+                                'Реальный риск': 'Затянутая продажа на 2-4 месяца'
                             }
                         ))
 

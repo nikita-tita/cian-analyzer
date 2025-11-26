@@ -597,9 +597,10 @@ const screen3 = {
                 const contentDisposition = response.headers.get('Content-Disposition');
                 let filename = `housler_report_${sessionId.substring(0, 8)}.md`;
                 if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    // Поддерживаем оба формата: filename="name" и filename=name
+                    const filenameMatch = contentDisposition.match(/filename="([^"]+)"|filename=([^\s;]+)/);
                     if (filenameMatch) {
-                        filename = filenameMatch[1];
+                        filename = filenameMatch[1] || filenameMatch[2];
                     }
                 }
 
