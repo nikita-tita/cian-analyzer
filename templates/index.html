@@ -153,7 +153,7 @@
             <p class="hero-subtitle">Чистые документы, сильная подача, правильные покупатели — без лишнего шума.</p>
             <div class="hero-cta">
                 <a href="/calculator?reset=1" class="btn btn-primary">Оценить стоимость</a>
-                <a href="#contact" class="btn btn-secondary">Связаться</a>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('requestPopup').classList.add('active'); document.body.style.overflow='hidden';">Связаться</button>
             </div>
         </div>
     </section>
@@ -273,7 +273,7 @@
             <div class="request-cta-content">
                 <h2>Готовы начать?</h2>
                 <p>Оставьте заявку — мы свяжемся и обсудим детали</p>
-                <button type="button" class="request-cta-btn" id="openRequestPopup">Оставить заявку</button>
+                <button type="button" class="request-cta-btn" id="openRequestPopup" onclick="document.getElementById('requestPopup').classList.add('active'); document.body.style.overflow='hidden'; return false;">Оставить заявку</button>
             </div>
         </div>
     </section>
