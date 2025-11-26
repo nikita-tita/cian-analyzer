@@ -522,7 +522,7 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
         "img-src 'self' data: https: http:; "
         "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://mc.yandex.ru; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "
         "form-action 'self';"
