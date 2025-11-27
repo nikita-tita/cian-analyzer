@@ -1081,6 +1081,178 @@ class PlaywrightParser(BaseCianParser):
         else:  # Эконом (до 25 млн)
             return 0.40, 0.30, "эконом"  # ±40% цена, ±30% площадь (было 0.60/0.40)
 
+    def _parse_address(self, address: str) -> dict:
+        """
+        Парсит адрес и извлекает улицу и номер дома
+
+        Примеры:
+            "Санкт-Петербург, ул. Примерная, д. 4к2" -> {"street": "Примерная", "house": "4", "building": "к2"}
+            "ул. Ленина, 15/3" -> {"street": "Ленина", "house": "15", "building": "/3"}
+
+        Returns:
+            dict: {"street": str, "house": str, "building": str} или пустой dict если не удалось распарсить
+        """
+        import re
+
+        if not address:
+            return {}
+
+        # Нормализуем адрес
+        addr = address.lower().strip()
+
+        # Паттерны для извлечения улицы
+        # ВАЖНО: ограничиваем захват до запятой или "д./дом"
+        street_patterns = [
+            r'(?:ул(?:\.|ица)?|пр(?:-т|оспект)?|пер(?:\.|еулок)?|б(?:-р|ульвар)?|наб(?:\.|ережная)?|ш(?:\.|оссе)?|пл(?:\.|ощадь)?)[.\s]+([а-яё][а-яё\s\-]*?)(?:,|\s+д\.|\s+д\s|\s+дом|\s*$)',
+            r'([а-яё][а-яё\s\-]+?)\s+(?:улица|проспект|переулок|бульвар)',
+        ]
+
+        street = ""
+        for pattern in street_patterns:
+            match = re.search(pattern, addr)
+            if match:
+                street = match.group(1).strip()
+                break
+
+        # Паттерны для извлечения номера дома
+        # Поддерживаем: д. 4, д.4, дом 4, 4к2, 4/3, 4 корп. 2, 4 стр. 1
+        house_patterns = [
+            r'(?:д(?:\.|ом)?)\s*(\d+)\s*(к(?:орп(?:\.|ус)?)?\.?\s*\d+|/\d+|стр(?:\.|оение)?\.?\s*\d+|лит(?:\.|ера)?\.?\s*[а-яa-z])?',
+            r',\s*(\d+)\s*(к(?:орп(?:\.|ус)?)?\.?\s*\d+|/\d+|стр(?:\.|оение)?\.?\s*\d+|лит(?:\.|ера)?\.?\s*[а-яa-z])?\s*(?:,|$)',
+        ]
+
+        house = ""
+        building = ""
+        for pattern in house_patterns:
+            match = re.search(pattern, addr)
+            if match:
+                house = match.group(1)
+                building = match.group(2) or ""
+                # Нормализуем корпус: "корп. 2" -> "к2", "корпус2" -> "к2"
+                if building:
+                    building = re.sub(r'корп(?:ус)?\.?\s*', 'к', building)
+                    building = re.sub(r'стр(?:оение)?\.?\s*', 'с', building)
+                    building = re.sub(r'\s+', '', building)
+                break
+
+        if not street and not house:
+            return {}
+
+        result = {
+            "street": street.strip(' ,-'),
+            "house": house,
+            "building": building
+        }
+
+        logger.debug(f"   📍 Парсинг адреса '{address}' -> {result}")
+        return result
+
+    def _generate_nearby_houses(self, parsed_address: dict, radius: int = 3) -> List[str]:
+        """
+        Генерирует список соседних домов для поиска аналогов
+
+        Args:
+            parsed_address: Результат _parse_address()
+            radius: Радиус поиска (сколько домов в каждую сторону)
+
+        Returns:
+            Список номеров домов для поиска: ["4к1", "4к2", "3", "3к1", "5", "5к1", ...]
+        """
+        if not parsed_address or not parsed_address.get("house"):
+            return []
+
+        try:
+            base_house = int(parsed_address["house"])
+        except (ValueError, TypeError):
+            return []
+
+        nearby = []
+
+        # Генерируем соседние номера домов
+        for offset in range(0, radius + 1):
+            for direction in [0, 1, -1] if offset == 0 else [1, -1]:
+                house_num = base_house + (offset * direction)
+                if house_num <= 0:
+                    continue
+
+                # Добавляем сам дом и его корпуса
+                nearby.append(str(house_num))
+                for korpus in range(1, 5):  # к1, к2, к3, к4
+                    nearby.append(f"{house_num}к{korpus}")
+                # Также добавляем литеры для некоторых домов
+                if offset <= 1:
+                    for lit in ['а', 'б', 'в']:
+                        nearby.append(f"{house_num}{lit}")
+
+        # Убираем дубликаты, сохраняя порядок
+        seen = set()
+        unique = []
+        for h in nearby:
+            if h not in seen:
+                seen.add(h)
+                unique.append(h)
+
+        logger.debug(f"   🏠 Сгенерировано {len(unique)} вариантов соседних домов: {unique[:10]}...")
+        return unique
+
+    def _search_by_address(self, street: str, house: str, target_property: Dict,
+                           price_tolerance: float, area_tolerance: float, limit: int = 5) -> List[Dict]:
+        """
+        Поиск аналогов по конкретному адресу (улица + дом)
+
+        Использует текстовый поиск ЦИАН по адресу
+        """
+        if not street:
+            return []
+
+        target_price = target_property.get('price', 100_000_000)
+        target_area = target_property.get('total_area', 100)
+        target_rooms = target_property.get('rooms', 2)
+
+        # Нормализуем комнаты
+        target_rooms_int = self._normalize_rooms(target_rooms) or 2
+
+        # Базовые параметры поиска
+        search_params = {
+            'deal_type': 'sale',
+            'offer_type': 'flat',
+            'engine_version': '2',
+            'price_min': int(target_price * (1 - price_tolerance)),
+            'price_max': int(target_price * (1 + price_tolerance)),
+            'minArea': int(target_area * (1 - area_tolerance)),
+            'maxArea': int(target_area * (1 + area_tolerance)),
+            'region': self.region_code,
+            f'room{target_rooms_int}': '1',
+        }
+
+        # Тип объекта
+        is_new_building = self._is_new_building(target_property)
+        search_params['type'] = '4' if is_new_building else '1'
+
+        # Формируем поисковый запрос по адресу
+        # ЦИАН поддерживает параметр 'text' для текстового поиска
+        search_query = f"{street}"
+        if house:
+            search_query += f" {house}"
+
+        search_params['text'] = search_query
+
+        url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
+
+        logger.debug(f"   🔍 Поиск по адресу: {search_query}")
+
+        results = self.parse_search_page(url)
+
+        # Дополнительная фильтрация - проверяем что адрес действительно содержит нужную улицу
+        filtered = []
+        street_lower = street.lower()
+        for r in results:
+            r_address = (r.get('address', '') or '').lower()
+            if street_lower in r_address:
+                filtered.append(r)
+
+        return filtered[:limit]
+
     def _build_search_url(self, target_price: float, target_area: float, target_rooms: int,
                           price_tolerance: float, area_tolerance: float, target_property: Dict = None) -> str:
         """
@@ -1485,13 +1657,99 @@ class PlaywrightParser(BaseCianParser):
             return final_results[:limit]
 
         # ═══════════════════════════════════════════════════════════════════════════
-        # УРОВЕНЬ 2: Расширенный поиск по городу (без фильтра локации)
+        # УРОВЕНЬ 1.5: ПОИСК ПО СОСЕДНИМ ДОМАМ (для вторички)
+        # Перебираем дома: 4к1, 4к2, 3, 3к1, 5, 5к1 и т.д.
         # ═══════════════════════════════════════════════════════════════════════════
-        logger.info(f"🌆 УРОВЕНЬ 2: Расширяем поиск на весь город")
+        new_results_level15 = []
+        if target_address and not is_new_building:
+            logger.info(f"🏠 УРОВЕНЬ 1.5: Поиск по соседним домам")
+            logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 10)")
+
+            parsed_addr = self._parse_address(target_address)
+            if parsed_addr.get('street'):
+                nearby_houses = self._generate_nearby_houses(parsed_addr, radius=3)
+                logger.info(f"   📍 Улица: {parsed_addr.get('street')}, дом: {parsed_addr.get('house')}{parsed_addr.get('building', '')}")
+                logger.info(f"   🏘️ Проверяем {len(nearby_houses)} вариантов соседних домов...")
+
+                existing_urls = {r.get('url') for r in final_results}
+                houses_checked = 0
+                houses_with_results = 0
+
+                for house_variant in nearby_houses:
+                    # Прерываем если уже достаточно аналогов
+                    if len(final_results) + len(new_results_level15) >= self.PREFERRED_RESULTS_THRESHOLD:
+                        logger.info(f"   ✅ Достаточно аналогов, прерываем поиск по домам")
+                        break
+
+                    # Ищем по конкретному адресу
+                    results_house = self._search_by_address(
+                        parsed_addr['street'], house_variant, target_property,
+                        price_tolerance, area_tolerance, limit=3
+                    )
+                    houses_checked += 1
+
+                    if results_house:
+                        houses_with_results += 1
+                        # Валидируем и добавляем только новые
+                        validated_house = self._validate_and_prepare_results(
+                            results_house, limit=3, target_property=target_property
+                        )
+                        for r in validated_house:
+                            if r.get('url') not in existing_urls:
+                                new_results_level15.append(r)
+                                existing_urls.add(r.get('url'))
+
+                final_results.extend(new_results_level15)
+                logger.info(f"   ✅ УРОВЕНЬ 1.5: Проверено {houses_checked} домов, найдено в {houses_with_results}")
+                logger.info(f"   ✅ УРОВЕНЬ 1.5: Добавлено {len(new_results_level15)} новых аналогов из соседних домов")
+                logger.info("")
+            else:
+                logger.info(f"   ⚠️ Не удалось распарсить адрес: {target_address}")
+                logger.info("")
+
+        # Проверяем после уровня 1.5
+        if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
+            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info("=" * 80)
+            return final_results[:limit]
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 2: РЕАЛЬНЫЙ поиск по всему городу (новый запрос без фильтра локации)
+        # ИСПРАВЛЕНО: Теперь делаем новый запрос к ЦИАН, а не переиспользуем результаты уровня 1
+        # ═══════════════════════════════════════════════════════════════════════════
+        logger.info(f"🌆 УРОВЕНЬ 2: Расширяем поиск на весь город (НОВЫЙ запрос)")
         logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 10)")
 
-        # Используем все результаты с уровня 1, но без фильтра локации
-        validated_level2 = self._validate_and_prepare_results(results_level1, limit, target_property=target_property)
+        # Строим URL БЕЗ дополнительных фильтров (год, класс, этажи, отделка)
+        search_params_city = {
+            'deal_type': 'sale',
+            'offer_type': 'flat',
+            'engine_version': '2',
+            'price_min': int(target_price * (1 - price_tolerance)),
+            'price_max': int(target_price * (1 + price_tolerance)),
+            'minArea': int(target_area * (1 - area_tolerance)),
+            'maxArea': int(target_area * (1 + area_tolerance)),
+            'region': self.region_code,
+        }
+
+        # Тип объекта
+        if is_new_building:
+            search_params_city['type'] = '4'
+        else:
+            search_params_city['type'] = '1'
+
+        # Комнаты (СТРОГО)
+        target_rooms_int = self._normalize_rooms(target_rooms) or 2
+        search_params_city[f'room{target_rooms_int}'] = '1'
+
+        url_level2 = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_city.items()])
+        logger.info(f"   URL: {url_level2[:100]}...")
+
+        results_level2 = self.parse_search_page(url_level2)
+        logger.info(f"   ✓ Найдено объявлений: {len(results_level2)}")
+
+        # Валидируем БЕЗ фильтра локации
+        validated_level2 = self._validate_and_prepare_results(results_level2, limit, target_property=target_property)
 
         # Добавляем только новые (которых нет в final_results)
         existing_urls = {r.get('url') for r in final_results}
@@ -1544,53 +1802,52 @@ class PlaywrightParser(BaseCianParser):
             return final_results[:limit]
 
         # ═══════════════════════════════════════════════════════════════════════════
-        # УРОВЕНЬ 4: FALLBACK ДЛЯ ПРЕМИУМ-СЕГМЕНТА (только район, без фильтра цены)
-        # FIX ISSUE #1: Добавлен fallback для премиум-сегмента
+        # УРОВЕНЬ 4: FALLBACK ДЛЯ ВСЕХ СЕГМЕНТОВ (максимально широкий поиск)
+        # ИСПРАВЛЕНО: Теперь работает для ВСЕХ ценовых сегментов, не только премиум
         # ═══════════════════════════════════════════════════════════════════════════
-        if target_price >= 25_000_000:  # Только для премиум/средний+
-            logger.info(f"🆘 УРОВЕНЬ 4: FALLBACK для премиум-сегмента")
-            logger.info(f"   (текущее количество: {len(final_results)}, критический минимум: 5)")
-            logger.info(f"   Ищем ТОЛЬКО по району, БЕЗ фильтра цены (максимально широкий поиск)")
+        logger.info(f"🆘 УРОВЕНЬ 4: FALLBACK - максимально широкий поиск")
+        logger.info(f"   (текущее количество: {len(final_results)}, критический минимум: 5)")
+        logger.info(f"   Ищем ТОЛЬКО по району, БЕЗ фильтра цены (максимально широкий поиск)")
 
-            # Убираем фильтр цены, оставляем только площадь и комнаты
-            search_params_fallback = {
-                'deal_type': 'sale',
-                'offer_type': 'flat',
-                'engine_version': '2',
-                'minArea': int(target_area * 0.5),  # Еще шире: ±50% площадь
-                'maxArea': int(target_area * 1.5),
-                'region': self.region_code,
-            }
+        # Убираем фильтр цены, оставляем только площадь и комнаты
+        search_params_fallback = {
+            'deal_type': 'sale',
+            'offer_type': 'flat',
+            'engine_version': '2',
+            'minArea': int(target_area * 0.5),  # Еще шире: ±50% площадь
+            'maxArea': int(target_area * 1.5),
+            'region': self.region_code,
+        }
 
-            # Комнаты (±1)
-            target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2
+        # Комнаты (±1)
+        target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2
 
-            # СТРОГИЙ фильтр комнат (без смешивания!)
-            search_params_fallback[f'room{target_rooms_int}'] = '1'
-            logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
+        # СТРОГИЙ фильтр комнат (без смешивания!)
+        search_params_fallback[f'room{target_rooms_int}'] = '1'
+        logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
 
-            url_fallback = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_fallback.items()])
-            logger.info(f"   URL: {url_fallback[:100]}...")
+        url_fallback = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_fallback.items()])
+        logger.info(f"   URL: {url_fallback[:100]}...")
 
-            results_fallback = self.parse_search_page(url_fallback)
-            logger.info(f"   ✓ Найдено объявлений: {len(results_fallback)}")
+        results_fallback = self.parse_search_page(url_fallback)
+        logger.info(f"   ✓ Найдено объявлений: {len(results_fallback)}")
 
-            # Фильтруем по локации (нестрогий режим)
-            if target_metro or target_address:
-                filtered_fallback = self._filter_by_location(results_fallback, target_property, strict=False)
-                logger.info(f"   ✓ После фильтрации по локации (нестрогий режим): {len(filtered_fallback)} объявлений")
-            else:
-                filtered_fallback = results_fallback
+        # Фильтруем по локации (нестрогий режим)
+        if target_metro or target_address:
+            filtered_fallback = self._filter_by_location(results_fallback, target_property, strict=False)
+            logger.info(f"   ✓ После фильтрации по локации (нестрогий режим): {len(filtered_fallback)} объявлений")
+        else:
+            filtered_fallback = results_fallback
 
-            validated_fallback = self._validate_and_prepare_results(filtered_fallback, limit, target_property=target_property)
+        validated_fallback = self._validate_and_prepare_results(filtered_fallback, limit, target_property=target_property)
 
-            # Добавляем только новые
-            existing_urls = {r.get('url') for r in final_results}
-            new_results_fallback = [r for r in validated_fallback if r.get('url') not in existing_urls]
+        # Добавляем только новые
+        existing_urls = {r.get('url') for r in final_results}
+        new_results_fallback = [r for r in validated_fallback if r.get('url') not in existing_urls]
 
-            final_results.extend(new_results_fallback)
-            logger.info(f"   ✅ УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
-            logger.info("")
+        final_results.extend(new_results_fallback)
+        logger.info(f"   ✅ УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
+        logger.info("")
 
         # ═══════════════════════════════════════════════════════════════════════════
         # НОВОЕ: Приоритизация аналогов из того же ЖК
@@ -1633,10 +1890,12 @@ class PlaywrightParser(BaseCianParser):
         logger.info("=" * 80)
         logger.info(f"🏁 ПОИСК ЗАВЕРШЕН: Найдено {len(final_results)} аналогов")
         logger.info(f"   - Уровень 1 (район/метро): {len(validated_level1)} шт.")
+        if new_results_level15:
+            logger.info(f"   - Уровень 1.5 (соседние дома): +{len(new_results_level15)} шт.")
         logger.info(f"   - Уровень 2 (город): +{len(new_results_level2)} шт.")
         logger.info(f"   - Уровень 3 (расширенный): +{len(new_results_level3)} шт.")
-        if target_price >= 25_000_000 and 'new_results_fallback' in locals():
-            logger.info(f"   - Уровень 4 (fallback для премиум): +{len(new_results_fallback)} шт.")
+        if 'new_results_fallback' in locals():
+            logger.info(f"   - Уровень 4 (fallback): +{len(new_results_fallback)} шт.")
 
         # ═══════════════════════════════════════════════════════════════════════════
         # НОВОЕ: Статистика качества подбора (разброс цен за м²)
