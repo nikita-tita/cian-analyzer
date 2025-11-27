@@ -202,6 +202,11 @@ function translateTechnicalError(technicalMessage) {
         return 'no_data';
     }
 
+    // Validation errors
+    if (msg.includes('validation') || msg.includes('валидаци')) {
+        return 'data_validation_error';
+    }
+
     // Invalid data
     if (msg.includes('invalid') || msg.includes('некорректн')) {
         return 'parsing_failed';

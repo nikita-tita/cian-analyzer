@@ -652,8 +652,17 @@ const screen1 = {
                 pixelLoader.complete();
                 utils.showToast('Объект создан!', 'success');
             } else {
-                const errorData = getErrorMessage(result.message || 'parsing_error');
-                utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+                // Use error_type if available (for structured errors), fallback to message
+                const errorKey = result.error_type || result.message || 'parsing_error';
+                const errorData = getErrorMessage(errorKey);
+
+                // If there are specific validation errors, show them
+                if (result.errors && result.errors.length > 0) {
+                    const errorDetails = result.errors.join('; ');
+                    utils.showToast(`${errorData.title}: ${errorDetails}`, 'error');
+                } else {
+                    utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+                }
             }
         } catch (error) {
             console.error('Manual input error:', error);
@@ -710,7 +719,8 @@ const screen1 = {
                 utils.showToast('Объект успешно загружен!', 'success');
             } else {
                 // Используем getErrorMessage для перевода технических ошибок
-                const errorData = getErrorMessage(result.message || 'parsing_error');
+                const errorKey = result.error_type || result.message || 'parsing_error';
+                const errorData = getErrorMessage(errorKey);
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
             }
         } catch (error) {
@@ -901,7 +911,8 @@ const screen1 = {
                     // Переходим на шаг 2
                     navigation.goToStep(2);
                 } else {
-                    const errorData = getErrorMessage(result.message || 'parsing_error');
+                    const errorKey = result.error_type || result.message || 'parsing_error';
+                    const errorData = getErrorMessage(errorKey);
                     utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
                 }
             } catch (error) {
@@ -1319,7 +1330,8 @@ const screen3 = {
                 utils.showToast('Анализ завершен!', 'success');
             } else {
                 console.error('❌ Ошибка анализа:', result);
-                const errorData = getErrorMessage(result.message || 'analysis_failed');
+                const errorKey = result.error_type || result.message || 'analysis_failed';
+                const errorData = getErrorMessage(errorKey);
                 utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
 
                 // Показываем техническую информацию для диагностики
