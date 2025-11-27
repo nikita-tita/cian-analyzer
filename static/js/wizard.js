@@ -1424,7 +1424,7 @@ const screen3 = {
                 </div>
                 <div class="col-md-4 mb-3">
                     <div class="metric-item">
-                        <div class="metric-label">Медиана рынка</div>
+                        <div class="metric-label">Типичная цена рядом</div>
                         <div class="metric-value">${utils.formatPrice(stats.median || 0)} / м²</div>
                     </div>
                 </div>
@@ -1461,7 +1461,7 @@ const screen3 = {
             <div class="row mb-3">
                 <div class="col-md-6">
                     <div class="metric-item">
-                        <div class="metric-label">Базовая цена/м²</div>
+                        <div class="metric-label">Типичная цена за м²</div>
                         <div class="metric-value">${utils.formatPrice(fairPrice.base_price_per_sqm || 0)}</div>
                     </div>
                 </div>
@@ -1473,26 +1473,20 @@ const screen3 = {
                 </div>
             </div>
             <div class="alert alert-${overpricingClass}">
-                <strong><i class="bi bi-${overpricingIcon} me-2"></i>Переоценка:</strong>
+                <strong><i class="bi bi-${overpricingIcon} me-2"></i>Разница с рынком:</strong>
                 ${utils.formatNumber(Math.abs(overpricing), 2)}%
-                ${overpricing > 0 ? '(цена выше справедливой)' : '(цена ниже справедливой)'}
+                ${overpricing > 0 ? '(ваша цена выше)' : '(ваша цена ниже)'}
             </div>
             <div class="mt-3">
-                <div class="alert alert-info mb-3">
-                    <strong>💡 Что такое "медиана"?</strong><br>
-                    Медиана — это среднее значение параметра по всем аналогам на рынке.
-                    Половина объектов лучше медианы, половина хуже. Мы сравниваем ваш объект с медианой,
-                    чтобы понять, насколько он отличается от типичного предложения.
-                </div>
-                <h6>Сравнение с рынком:</h6>
-                <p class="text-muted small mb-3">Показываем, как ваши параметры отличаются от медианы рынка и как это влияет на цену</p>
+                <h6>Сравнение с похожими квартирами:</h6>
+                <p class="text-muted small mb-3">Показываем, чем ваша квартира отличается от типичных предложений рядом</p>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
                                 <th>Параметр</th>
                                 <th>У вас</th>
-                                <th>Медиана рынка</th>
+                                <th>Типичное</th>
                                 <th>Влияние на цену</th>
                             </tr>
                         </thead>
@@ -1548,8 +1542,8 @@ const screen3 = {
                         <div class="metric-value text-success">${utils.formatPrice(scenario.expected_final_price)}</div>
                     </div>
                     <div class="metric-item">
-                        <div class="metric-label">Вероятность</div>
-                        <div class="metric-value">${scenario.base_probability}%</div>
+                        <div class="metric-label">Шансы продажи</div>
+                        <div class="metric-value">${Math.round(scenario.base_probability / 10)} из 10</div>
                     </div>
                     <div class="metric-item">
                         <div class="metric-label">Чистый доход</div>
@@ -1704,7 +1698,7 @@ const screen3 = {
                             'торг_диапазон': 'Диапазон торга',
                             'expected_value': 'Ожидаемый доход',
                             'net_profit': 'Чистая прибыль',
-                            'probability_percent': 'Вероятность',
+                            'probability_percent': 'Шансы продажи',
                             'scenario': 'Сценарий',
                             'difference': 'Разница',
                             'explanation': 'Пояснение',
