@@ -1113,6 +1113,8 @@ const screen2 = {
                         Нажмите кнопку "Автоматически найти" или добавьте объекты вручную
                     </div>
                 `;
+                // Скрываем индикатор качества когда нет аналогов
+                this.updateQualityIndicator();
                 return;
             }
 
@@ -1132,6 +1134,9 @@ const screen2 = {
             `;
 
             console.log('✅ Successfully rendered', state.comparables.length, 'comparables');
+
+            // Обновляем индикатор качества выборки
+            this.updateQualityIndicator();
         } catch (error) {
             console.error('❌ CRITICAL ERROR in renderComparables:', error);
             console.error('State comparables:', state.comparables);
@@ -1254,6 +1259,56 @@ const screen2 = {
         } catch (error) {
             console.error('Include error:', error);
             utils.showToast('Ошибка включения', 'error');
+        }
+    },
+
+    /**
+     * Обновление индикатора качества выборки
+     * Показывает прогресс-бар с цветовой индикацией количества аналогов
+     */
+    updateQualityIndicator() {
+        const indicator = document.getElementById('quality-indicator');
+        const fill = document.getElementById('quality-fill');
+        const countEl = document.getElementById('quality-count');
+        const hintEl = document.getElementById('quality-hint');
+
+        if (!indicator || !fill || !countEl || !hintEl) return;
+
+        const activeCount = state.comparables.filter(c => !c.excluded).length;
+        const targetMin = 10;
+        const targetMax = 15;
+
+        // Показываем индикатор только если есть хоть один аналог
+        if (state.comparables.length === 0) {
+            indicator.style.display = 'none';
+            return;
+        }
+
+        indicator.style.display = 'block';
+
+        // Рассчитываем процент заполнения (до 100% при targetMin)
+        const percentage = Math.min((activeCount / targetMin) * 100, 100);
+        fill.style.width = percentage + '%';
+
+        // Обновляем текст
+        const word = utils.pluralizeAnalogs(activeCount);
+        countEl.textContent = `${activeCount} ${word} из ${targetMin}-${targetMax} рекомендуемых`;
+
+        // Определяем цвет и подсказку
+        fill.classList.remove('critical', 'warning', 'acceptable', 'good');
+
+        if (activeCount <= 2) {
+            fill.classList.add('critical');
+            hintEl.textContent = 'Критически мало данных для анализа. Добавьте больше аналогов.';
+        } else if (activeCount <= 4) {
+            fill.classList.add('warning');
+            hintEl.textContent = 'Мало аналогов. Результат может быть неточным.';
+        } else if (activeCount <= 9) {
+            fill.classList.add('acceptable');
+            hintEl.textContent = 'Приемлемо, но для точности лучше добавить ещё.';
+        } else {
+            fill.classList.add('good');
+            hintEl.textContent = 'Отличная выборка для точного анализа!';
         }
     },
 
