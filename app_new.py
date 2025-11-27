@@ -2191,7 +2191,7 @@ def contact_request():
 
 
 # Telegram Bot configuration for client requests
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8107613087:AAH6CZ7b1mHVfCoa8vZOwrpLRSoCbILHqV0')
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')  # Will be set on first message
 
 
