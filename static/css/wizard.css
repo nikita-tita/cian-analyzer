@@ -916,3 +916,287 @@ canvas {
         height: 60px;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Enhanced Progress Bar with Steps
+   ══════════════════════════════════════════════════════════════ */
+
+.pixel-progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.pixel-progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.pixel-progress-step-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    border: 2px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #999;
+    transition: all 0.3s ease;
+    margin-bottom: 6px;
+}
+
+.pixel-progress-step.active .pixel-progress-step-dot {
+    background: #000;
+    border-color: #000;
+    color: #fff;
+    animation: stepPulse 1s ease-in-out infinite;
+}
+
+.pixel-progress-step.completed .pixel-progress-step-dot {
+    background: #000;
+    border-color: #000;
+    color: #fff;
+}
+
+.pixel-progress-step.completed .pixel-progress-step-dot::after {
+    content: '✓';
+    font-size: 12px;
+}
+
+.pixel-progress-step-label {
+    font-size: 9px;
+    color: #999;
+    text-align: center;
+    max-width: 70px;
+    line-height: 1.2;
+    transition: color 0.3s ease;
+}
+
+.pixel-progress-step.active .pixel-progress-step-label,
+.pixel-progress-step.completed .pixel-progress-step-label {
+    color: #000;
+    font-weight: 500;
+}
+
+/* Progress line between steps */
+.pixel-progress-line {
+    position: absolute;
+    top: 12px;
+    left: 12%;
+    right: 12%;
+    height: 2px;
+    background: #e0e0e0;
+    z-index: 0;
+}
+
+.pixel-progress-line-fill {
+    height: 100%;
+    background: #000;
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+@keyframes stepPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+/* Enhanced progress bar with percentage */
+.pixel-progress-bar-enhanced {
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.pixel-progress-fill-enhanced {
+    height: 100%;
+    background: #000;
+    width: 0%;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.pixel-progress-fill-enhanced::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Timer and status */
+.pixel-loader-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.pixel-loader-timer {
+    font-family: 'SF Mono', 'Monaco', monospace;
+    font-size: 11px;
+    color: #999;
+}
+
+.pixel-loader-percentage {
+    font-weight: 600;
+    color: #000;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Skeleton Loading
+   ══════════════════════════════════════════════════════════════ */
+
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+    height: 14px;
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+.skeleton-text.short {
+    width: 60%;
+}
+
+.skeleton-text.medium {
+    width: 80%;
+}
+
+.skeleton-title {
+    height: 20px;
+    width: 40%;
+    margin-bottom: 16px;
+}
+
+.skeleton-chart {
+    height: 200px;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.skeleton-card {
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.skeleton-price {
+    height: 32px;
+    width: 50%;
+    margin-bottom: 12px;
+}
+
+.skeleton-badge {
+    height: 24px;
+    width: 80px;
+    display: inline-block;
+    margin-right: 8px;
+    border-radius: 12px;
+}
+
+/* Skeleton container for report sections */
+.skeleton-report-section {
+    padding: 20px;
+}
+
+.skeleton-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.skeleton-col {
+    flex: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Button Loading States
+   ══════════════════════════════════════════════════════════════ */
+
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+    cursor: not-allowed !important;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: btnSpin 0.8s linear infinite;
+}
+
+.btn-loading span {
+    visibility: hidden;
+}
+
+@keyframes btnSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Disabled state for all interactive elements during loading */
+.loading-disabled {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Floating buttons loading state */
+.floating-btn.btn-loading {
+    min-width: 100px;
+}
+
+.floating-btn.btn-loading::after {
+    border-top-color: #fff;
+}
+
+.floating-btn-secondary.btn-loading::after {
+    border-top-color: #000;
+}

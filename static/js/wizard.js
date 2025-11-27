@@ -323,6 +323,7 @@ const utils = {
                 }
 
                 console.log(`Сессия загружена: шаг ${targetStep}, анализ: ${!!state.analysis}, аналогов: ${state.comparables.length}`);
+                pixelLoader.complete();
                 this.showToast('Сессия загружена успешно', 'success');
                 return true;
             } else {
@@ -648,6 +649,7 @@ const screen1 = {
 
                 // Показываем результат
                 this.displayParseResult(result.data, result.missing_fields || []);
+                pixelLoader.complete();
                 utils.showToast('Объект создан!', 'success');
             } else {
                 const errorData = getErrorMessage(result.message || 'parsing_error');
@@ -704,6 +706,7 @@ const screen1 = {
                 }
 
                 this.displayParseResult(result.data, result.missing_fields);
+                pixelLoader.complete();
                 utils.showToast('Объект успешно загружен!', 'success');
             } else {
                 // Используем getErrorMessage для перевода технических ошибок
@@ -892,6 +895,7 @@ const screen1 = {
                     // Скрываем форму недостающих полей
                     document.getElementById('missing-fields').style.display = 'none';
 
+                    pixelLoader.complete();
                     utils.showToast('Данные сохранены', 'success');
 
                     // Переходим на шаг 2
@@ -964,6 +968,7 @@ const screen2 = {
                 }
 
                 // ДОРАБОТКА #4: Отображение предупреждений о качестве аналогов
+                pixelLoader.complete();
                 if (result.warnings && result.warnings.length > 0) {
                     this.showQualityWarnings(result.warnings);
                 } else {
@@ -1033,6 +1038,7 @@ const screen2 = {
                 }
 
                 document.getElementById('add-comparable-input').value = '';
+                pixelLoader.complete();
                 utils.showToast('Объект добавлен', 'success');
             } else {
                 // Show detailed error message
@@ -1280,6 +1286,13 @@ const screen3 = {
     async runAnalysis() {
         pixelLoader.show('analyzing');
 
+        // Показываем skeleton-плейсхолдеры пока грузятся данные
+        const resultsContainer = document.getElementById('analysis-results');
+        if (resultsContainer) {
+            resultsContainer.style.display = 'block';
+            skeletonLoader.showForReport('fair-price-details');
+        }
+
         try {
             console.log('🔄 Запуск анализа для сессии:', state.sessionId);
 
@@ -1302,6 +1315,7 @@ const screen3 = {
                 console.log('✅ Анализ успешен, данные:', result.analysis);
                 state.analysis = result.analysis;
                 this.displayAnalysis(result.analysis);
+                pixelLoader.complete();
                 utils.showToast('Анализ завершен!', 'success');
             } else {
                 console.error('❌ Ошибка анализа:', result);
@@ -2207,6 +2221,7 @@ const floatingButtons = {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
+            pixelLoader.complete();
             utils.showToast('Отчет успешно скачан!', 'success');
         } catch (error) {
             console.error('Download error:', error);
@@ -2222,52 +2237,63 @@ const floatingButtons = {
 // ══════════════════════════════════════════════════════════════
 
 const pixelLoader = {
-    // Профессиональные тексты для разных этапов (без emoji, до 30 символов)
+    // Этапы для каждого типа операции
+    stages: {
+        parsing: [
+            { label: 'Загрузка', duration: 2 },
+            { label: 'Парсинг', duration: 3 },
+            { label: 'Проверка', duration: 2 }
+        ],
+        searching: [
+            { label: 'Поиск', duration: 4 },
+            { label: 'Парсинг', duration: 6 },
+            { label: 'Обработка', duration: 3 }
+        ],
+        analyzing: [
+            { label: 'Парсинг', duration: 2 },
+            { label: 'Поиск аналогов', duration: 3 },
+            { label: 'Расчёт цены', duration: 3 },
+            { label: 'Генерация', duration: 2 }
+        ]
+    },
+
+    // Сообщения для бегущей строки
     messages: {
-        // Парсинг объекта
         parsing: [
             'Загрузка объекта',
             'Проверка данных',
             'Получение информации',
-            'Анализ параметров',
-            'Валидация адреса',
-            'Обработка запроса'
+            'Анализ параметров'
         ],
-
-        // Поиск аналогов - веселые вовлекающие сообщения с прогрессом
         searching: [
-            // Начало поиска (0-5 объектов)
-            'Звоню агентам... опять не берут трубку, видимо заняты другими важными объектами',
-            'Применяю технику клонирования и бегаю по всем квартирам на районе',
-            'Записался на консультацию к ИИ, который поможет обзвонить все объявления',
-            // Середина (5-10 объектов)
-            'Уже на середине! Наклеил баннер что ищем похожую квартиру',
-            'Еще немного... база данных уже наполовину собрана',
-            'Продолжаю поиск, совсем скоро найдем все лучшие варианты',
-            // Почти готово (10-15+ объектов)
-            'Уже почти готово! База почти вся собралась',
-            'Осталось совсем чуть-чуть, заканчиваю сбор данных',
-            'Финальные штрихи... сейчас покажу все что нашел'
+            'Звоню агентам... опять не берут трубку',
+            'Бегаю по всем квартирам на районе',
+            'Уже на середине! База наполовину собрана',
+            'Почти готово! Финальные штрихи'
         ],
-
-        // Анализ
         analyzing: [
             'Расчет стоимости',
             'Анализ данных',
             'Формирование отчета',
-            'Построение графиков',
-            'Оценка рисков',
-            'Финализация'
+            'Построение графиков'
         ]
     },
 
+    // Состояние
     currentLoader: null,
+    currentStage: 0,
     currentMessageIndex: 0,
     messageInterval: null,
+    progressInterval: null,
+    timerInterval: null,
+    startTime: null,
+    estimatedTime: 0,
+    currentProgress: 0,
+    disabledElements: [],
+    isCompleting: false, // Флаг для избежания двойного вызова
 
     // Показать лоадер
     show(type = 'parsing') {
-        // Создаем лоадер если его нет
         const loader = document.getElementById('pixel-loader');
         if (!loader) {
             console.error('Pixel loader element not found');
@@ -2276,43 +2302,145 @@ const pixelLoader = {
 
         const textElement = document.getElementById('pixel-text');
         const iconElement = loader.querySelector('.pixel-icon');
+        const stepsContainer = document.getElementById('pixel-progress-steps');
+        const progressFill = document.getElementById('pixel-progress-fill');
+        const percentageEl = document.getElementById('pixel-percentage');
+        const timerEl = document.getElementById('pixel-timer');
+        const lineFill = document.getElementById('pixel-line-fill');
+
+        // Сброс состояния
+        this.currentLoader = type;
+        this.currentStage = 0;
+        this.currentMessageIndex = 0;
+        this.currentProgress = 0;
+        this.startTime = Date.now();
+        this.isCompleting = false;
+
+        // Расчёт общего времени
+        const stages = this.stages[type] || this.stages.parsing;
+        this.estimatedTime = stages.reduce((sum, s) => sum + s.duration, 0);
 
         // Устанавливаем тип лоадера
         loader.className = 'pixel-loader ' + type;
-        this.currentLoader = type;
-        this.currentMessageIndex = 0;
 
-        // Устанавливаем иконку в зависимости от типа
-        const icons = {
-            parsing: 'agent',
-            searching: 'house',
-            analyzing: 'document'
-        };
+        // Устанавливаем иконку
+        const icons = { parsing: 'agent', searching: 'house', analyzing: 'document' };
         iconElement.className = 'pixel-icon ' + icons[type];
+
+        // Генерируем этапы
+        this.renderStages(stepsContainer, stages);
+
+        // Сброс прогресса
+        progressFill.style.width = '0%';
+        percentageEl.textContent = '0%';
+        timerEl.textContent = `Осталось ~${this.estimatedTime} сек`;
+        lineFill.style.width = '0%';
 
         // Показываем первое сообщение
         const messages = this.messages[type] || this.messages.parsing;
-        textElement.textContent = messages[0] + ' ⚡ ' + messages[0] + ' ⚡ '; // Дублируем для бесшовной анимации
+        textElement.textContent = messages[0] + ' ⚡ ' + messages[0] + ' ⚡ ';
 
         // Показываем лоадер
         loader.style.display = 'flex';
 
-        // Запускаем смену сообщений
+        // Блокируем кнопки
+        this.disableButtons();
+
+        // Запускаем анимации
+        this.startProgressAnimation(type);
         this.startMessageRotation(type);
+        this.startTimer();
     },
 
-    // Скрыть лоадер
-    hide() {
-        const loader = document.getElementById('pixel-loader');
-        if (loader) {
-            loader.style.display = 'none';
-        }
+    // Рендер этапов
+    renderStages(container, stages) {
+        // Сохраняем линию прогресса
+        const line = container.querySelector('.pixel-progress-line');
+        container.innerHTML = '';
+        container.appendChild(line);
 
-        // Останавливаем смену сообщений
-        if (this.messageInterval) {
-            clearInterval(this.messageInterval);
-            this.messageInterval = null;
-        }
+        stages.forEach((stage, index) => {
+            const stepEl = document.createElement('div');
+            stepEl.className = 'pixel-progress-step' + (index === 0 ? ' active' : '');
+            stepEl.dataset.index = index;
+            stepEl.innerHTML = `
+                <div class="pixel-progress-step-dot">${index + 1}</div>
+                <div class="pixel-progress-step-label">${stage.label}</div>
+            `;
+            container.appendChild(stepEl);
+        });
+    },
+
+    // Анимация прогресса
+    startProgressAnimation(type) {
+        const stages = this.stages[type] || this.stages.parsing;
+        const totalDuration = this.estimatedTime * 1000;
+        const progressFill = document.getElementById('pixel-progress-fill');
+        const percentageEl = document.getElementById('pixel-percentage');
+        const lineFill = document.getElementById('pixel-line-fill');
+        const stepsContainer = document.getElementById('pixel-progress-steps');
+
+        let elapsed = 0;
+        const interval = 100; // Обновление каждые 100мс
+
+        if (this.progressInterval) clearInterval(this.progressInterval);
+
+        this.progressInterval = setInterval(() => {
+            elapsed += interval;
+            const progress = Math.min((elapsed / totalDuration) * 100, 95); // Макс 95% до завершения
+            this.currentProgress = progress;
+
+            // Обновляем прогресс-бар
+            progressFill.style.width = progress + '%';
+            percentageEl.textContent = Math.round(progress) + '%';
+
+            // Обновляем линию между этапами
+            lineFill.style.width = progress + '%';
+
+            // Определяем текущий этап
+            let accumulatedTime = 0;
+            let newStage = 0;
+            for (let i = 0; i < stages.length; i++) {
+                accumulatedTime += stages[i].duration * 1000;
+                if (elapsed < accumulatedTime) {
+                    newStage = i;
+                    break;
+                }
+                newStage = i;
+            }
+
+            // Обновляем активный этап
+            if (newStage !== this.currentStage) {
+                this.currentStage = newStage;
+                const steps = stepsContainer.querySelectorAll('.pixel-progress-step');
+                steps.forEach((step, idx) => {
+                    step.classList.remove('active', 'completed');
+                    if (idx < newStage) {
+                        step.classList.add('completed');
+                    } else if (idx === newStage) {
+                        step.classList.add('active');
+                    }
+                });
+            }
+        }, interval);
+    },
+
+    // Таймер обратного отсчёта
+    startTimer() {
+        const timerEl = document.getElementById('pixel-timer');
+
+        if (this.timerInterval) clearInterval(this.timerInterval);
+
+        this.timerInterval = setInterval(() => {
+            const elapsed = (Date.now() - this.startTime) / 1000;
+            const remaining = Math.max(0, this.estimatedTime - elapsed);
+
+            if (remaining > 0) {
+                timerEl.textContent = `Осталось ~${Math.ceil(remaining)} сек`;
+            } else {
+                timerEl.textContent = 'Почти готово...';
+            }
+        }, 1000);
     },
 
     // Ротация сообщений
@@ -2320,19 +2448,161 @@ const pixelLoader = {
         const messages = this.messages[type] || this.messages.parsing;
         const textElement = document.getElementById('pixel-text');
 
-        // Останавливаем предыдущий интервал
-        if (this.messageInterval) {
-            clearInterval(this.messageInterval);
-        }
+        if (this.messageInterval) clearInterval(this.messageInterval);
 
-        // Меняем сообщение каждые 3 секунды
         this.messageInterval = setInterval(() => {
             this.currentMessageIndex = (this.currentMessageIndex + 1) % messages.length;
             const message = messages[this.currentMessageIndex];
-
-            // Дублируем текст для бесшовной бегущей строки
             textElement.textContent = message + ' ⚡ ' + message + ' ⚡ ';
         }, 3000);
+    },
+
+    // Блокировка кнопок
+    disableButtons() {
+        const selectors = [
+            '#floating-next-btn',
+            '#floating-back-btn',
+            '.btn-parse-url',
+            '.btn-find-similar',
+            '.btn-run-analysis',
+            '.btn-download-report',
+            '#btn-add-comparable'
+        ];
+
+        this.disabledElements = [];
+
+        selectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                if (el && !el.disabled) {
+                    el.disabled = true;
+                    el.classList.add('btn-loading');
+                    this.disabledElements.push(el);
+                }
+            });
+        });
+    },
+
+    // Разблокировка кнопок
+    enableButtons() {
+        this.disabledElements.forEach(el => {
+            el.disabled = false;
+            el.classList.remove('btn-loading');
+        });
+        this.disabledElements = [];
+    },
+
+    // Завершить с успехом (100%)
+    complete() {
+        if (this.isCompleting) return; // Уже завершается
+        this.isCompleting = true;
+
+        const progressFill = document.getElementById('pixel-progress-fill');
+        const percentageEl = document.getElementById('pixel-percentage');
+        const lineFill = document.getElementById('pixel-line-fill');
+        const timerEl = document.getElementById('pixel-timer');
+        const stepsContainer = document.getElementById('pixel-progress-steps');
+
+        // Останавливаем анимацию прогресса
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+
+        // Устанавливаем 100%
+        if (progressFill) progressFill.style.width = '100%';
+        if (percentageEl) percentageEl.textContent = '100%';
+        if (lineFill) lineFill.style.width = '100%';
+        if (timerEl) timerEl.textContent = 'Готово!';
+
+        // Все этапы завершены
+        if (stepsContainer) {
+            const steps = stepsContainer.querySelectorAll('.pixel-progress-step');
+            steps.forEach(step => {
+                step.classList.remove('active');
+                step.classList.add('completed');
+            });
+        }
+
+        // Скрываем через 500мс
+        setTimeout(() => this.hide(true), 500);
+    },
+
+    // Скрыть лоадер
+    hide(fromComplete = false) {
+        // Если уже завершается через complete(), игнорируем прямой вызов hide()
+        if (this.isCompleting && !fromComplete) return;
+
+        const loader = document.getElementById('pixel-loader');
+        if (loader) {
+            loader.style.display = 'none';
+        }
+
+        // Останавливаем все интервалы
+        if (this.messageInterval) {
+            clearInterval(this.messageInterval);
+            this.messageInterval = null;
+        }
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+
+        // Разблокируем кнопки
+        this.enableButtons();
+        this.isCompleting = false;
+    },
+
+    // Обновить прогресс вручную (для длительных операций)
+    setProgress(percent) {
+        const progressFill = document.getElementById('pixel-progress-fill');
+        const percentageEl = document.getElementById('pixel-percentage');
+        const lineFill = document.getElementById('pixel-line-fill');
+
+        this.currentProgress = percent;
+        if (progressFill) progressFill.style.width = percent + '%';
+        if (percentageEl) percentageEl.textContent = Math.round(percent) + '%';
+        if (lineFill) lineFill.style.width = percent + '%';
+    }
+};
+
+// Утилиты для skeleton-загрузки
+const skeletonLoader = {
+    // Показать skeleton для секции отчёта
+    showForReport(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="skeleton-report-section">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton-row">
+                    <div class="skeleton-col">
+                        <div class="skeleton skeleton-price"></div>
+                        <div class="skeleton skeleton-text"></div>
+                        <div class="skeleton skeleton-text medium"></div>
+                    </div>
+                    <div class="skeleton-col">
+                        <div class="skeleton skeleton-badge"></div>
+                        <div class="skeleton skeleton-badge"></div>
+                        <div class="skeleton skeleton-text short"></div>
+                    </div>
+                </div>
+                <div class="skeleton skeleton-chart"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text medium"></div>
+                <div class="skeleton skeleton-text short"></div>
+            </div>
+        `;
+    },
+
+    // Скрыть skeleton (контент заменяется автоматически)
+    hide(containerId) {
+        // Skeleton убирается при заполнении реальным контентом
     }
 };
 
