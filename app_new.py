@@ -1107,14 +1107,20 @@ def find_similar():
 
         # Используем URL целевого объекта для создания парсера
         target_url = target.get('url', '')
+        is_manual_input = target.get('manual_input', False) or target_url == 'manual-input'
+
+        if is_manual_input:
+            logger.info(f"📝 Manual input detected - using citywide search")
 
         # Поиск аналогов с кэшем и регионом
         try:
             logger.info(f"🔍 Starting search (type: {search_type}, limit: {limit})")
             # Используем целевой URL для определения источника (или fallback на ЦИАН)
-            search_url = target_url if target_url else 'https://www.cian.ru/'
+            # Для ручного ввода всегда используем ЦИАН как источник
+            search_url = 'https://www.cian.ru/' if is_manual_input else (target_url or 'https://www.cian.ru/')
             with get_parser_for_url(search_url, region=region) as parser:
-                if search_type == 'building':
+                # Для ручного ввода всегда используем citywide search (нет ЖК)
+                if search_type == 'building' and not is_manual_input:
                     # Поиск в том же ЖК
                     logger.info(f"🏢 Searching in building: {target.get('residential_complex', 'Unknown')}")
                     similar = parser.search_similar_in_building(target, limit=limit)

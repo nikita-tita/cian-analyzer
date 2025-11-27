@@ -1672,6 +1672,20 @@ class PlaywrightParser(BaseCianParser):
                     filtered.append(result)
                     continue
 
+            # FIX: Для ручного ввода (без метро) - используем адрес даже в строгом режиме
+            # Это позволяет искать по улице когда метро не указано
+            if strict and not target_metro and target_keywords:
+                result_keywords = set()
+                for word in result_address.replace(',', ' ').split():
+                    word = word.strip()
+                    if len(word) > 3 and word not in stop_words:
+                        result_keywords.add(word)
+
+                # Требуем совпадение минимум 1 ключевого слова (улица, район)
+                if target_keywords & result_keywords:
+                    filtered.append(result)
+                    continue
+
             # Нестрогий режим: совпадение части адреса
             if not strict and target_keywords:
                 result_keywords = set()
