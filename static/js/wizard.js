@@ -2196,12 +2196,17 @@ const floatingButtons = {
             });
 
             if (!response.ok) {
-                throw new Error('Ошибка загрузки отчета');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Ошибка генерации отчёта');
             }
 
             // Получаем имя файла из заголовков
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'housler_report.md';
+
+            // Генерируем имя с датой
+            const today = new Date().toISOString().split('T')[0];
+            let filename = `housler_report_${today}.pdf`;
+
             if (contentDisposition) {
                 // Поддерживаем оба формата: filename="name" и filename=name
                 const filenameMatch = contentDisposition.match(/filename="([^"]+)"|filename=([^\s;]+)/);
@@ -2210,25 +2215,174 @@ const floatingButtons = {
                 }
             }
 
-            // Скачиваем файл
+            // Получаем blob
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
 
+            // Завершаем лоадер
             pixelLoader.complete();
-            utils.showToast('Отчет успешно скачан!', 'success');
+
+            // Показываем модалку с результатом
+            reportModal.showSuccess(filename, blob);
+
         } catch (error) {
             console.error('Download error:', error);
-            utils.showToast('Ошибка при скачивании отчета', 'error');
-        } finally {
             pixelLoader.hide();
+
+            // Показываем модалку с ошибкой
+            reportModal.showError(error.message || 'Произошла ошибка при генерации PDF. Попробуйте ещё раз или напишите нам.');
         }
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// Report Modal - Модальное окно для скачивания отчёта
+// ══════════════════════════════════════════════════════════════
+
+const reportModal = {
+    currentBlob: null,
+    currentFilename: null,
+
+    init() {
+        // Close button
+        document.getElementById('report-modal-close')?.addEventListener('click', () => this.hide());
+
+        // Backdrop click
+        document.querySelector('.report-modal-backdrop')?.addEventListener('click', () => this.hide());
+
+        // Download button
+        document.getElementById('report-download-btn')?.addEventListener('click', () => this.download());
+
+        // Email button
+        document.getElementById('report-email-btn')?.addEventListener('click', () => this.showEmailForm());
+
+        // Back to download
+        document.getElementById('report-back-btn')?.addEventListener('click', () => this.showSuccess());
+
+        // Send email button
+        document.getElementById('report-send-email-btn')?.addEventListener('click', () => this.sendEmail());
+
+        // Retry button
+        document.getElementById('report-retry-btn')?.addEventListener('click', () => {
+            this.hide();
+            floatingButtons.downloadReport();
+        });
+
+        // ESC to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('report-modal').style.display !== 'none') {
+                this.hide();
+            }
+        });
+    },
+
+    showSuccess(filename, blob) {
+        if (filename) this.currentFilename = filename;
+        if (blob) this.currentBlob = blob;
+
+        const modal = document.getElementById('report-modal');
+        const successState = document.getElementById('report-modal-success');
+        const errorState = document.getElementById('report-modal-error');
+        const emailState = document.getElementById('report-modal-email');
+        const filenameEl = document.getElementById('report-filename');
+
+        // Show success state
+        successState.style.display = 'block';
+        errorState.style.display = 'none';
+        emailState.style.display = 'none';
+
+        // Update filename
+        if (filenameEl && this.currentFilename) {
+            filenameEl.textContent = this.currentFilename;
+        }
+
+        modal.style.display = 'flex';
+    },
+
+    showError(errorMessage) {
+        const modal = document.getElementById('report-modal');
+        const successState = document.getElementById('report-modal-success');
+        const errorState = document.getElementById('report-modal-error');
+        const emailState = document.getElementById('report-modal-email');
+        const errorText = document.getElementById('report-error-text');
+
+        // Show error state
+        successState.style.display = 'none';
+        errorState.style.display = 'block';
+        emailState.style.display = 'none';
+
+        // Update error message
+        if (errorText) {
+            errorText.textContent = errorMessage || 'Произошла ошибка при генерации PDF. Попробуйте ещё раз или напишите нам.';
+        }
+
+        modal.style.display = 'flex';
+    },
+
+    showEmailForm() {
+        const successState = document.getElementById('report-modal-success');
+        const errorState = document.getElementById('report-modal-error');
+        const emailState = document.getElementById('report-modal-email');
+
+        successState.style.display = 'none';
+        errorState.style.display = 'none';
+        emailState.style.display = 'block';
+
+        // Focus email input
+        document.getElementById('report-email-input')?.focus();
+    },
+
+    hide() {
+        const modal = document.getElementById('report-modal');
+        modal.style.display = 'none';
+    },
+
+    download() {
+        if (!this.currentBlob || !this.currentFilename) {
+            utils.showToast('Файл недоступен', 'error');
+            return;
+        }
+
+        const url = window.URL.createObjectURL(this.currentBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.currentFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        utils.showToast('Отчёт скачан!', 'success');
+        this.hide();
+    },
+
+    async sendEmail() {
+        const emailInput = document.getElementById('report-email-input');
+        const email = emailInput?.value.trim();
+
+        if (!email) {
+            utils.showToast('Введите email', 'warning');
+            return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            utils.showToast('Некорректный email', 'warning');
+            return;
+        }
+
+        // For now, just show that this feature is coming soon
+        utils.showToast('Функция отправки на email скоро будет доступна', 'info');
+
+        // TODO: Implement actual email sending
+        // try {
+        //     const response = await fetch('/api/send-report-email', {
+        //         method: 'POST',
+        //         headers: utils.getCsrfHeaders(),
+        //         body: JSON.stringify({ session_id: state.sessionId, email })
+        //     });
+        //     ...
+        // }
     }
 };
 
@@ -2615,6 +2769,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     screen2.init();
     screen3.init();
     floatingButtons.init();
+    reportModal.init();
 
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;
