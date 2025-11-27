@@ -370,6 +370,27 @@ const utils = {
             console.error('Failed to copy URL:', error);
             this.showToast('Не удалось скопировать ссылку', 'error');
         }
+    },
+
+    /**
+     * Склонение слова "аналог" по числу
+     * @param {number} count - количество аналогов
+     * @returns {string} - правильная форма слова
+     */
+    pluralizeAnalogs(count) {
+        const lastTwo = count % 100;
+        const lastOne = count % 10;
+
+        if (lastTwo >= 11 && lastTwo <= 19) {
+            return 'аналогов';
+        }
+        if (lastOne === 1) {
+            return 'аналог';
+        }
+        if (lastOne >= 2 && lastOne <= 4) {
+            return 'аналога';
+        }
+        return 'аналогов';
     }
 };
 
@@ -2158,21 +2179,34 @@ const floatingButtons = {
             nextBtn.style.display = 'flex';
         }
 
-        // На втором шаге блокируем кнопку если нет аналогов
+        // На втором шаге: динамическая кнопка с количеством аналогов
         if (state.currentStep === 2) {
             const activeComparables = state.comparables.filter(c => !c.excluded);
-            if (activeComparables.length === 0) {
+            const count = activeComparables.length;
+
+            // Убираем предыдущие стили предупреждения
+            nextBtn.classList.remove('btn-warning', 'btn-outline-warning');
+
+            if (count === 0) {
+                // Нет аналогов - блокируем
                 nextBtn.classList.add('disabled');
                 nextBtn.style.opacity = '0.5';
                 nextBtn.style.cursor = 'not-allowed';
+            } else if (count < 5) {
+                // Мало аналогов - предупреждающий стиль
+                nextBtn.classList.remove('disabled');
+                nextBtn.classList.add('btn-warning');
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
             } else {
+                // Достаточно аналогов - нормальный стиль
                 nextBtn.classList.remove('disabled');
                 nextBtn.style.opacity = '1';
                 nextBtn.style.cursor = 'pointer';
             }
         } else {
-            // На других шагах убираем блокировку
-            nextBtn.classList.remove('disabled');
+            // На других шагах убираем блокировку и стили предупреждения
+            nextBtn.classList.remove('disabled', 'btn-warning', 'btn-outline-warning');
             nextBtn.style.opacity = '1';
             nextBtn.style.cursor = 'pointer';
         }
@@ -2191,7 +2225,17 @@ const floatingButtons = {
         if (state.currentStep === 1) {
             nextText.textContent = 'Далее';
         } else if (state.currentStep === 2) {
-            nextText.textContent = 'К анализу';
+            // Динамический текст с количеством аналогов
+            const activeComparables = state.comparables.filter(c => !c.excluded);
+            const count = activeComparables.length;
+
+            if (count === 0) {
+                nextText.textContent = 'Добавьте аналоги';
+            } else if (count < 5) {
+                nextText.textContent = `К анализу (${count} ${utils.pluralizeAnalogs(count)})`;
+            } else {
+                nextText.textContent = `К анализу (${count})`;
+            }
         } else if (state.currentStep === 3) {
             nextText.textContent = 'Скачать отчет';
         }
