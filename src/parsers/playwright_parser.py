@@ -853,9 +853,9 @@ class PlaywrightParser(BaseCianParser):
         """
         logger.info("🔍 Начинаем поиск похожих квартир в том же ЖК...")
 
-        residential_complex = target_property.get('residential_complex')
-        residential_complex_url = target_property.get('residential_complex_url')
-        address = target_property.get('address', '')
+        residential_complex = target_property.get('residential_complex') or ''
+        residential_complex_url = target_property.get('residential_complex_url') or ''
+        address = target_property.get('address') or ''
 
         # DEBUG: Показываем, какие данные мы получили
         logger.info("📋 DEBUG: Данные целевой квартиры:")
@@ -909,7 +909,7 @@ class PlaywrightParser(BaseCianParser):
             logger.warning("⚠️ Не указан ЖК, используется поиск по адресу")
             # Пробуем извлечь из адреса
             import re
-            match = re.search(r'ЖК\s+([А-Яа-яёЁ\s\-\d]+?)(?:,|$)', address)
+            match = re.search(r'ЖК\s+([А-Яа-яёЁ\s\-\d]+?)(?:,|$)', address or '')
             if match:
                 residential_complex = match.group(1).strip()
             else:
@@ -1437,7 +1437,7 @@ class PlaywrightParser(BaseCianParser):
         else:
             target_metro = str(target_metro_raw).lower().strip()
 
-        target_address = target_property.get('address', '').lower().strip()
+        target_address = target_property.get('address') or ''.lower().strip()
 
         if not target_metro and not target_address:
             logger.info("   ℹ️ Нет данных о локации целевого объекта, фильтрация пропущена")
@@ -1529,7 +1529,7 @@ class PlaywrightParser(BaseCianParser):
         else:
             target_metro = target_metro_raw if target_metro_raw else ''
 
-        target_address = target_property.get('address', '')
+        target_address = target_property.get('address') or ''
 
         # ═══════════════════════════════════════════════════════════════════════════
         # ДОРАБОТКА #2: АДАПТИВНЫЕ ДИАПАЗОНЫ ПОИСКА (в зависимости от сегмента)
