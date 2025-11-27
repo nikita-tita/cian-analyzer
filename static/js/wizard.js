@@ -2136,6 +2136,11 @@ const floatingButtons = {
                     utils.showToast('Сначала добавьте объекты для сравнения', 'warning');
                     return;
                 }
+                // При малом количестве аналогов показываем предупреждение
+                if (activeComparables.length < 5) {
+                    lowAnalogsModal.show(activeComparables.length);
+                    return;
+                }
                 navigation.goToStep(3);
             } else if (state.currentStep === 3) {
                 // На последнем экране кнопка скачивает отчет
@@ -2449,6 +2454,66 @@ const reportModal = {
         //     });
         //     ...
         // }
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// Low Analogs Modal - Предупреждение при малом количестве аналогов
+// ══════════════════════════════════════════════════════════════
+
+const lowAnalogsModal = {
+    init() {
+        const modal = document.getElementById('low-analogs-modal');
+        if (!modal) return;
+
+        // Close button
+        document.getElementById('low-analogs-modal-close')?.addEventListener('click', () => this.hide());
+
+        // Backdrop click
+        modal.querySelector('.report-modal-backdrop')?.addEventListener('click', () => this.hide());
+
+        // "Add more" button - closes modal and stays on step 2
+        document.getElementById('low-analogs-add-btn')?.addEventListener('click', () => {
+            this.hide();
+            // Scroll to manual add form
+            const manualForm = document.querySelector('.manual-add-form, .add-comparable-section');
+            if (manualForm) {
+                manualForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+
+        // "Continue" button - proceeds to analysis
+        document.getElementById('low-analogs-continue-btn')?.addEventListener('click', () => {
+            this.hide();
+            navigation.goToStep(3);
+        });
+
+        // ESC to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display !== 'none') {
+                this.hide();
+            }
+        });
+    },
+
+    show(count) {
+        const modal = document.getElementById('low-analogs-modal');
+        if (!modal) return;
+
+        // Update count in modal text
+        const countEl = document.getElementById('low-analogs-count');
+        const countBtnEl = document.getElementById('low-analogs-count-btn');
+        const word = utils.pluralizeAnalogs(count);
+
+        if (countEl) countEl.textContent = count;
+        if (countBtnEl) countBtnEl.textContent = count + ' ' + word;
+
+        modal.style.display = 'flex';
+    },
+
+    hide() {
+        const modal = document.getElementById('low-analogs-modal');
+        if (modal) modal.style.display = 'none';
     }
 };
 
@@ -2836,6 +2901,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     screen3.init();
     floatingButtons.init();
     reportModal.init();
+    lowAnalogsModal.init();
 
     // Экспортируем для доступа из navigation
     window.floatingButtons = floatingButtons;

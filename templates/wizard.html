@@ -756,6 +756,51 @@
         </div>
     </div>
 
+    <!-- Low Analogs Warning Modal -->
+    <div id="low-analogs-modal" class="report-modal" style="display: none;">
+        <div class="report-modal-backdrop"></div>
+        <div class="report-modal-content">
+            <div class="report-modal-icon report-modal-icon-warning" style="color: #f59e0b;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+            <h3 class="report-modal-title">Мало аналогов для анализа</h3>
+            <p class="report-modal-text" id="low-analogs-text" style="color: #666; margin: 16px 0; line-height: 1.5;">
+                У вас только <strong id="low-analogs-count">3</strong> аналога.
+                Для точной оценки рекомендуется минимум 10-15 объектов.
+                <br><br>
+                Результат будет менее точным, но анализ возможен.
+            </p>
+            <div class="report-modal-actions">
+                <button class="btn btn-outline-dark report-modal-btn-secondary" id="low-analogs-add-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    Добавить ещё
+                </button>
+                <button class="btn btn-warning report-modal-btn-primary" id="low-analogs-continue-btn">
+                    Продолжить с <span id="low-analogs-count-btn">3</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </div>
+            <!-- Close button -->
+            <button class="report-modal-close" id="low-analogs-modal-close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <!-- Фиксированная бегущая строка с советами -->
     <div class="advice-ticker" id="advice-ticker">
         <div class="advice-ticker-track">
@@ -784,7 +829,7 @@
         window.SERVER_SESSION_ID = {{ ('"%s"' % session_id) if session_id else 'null' }};
     </script>
     <script src="/static/js/error-messages.js?v=20251108"></script>
-    <script src="/static/js/wizard.js?v=20251127130000"></script>
+    <script src="/static/js/wizard.js?v=20251127143000"></script>
     <script src="/static/js/advice-ticker.js?v=20251108210930"></script>
 </body>
 </html>
