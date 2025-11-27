@@ -302,9 +302,10 @@ class PriceScenario(BaseModel):
     cumulative_probability: List[float] = []
     financials: Dict[str, Any] = {}
 
-    # НОВОЕ: Флаг рекомендуемого сценария (автоматически выбирается по максимальному expected_value)
+    # Флаг рекомендуемого сценария
     is_recommended: bool = False
     recommendation_reason: Optional[str] = None
+    icon: str = ""  # Иконка сценария (⚡, 🎯, 💎)
 
 
 class AnalysisResult(BaseModel):
