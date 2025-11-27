@@ -1265,23 +1265,66 @@ def find_similar():
                     })
 
         # Проверка 1: Достаточно ли аналогов?
+        # Генерируем контекстные подсказки на основе характеристик объекта
+        def get_context_tips(target_prop, count, rc_name):
+            """Генерирует контекстные подсказки почему мало аналогов и что делать"""
+            tips = []
+            context_reason = None
+
+            rooms = target_prop.get('rooms', '')
+            price_sqm = target_prop.get('price_per_sqm', 0)
+            region = target_prop.get('region', '')
+
+            # Определяем контекст
+            if rc_name:
+                context_reason = f'В ЖК «{rc_name}» сейчас мало активных предложений на продажу'
+                tips.append('Посмотрите историю продаж в этом ЖК на ЦИАН')
+            elif rooms in ['5', '5+', '6', '7']:
+                context_reason = 'Квартиры с 5+ комнатами — редкий сегмент рынка'
+            elif price_sqm and price_sqm > 500000:
+                context_reason = 'Премиальный сегмент имеет ограниченное количество предложений'
+            elif region and region not in ['msk', 'spb']:
+                context_reason = 'Для регионов база данных ограничена'
+
+            # Общие советы
+            tips.append('Добавьте аналоги вручную через кнопку «Добавить по ссылке»')
+            if count > 0:
+                tips.append('Можно продолжить анализ с имеющимися аналогами')
+
+            return context_reason, tips
+
         if len(similar) == 0:
+            context_reason, tips = get_context_tips(target, 0, residential_complex)
+            message = 'Не найдено ни одного аналога.'
+            if context_reason:
+                message += f' {context_reason}.'
             warnings.append({
                 'type': 'error',
                 'title': 'Аналоги не найдены',
-                'message': 'Не найдено ни одного аналога. Попробуйте изменить параметры поиска или добавить аналоги вручную.'
+                'message': message,
+                'tips': tips
             })
         elif len(similar) < 5:
+            context_reason, tips = get_context_tips(target, len(similar), residential_complex)
+            message = f'Найдено всего {len(similar)} аналог(ов). Для точной оценки рекомендуется 10-15.'
+            if context_reason:
+                message += f' {context_reason}.'
             warnings.append({
                 'type': 'error',
                 'title': 'Недостаточно аналогов',
-                'message': f'Найдено всего {len(similar)} аналог(ов). Для точной оценки рекомендуется минимум 10-15 аналогов. Добавьте аналоги вручную или расширьте критерии поиска.'
+                'message': message,
+                'tips': tips
             })
         elif len(similar) < 10:
+            context_reason, tips = get_context_tips(target, len(similar), residential_complex)
+            message = f'Найдено {len(similar)} аналогов. Для более точной оценки рекомендуется 15-20.'
+            if context_reason:
+                message += f' {context_reason}.'
             warnings.append({
                 'type': 'warning',
                 'title': 'Мало аналогов',
-                'message': f'Найдено {len(similar)} аналогов. Для более точной оценки рекомендуется 15-20 аналогов. Можно продолжить, но точность может быть ниже.'
+                'message': message,
+                'tips': tips
             })
 
         # Проверка 2: Разброс цен (коэффициент вариации)

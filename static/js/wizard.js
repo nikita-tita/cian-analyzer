@@ -1243,12 +1243,26 @@ const screen2 = {
          * Показывает алерты с предупреждениями о проблемах с подобранными аналогами:
          * - error (красный): критичные проблемы (мало аналогов, нет цен, очень большой разброс)
          * - warning (желтый): некритичные проблемы (средний разброс, неполные данные)
+         * - tips: контекстные подсказки что делать
          */
         const container = document.getElementById('comparables-list');
 
         // Группируем warnings по типу
         const errors = warnings.filter(w => w.type === 'error');
         const warningsOnly = warnings.filter(w => w.type === 'warning');
+
+        // Генерируем HTML для tips если есть
+        const renderTips = (tips) => {
+            if (!tips || tips.length === 0) return '';
+            return `
+                <div class="mt-2 pt-2 border-top border-opacity-25">
+                    <small class="text-muted d-block mb-1"><strong>💡 Что можно сделать:</strong></small>
+                    <ul class="mb-0 ps-3" style="font-size: 0.9em;">
+                        ${tips.map(tip => `<li>${tip}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        };
 
         let alertsHtml = '';
 
@@ -1259,6 +1273,7 @@ const screen2 = {
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     <strong>${warning.title}</strong><br>
                     ${warning.message}
+                    ${renderTips(warning.tips)}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             `;
@@ -1271,6 +1286,7 @@ const screen2 = {
                     <i class="bi bi-exclamation-circle-fill me-2"></i>
                     <strong>${warning.title}</strong><br>
                     ${warning.message}
+                    ${renderTips(warning.tips)}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             `;
