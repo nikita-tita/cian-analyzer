@@ -181,6 +181,50 @@ class PlaywrightParser(BaseCianParser):
         # Если уже int
         return int(target_rooms)
 
+    @staticmethod
+    def _get_room_filter_params(target_rooms: int, strict: bool = True) -> dict:
+        """
+        Генерирует параметры фильтра комнат для ЦИАН API
+
+        Args:
+            target_rooms: Количество комнат (нормализованное)
+            strict: Если True - только точное совпадение, False - ±1 комната
+
+        Returns:
+            dict: Параметры для URL (например {'room2': '1', 'room3': '1'})
+
+        Examples:
+            >>> PlaywrightParser._get_room_filter_params(3, strict=True)
+            {'room3': '1'}
+            >>> PlaywrightParser._get_room_filter_params(3, strict=False)
+            {'room2': '1', 'room3': '1', 'room4': '1'}
+        """
+        if target_rooms <= 0:
+            target_rooms = 2  # дефолт
+
+        if strict:
+            return {f'room{target_rooms}': '1'}
+
+        # Нестрогий режим: ±1 комната с учетом крайних случаев
+        params = {}
+
+        # Студия (room9 в ЦИАН) или 1-комн → разрешаем студии + 1 + 2
+        if target_rooms == 1:
+            params['room9'] = '1'  # студия в ЦИАН
+            params['room1'] = '1'
+            params['room2'] = '1'
+        # 5+ комнат → 4, 5, 6 (все большие квартиры схожий сегмент)
+        elif target_rooms >= 5:
+            params['room4'] = '1'
+            params['room5'] = '1'
+            params['room6'] = '1'  # 6+ в ЦИАН
+        # 2-4 комнаты → ±1
+        else:
+            for r in range(max(1, target_rooms - 1), min(6, target_rooms + 2)):
+                params[f'room{r}'] = '1'
+
+        return params
+
     def __init__(
         self,
         headless: bool = True,
@@ -1748,9 +1792,12 @@ class PlaywrightParser(BaseCianParser):
         else:
             search_params_city['type'] = '1'
 
-        # Комнаты (СТРОГО)
+        # Комнаты (ОСЛАБЛЕННЫЙ фильтр ±1 комната для расширения поиска)
         target_rooms_int = self._normalize_rooms(target_rooms) or 2
-        search_params_city[f'room{target_rooms_int}'] = '1'
+        room_params = self._get_room_filter_params(target_rooms_int, strict=False)
+        search_params_city.update(room_params)
+        room_range = ', '.join([k.replace('room', '') for k in room_params.keys()])
+        logger.info(f"   🏠 Фильтр комнат: {room_range}-комнатные (±1 для расширения)")
 
         url_level2 = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_city.items()])
         logger.info(f"   URL: {url_level2[:100]}...")
@@ -1776,9 +1823,9 @@ class PlaywrightParser(BaseCianParser):
             return final_results[:limit]
 
         # ═══════════════════════════════════════════════════════════════════════════
-        # УРОВЕНЬ 3: Сверхрасширенный поиск (допуски +50%)
+        # УРОВЕНЬ 3: Сверхрасширенный поиск (допуски +50% + ослабленный фильтр комнат)
         # ═══════════════════════════════════════════════════════════════════════════
-        logger.info(f"🚀 УРОВЕНЬ 3: Расширяем диапазоны поиска (+50% к допускам)")
+        logger.info(f"🚀 УРОВЕНЬ 3: Расширяем диапазоны поиска (+50% к допускам, ±1 комната)")
         logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 5)")
 
         expanded_price_tolerance = price_tolerance * 1.5
@@ -1788,8 +1835,32 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   Диапазон цен: {int(target_price * (1-expanded_price_tolerance)):,} - {int(target_price * (1+expanded_price_tolerance)):,} ₽")
         logger.info(f"   Диапазон площади: {int(target_area * (1-expanded_area_tolerance))} - {int(target_area * (1+expanded_area_tolerance))} м²")
 
-        url_level3 = self._build_search_url(target_price, target_area, target_rooms,
-                                            expanded_price_tolerance, expanded_area_tolerance, target_property)
+        # Строим URL с расширенными допусками и ослабленным фильтром комнат
+        search_params_level3 = {
+            'deal_type': 'sale',
+            'offer_type': 'flat',
+            'engine_version': '2',
+            'price_min': int(target_price * (1 - expanded_price_tolerance)),
+            'price_max': int(target_price * (1 + expanded_price_tolerance)),
+            'minArea': int(target_area * (1 - expanded_area_tolerance)),
+            'maxArea': int(target_area * (1 + expanded_area_tolerance)),
+            'region': self.region_code,
+        }
+
+        # Тип объекта
+        if is_new_building:
+            search_params_level3['type'] = '4'
+        else:
+            search_params_level3['type'] = '1'
+
+        # Комнаты (ОСЛАБЛЕННЫЙ фильтр ±1 комната)
+        target_rooms_int = self._normalize_rooms(target_rooms) or 2
+        room_params = self._get_room_filter_params(target_rooms_int, strict=False)
+        search_params_level3.update(room_params)
+        room_range = ', '.join([k.replace('room', '') for k in room_params.keys()])
+        logger.info(f"   🏠 Фильтр комнат: {room_range}-комнатные (±1 для расширения)")
+
+        url_level3 = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_level3.items()])
         logger.info(f"   URL: {url_level3[:100]}...")
 
         results_level3 = self.parse_search_page(url_level3)
@@ -1829,12 +1900,12 @@ class PlaywrightParser(BaseCianParser):
             'region': self.region_code,
         }
 
-        # Комнаты (±1)
+        # Комнаты (ОСЛАБЛЕННЫЙ фильтр ±1 комната для максимального охвата)
         target_rooms_int = self._normalize_rooms(target_rooms) or 2  # дефолт 2
-
-        # СТРОГИЙ фильтр комнат (без смешивания!)
-        search_params_fallback[f'room{target_rooms_int}'] = '1'
-        logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
+        room_params = self._get_room_filter_params(target_rooms_int, strict=False)
+        search_params_fallback.update(room_params)
+        room_range = ', '.join([k.replace('room', '') for k in room_params.keys()])
+        logger.info(f"   🏠 Фильтр комнат: {room_range}-комнатные (±1 для максимального охвата)")
 
         url_fallback = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params_fallback.items()])
         logger.info(f"   URL: {url_fallback[:100]}...")
