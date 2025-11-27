@@ -654,7 +654,8 @@ class PlaywrightParser(BaseCianParser):
         results: List[Dict],
         limit: int,
         enable_validation: bool = True,
-        target_property: Dict = None
+        target_property: Dict = None,
+        relaxed_filters: bool = False
     ) -> List[Dict]:
         """
         Валидация и подготовка результатов перед возвратом
@@ -664,6 +665,7 @@ class PlaywrightParser(BaseCianParser):
             limit: Максимальное количество результатов
             enable_validation: Включить валидацию данных
             target_property: Целевой объект для проверки разумности аналогов (опционально)
+            relaxed_filters: Ослабить фильтры (для ЖК где цена/м² важнее площади)
 
         Returns:
             Список валидных и подготовленных результатов
@@ -728,10 +730,24 @@ class PlaywrightParser(BaseCianParser):
 
         # ═══════════════════════════════════════════════════════════════════════════
         # ДОРАБОТКА #3: ВАЛИДАЦИЯ РАЗУМНОСТИ АНАЛОГОВ
+        # УЛУЧШЕНИЕ: relaxed_filters для ЖК (цена/м² важнее площади)
         # ═══════════════════════════════════════════════════════════════════════════
         if target_property:
             target_price = target_property.get('price', 0)
             target_area = target_property.get('total_area', 0)
+
+            # Адаптивные пороги в зависимости от режима
+            if relaxed_filters:
+                # Для ЖК: ослабленные фильтры (цена/м² важнее)
+                price_ratio_threshold = 5.0      # было 3.0
+                area_ratio_threshold = 3.0       # было 1.5 (для ЖК не так важно)
+                price_sqm_threshold = 0.40       # было 0.30
+                logger.info(f"   📊 Режим: ОСЛАБЛЕННЫЕ фильтры для ЖК (площадь ±{area_ratio_threshold}x, цена/м² ±{int(price_sqm_threshold*100)}%)")
+            else:
+                # Стандартные строгие фильтры
+                price_ratio_threshold = 3.0
+                area_ratio_threshold = 1.5
+                price_sqm_threshold = 0.30
 
             if target_price > 0 and target_area > 0:
                 reasonable = []
@@ -746,9 +762,9 @@ class PlaywrightParser(BaseCianParser):
                         reasonable.append(result)
                         continue
 
-                    # Проверка 1: Цена не должна отличаться больше чем в 3 раза
+                    # Проверка 1: Цена не должна отличаться слишком сильно
                     price_ratio = max(comp_price, target_price) / min(comp_price, target_price)
-                    if price_ratio > 3.0:
+                    if price_ratio > price_ratio_threshold:
                         unreasonable_count += 1
                         logger.warning(
                             f"⚠️ Исключен неразумный аналог: цена отличается в {price_ratio:.1f} раз "
@@ -757,9 +773,9 @@ class PlaywrightParser(BaseCianParser):
                         )
                         continue
 
-                    # Проверка 2: Площадь не должна отличаться больше чем в 1.5 раза
+                    # Проверка 2: Площадь (для ЖК - ослабленная)
                     area_ratio = max(comp_area, target_area) / min(comp_area, target_area)
-                    if area_ratio > 1.5:
+                    if area_ratio > area_ratio_threshold:
                         unreasonable_count += 1
                         logger.warning(
                             f"⚠️ Исключен неразумный аналог: площадь отличается в {area_ratio:.1f} раз "
@@ -768,13 +784,12 @@ class PlaywrightParser(BaseCianParser):
                         )
                         continue
 
-                    # Проверка 3: НОВОЕ - Цена за м² не должна отличаться больше чем на ±30%
-                    # КРИТИЧНО для устранения разброса 76%
+                    # Проверка 3: Цена за м² (главный критерий для ЖК)
                     target_price_per_sqm = target_price / target_area
                     comp_price_per_sqm = comp_price / comp_area
                     price_per_sqm_diff = abs(comp_price_per_sqm - target_price_per_sqm) / target_price_per_sqm
 
-                    if price_per_sqm_diff > 0.30:  # ±30%
+                    if price_per_sqm_diff > price_sqm_threshold:
                         unreasonable_count += 1
                         logger.warning(
                             f"⚠️ Исключен по цене/м²: отличие {price_per_sqm_diff*100:.0f}% "
@@ -926,11 +941,11 @@ class PlaywrightParser(BaseCianParser):
         search_query = f"ЖК {residential_complex}"
         encoded_query = urllib.parse.quote(search_query)
 
-        # ИСПРАВЛЕНИЕ: Добавляем фильтры по площади и комнатам для более точного подбора
+        # УЛУЧШЕНИЕ: Для ЖК ищем ВСЕ квартиры, т.к. цена/м² одинаковая
+        # Фильтр комнат УБРАН - в ЖК 1-комн и 3-комн = хорошие аналоги по цене/м²
         target_area = target_property.get('total_area', 0)
-        target_rooms = target_property.get('rooms', 0)
 
-        # Строим URL поиска с текстовым запросом и фильтрами
+        # Строим URL поиска с текстовым запросом БЕЗ строгих фильтров
         search_params = {
             'deal_type': 'sale',
             'offer_type': 'flat',
@@ -939,19 +954,11 @@ class PlaywrightParser(BaseCianParser):
             'text': encoded_query,
         }
 
-        # Добавляем фильтр по площади (±30% для поиска в том же ЖК)
-        if target_area > 0:
-            area_tolerance = 0.30  # Более мягкий допуск для поиска в ЖК
-            search_params['minArea'] = int(target_area * (1 - area_tolerance))
-            search_params['maxArea'] = int(target_area * (1 + area_tolerance))
-            logger.info(f"   Фильтр площади: {search_params['minArea']}-{search_params['maxArea']} м²")
+        # НЕ добавляем фильтр по площади для ЖК - цена/м² важнее!
+        # В ЖК все квартиры имеют примерно одинаковую цену за м²
+        logger.info(f"   📊 Поиск в ЖК: БЕЗ фильтра площади и комнат (цена/м² важнее)")
 
-        # Добавляем фильтр по комнатам (±1 комната)
-        target_rooms_int = self._normalize_rooms(target_rooms)
-        if target_rooms_int > 0:
-            # СТРОГИЙ фильтр комнат (без смешивания!)
-            search_params[f'room{target_rooms_int}'] = '1'
-            logger.info(f"   🏠 Фильтр комнат: СТРОГО {target_rooms_int}-комнатные")
+        # НЕ добавляем фильтр по комнатам - в ЖК это не важно
 
         url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
@@ -1004,8 +1011,9 @@ class PlaywrightParser(BaseCianParser):
 
         logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений после фильтрации по ЖК '{residential_complex}'")
 
-        # Валидация и подготовка
-        return self._validate_and_prepare_results(filtered_results, limit, target_property=target_property)
+        # Валидация и подготовка с ОСЛАБЛЕННЫМИ фильтрами для ЖК
+        # В ЖК цена/м² одинакова, поэтому площадь менее важна
+        return self._validate_and_prepare_results(filtered_results, limit, target_property=target_property, relaxed_filters=True)
 
     def _is_new_building(self, target_property: Dict = None) -> bool:
         """
@@ -1657,12 +1665,14 @@ class PlaywrightParser(BaseCianParser):
             return final_results[:limit]
 
         # ═══════════════════════════════════════════════════════════════════════════
-        # УРОВЕНЬ 1.5: ПОИСК ПО СОСЕДНИМ ДОМАМ (для вторички)
-        # Перебираем дома: 4к1, 4к2, 3, 3к1, 5, 5к1 и т.д.
+        # УРОВЕНЬ 1.5: ПОИСК ПО СОСЕДНИМ ДОМАМ/КОРПУСАМ
+        # Для вторички: соседние дома (4 → 3, 5, 4к1...)
+        # Для новостроек: соседние корпуса ЖК (9Ак3 → 9Ак1, 9Ак2, 9Б...)
         # ═══════════════════════════════════════════════════════════════════════════
         new_results_level15 = []
-        if target_address and not is_new_building:
-            logger.info(f"🏠 УРОВЕНЬ 1.5: Поиск по соседним домам")
+        if target_address:  # Убрано ограничение "not is_new_building"
+            search_type = "корпусам" if is_new_building else "домам"
+            logger.info(f"🏠 УРОВЕНЬ 1.5: Поиск по соседним {search_type}")
             logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 10)")
 
             parsed_addr = self._parse_address(target_address)
