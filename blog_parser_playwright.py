@@ -31,47 +31,52 @@ class CianMagazineParserPlaywright:
 
                 logger.info(f"Navigating to {self.magazine_url}")
                 page.goto(self.magazine_url, wait_until='domcontentloaded', timeout=30000)
-
-                # Даем странице время на загрузку JS-контента
                 time.sleep(3)
 
-                # Получаем HTML после рендеринга
                 html = page.content()
                 soup = BeautifulSoup(html, 'html.parser')
 
-                # Ищем статьи по различным селекторам
-                article_links = []
+                # Ищем статьи внутри тегов <article> с URL /stati-*
+                article_elements = soup.find_all('article')
+                logger.info(f"Found {len(article_elements)} article elements")
 
-                # Вариант 1: ссылки на статьи в magazine
-                for link in soup.find_all('a', href=re.compile(r'/magazine/[^/]+/?$')):
-                    href = link.get('href')
-                    if href and '/magazine/' in href:
-                        full_url = href if href.startswith('http') else f"{self.base_url}{href}"
-                        article_links.append({
-                            'url': full_url,
-                            'element': link
-                        })
-
-                # Убираем дубликаты
                 seen_urls = set()
-                unique_articles = []
-                for item in article_links:
-                    if item['url'] not in seen_urls:
-                        seen_urls.add(item['url'])
-                        unique_articles.append(item)
 
-                logger.info(f"Found {len(unique_articles)} unique article links")
-
-                # Парсим каждую статью
-                for item in unique_articles[:limit]:
+                for article_elem in article_elements:
+                    if len(articles) >= limit:
+                        break
                     try:
-                        article = self._parse_article_from_link(item)
-                        if article:
-                            articles.append(article)
+                        link = article_elem.find('a', href=re.compile(r'/stati-'))
+                        if not link:
+                            continue
+
+                        href = link.get('href')
+                        full_url = href if href.startswith('http') else f"{self.base_url}{href}"
+
+                        if full_url in seen_urls:
+                            continue
+                        seen_urls.add(full_url)
+
+                        title_elem = article_elem.find('a', class_=re.compile(r'title', re.I))
+                        title = title_elem.get_text(strip=True) if title_elem else link.get('title', '') or link.get_text(strip=True)
+
+                        if not title or len(title) < 10:
+                            continue
+
+                        date_elem = article_elem.find('div', itemprop='datePublished')
+                        date_text = date_elem.get_text(strip=True) if date_elem else None
+
+                        articles.append({
+                            'url': full_url,
+                            'title': title,
+                            'excerpt': None,
+                            'published_date': date_text
+                        })
                     except Exception as e:
-                        logger.warning(f"Failed to parse article {item['url']}: {e}")
+                        logger.warning(f"Failed to parse article element: {e}")
                         continue
 
+                logger.info(f"Found {len(articles)} valid articles")
                 browser.close()
 
             except Exception as e:
