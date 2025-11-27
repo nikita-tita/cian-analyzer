@@ -28,61 +28,218 @@ except ImportError:
     logger.warning("⚠️ Валидатор данных недоступен - фильтрация отключена")
 
 
+# Глобальный маппинг поддоменов ЦИАН на коды регионов (для detect_region_from_url)
+SUBDOMAIN_TO_REGION = {
+    # Основные города
+    'spb': 'spb', 'piter': 'spb', 'saint-petersburg': 'spb',
+    'msk': 'msk', 'moskva': 'msk', 'moscow': 'msk',
+    # Области
+    'mo': 'mo', 'moskovskaya-oblast': 'mo',
+    'lo': 'lo', 'leningradskaya-oblast': 'lo',
+    # Города-миллионники и крупные города
+    'ekaterinburg': 'sverdlovsk', 'ekb': 'sverdlovsk',
+    'novosibirsk': 'novosibirsk', 'nsk': 'novosibirsk',
+    'kazan': 'tatarstan', 'tatarstan': 'tatarstan',
+    'nizhniy-novgorod': 'nizhniy-novgorod', 'nn': 'nizhniy-novgorod',
+    'krasnodar': 'krasnodar', 'sochi': 'krasnodar',
+    'rostov': 'rostov', 'rostov-na-donu': 'rostov',
+    'samara': 'samara',
+    'chelyabinsk': 'chelyabinsk',
+    'voronezh': 'voronezh',
+    'omsk': 'omsk',
+    'krasnoyarsk': 'krasnoyarsk',
+    # Тула и другие регионы
+    'tula': 'tula',
+    'tver': 'tver',
+    'kaliningrad': 'kaliningrad',
+    'tyumen': 'tyumen',
+    'irkutsk': 'irkutsk',
+    'perm': 'perm',
+    'ufa': 'bashkortostan', 'bashkortostan': 'bashkortostan',
+    'vladivostok': 'primorye', 'primorye': 'primorye',
+    'khabarovsk': 'khabarovsk',
+    'yaroslavl': 'yaroslavl',
+    'ryazan': 'ryazan',
+    'lipetsk': 'lipetsk',
+    'ivanovo': 'ivanovo',
+    'vladimir': 'vladimir',
+    'bryansk': 'bryansk',
+    'orel': 'orel',
+    'kursk': 'kursk',
+    'belgorod': 'belgorod',
+    'tambov': 'tambov',
+    'saratov': 'saratov',
+    'penza': 'penza',
+    'volgograd': 'volgograd',
+    'astrakhan': 'astrakhan',
+    'kaluga': 'kaluga',
+    'smolensk': 'smolensk',
+    'pskov': 'pskov',
+    'novgorod': 'novgorod',
+    'vologda': 'vologda',
+    'arkhangelsk': 'arkhangelsk',
+    'murmansk': 'murmansk',
+    'karelia': 'karelia',
+    'crimea': 'crimea', 'krym': 'crimea', 'simferopol': 'crimea',
+    'sevastopol': 'sevastopol',
+    'komi': 'komi',
+    'kirov': 'kirov',
+    'kostroma': 'kostroma',
+    'tomsk': 'tomsk',
+    'kemerovo': 'kemerovo',
+    'ulyanovsk': 'ulyanovsk',
+    'orenburg': 'orenburg',
+    'kurgan': 'kurgan',
+    'magadan': 'magadan',
+    'sakhalin': 'sakhalin',
+    'amur': 'amur',
+}
+
+
 def detect_region_from_url(url: str) -> str:
     """
-    Автоопределение региона по URL объекта
+    Автоопределение региона по URL объекта.
+    Поддерживает все регионы России через поддомены ЦИАН.
 
     Args:
         url: URL объявления
 
     Returns:
-        'msk' или 'spb'
+        Ключ региона (например 'msk', 'spb', 'tula') или None если не удалось определить
     """
-    # Парсим URL для поиска региона
+    if not url:
+        return None
+
     url_lower = url.lower()
 
-    # ПРИОРИТЕТ 1: Санкт-Петербург (проверяем первым, т.к. spb.cian.ru явно указывает регион)
-    if any(word in url_lower for word in ['spb.cian.ru', 'sankt-peterburg', 'saint-petersburg', '/spb/', 'piter']):
+    # Извлекаем поддомен из URL
+    # Формат: https://tula.cian.ru/... -> tula
+    import re
+    subdomain_match = re.search(r'https?://([a-z0-9-]+)\.cian\.ru', url_lower)
+
+    if subdomain_match:
+        subdomain = subdomain_match.group(1)
+
+        # www.cian.ru = Москва (дефолтный регион)
+        if subdomain == 'www':
+            logger.info(f"✓ URL www.cian.ru определен как МОСКВА (дефолтный регион)")
+            return 'msk'
+
+        # Ищем поддомен в маппинге
+        if subdomain in SUBDOMAIN_TO_REGION:
+            region = SUBDOMAIN_TO_REGION[subdomain]
+            logger.info(f"✓ Регион определен по поддомену: {subdomain} -> {region}")
+            return region
+
+        # Если поддомен неизвестен, возвращаем его как есть (возможно новый регион)
+        logger.warning(f"⚠️ Неизвестный поддомен: {subdomain}, используем как ключ региона")
+        return subdomain
+
+    # cian.ru без поддомена = Москва
+    if 'cian.ru' in url_lower:
+        logger.info(f"✓ URL cian.ru без поддомена определен как МОСКВА")
+        return 'msk'
+
+    # Резервные проверки для старого формата URL
+    if any(word in url_lower for word in ['sankt-peterburg', 'saint-petersburg', '/spb/']):
         return 'spb'
-
-    # ПРИОРИТЕТ 2: Москва (явные указания)
-    if any(word in url_lower for word in ['moskva', 'moscow', '/msk/', 'moscow-city']):
+    if any(word in url_lower for word in ['moskva', 'moscow', '/msk/']):
         return 'msk'
 
-    # ПРИОРИТЕТ 3: www.cian.ru (без региона) = Москва (дефолтный регион ЦИАН)
-    # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: www.cian.ru и cian.ru БЕЗ поддомена = Москва
-    if 'www.cian.ru' in url_lower or url_lower.startswith('https://cian.ru') or url_lower.startswith('http://cian.ru'):
-        logger.info(f"✓ URL www.cian.ru определен как МОСКВА (дефолтный регион)")
-        return 'msk'
-
-    # КРИТИЧНО: По умолчанию возвращаем None вместо 'spb'
-    # Регион должен определяться по адресу после парсинга
-    logger.warning(f"⚠️ Не удалось определить регион по URL: {url}, требуется определение по адресу")
+    logger.warning(f"⚠️ Не удалось определить регион по URL: {url}")
     return None
+
+
+# Маппинг ключевых слов в адресе на регионы
+ADDRESS_KEYWORDS_TO_REGION = {
+    # Москва и МО
+    'msk': ['москва', 'moscow', 'г москва', 'г.москва'],
+    'mo': ['московская область', 'московская обл', 'мо,'],
+    # Санкт-Петербург и ЛО
+    'spb': ['санкт-петербург', 'спб', 'с-петербург', 'с.петербург', 'питер', 'saint-petersburg'],
+    'lo': ['ленинградская область', 'ленинградская обл', 'ло,'],
+    # Города-миллионники
+    'novosibirsk': ['новосибирск', 'новосибирская'],
+    'sverdlovsk': ['екатеринбург', 'свердловская'],
+    'tatarstan': ['казань', 'татарстан', 'республика татарстан'],
+    'nizhniy-novgorod': ['нижний новгород', 'нижегородская'],
+    'chelyabinsk': ['челябинск', 'челябинская'],
+    'omsk': ['омск', 'омская'],
+    'samara': ['самара', 'самарская'],
+    'rostov': ['ростов-на-дону', 'ростов на дону', 'ростовская'],
+    'bashkortostan': ['уфа', 'башкортостан', 'республика башкортостан'],
+    'krasnoyarsk': ['красноярск', 'красноярская'],
+    'perm': ['пермь', 'пермская', 'пермский'],
+    'voronezh': ['воронеж', 'воронежская'],
+    'volgograd': ['волгоград', 'волгоградская'],
+    'krasnodar': ['краснодар', 'сочи', 'краснодарский'],
+    # Областные центры
+    'tula': ['тула', 'тульская'],
+    'tver': ['тверь', 'тверская'],
+    'kaluga': ['калуга', 'калужская'],
+    'ryazan': ['рязань', 'рязанская'],
+    'vladimir': ['владимир', 'владимирская'],
+    'yaroslavl': ['ярославль', 'ярославская'],
+    'ivanovo': ['иваново', 'ивановская'],
+    'kostroma': ['кострома', 'костромская'],
+    'bryansk': ['брянск', 'брянская'],
+    'orel': ['орёл', 'орел', 'орловская'],
+    'kursk': ['курск', 'курская'],
+    'belgorod': ['белгород', 'белгородская'],
+    'lipetsk': ['липецк', 'липецкая'],
+    'tambov': ['тамбов', 'тамбовская'],
+    'penza': ['пенза', 'пензенская'],
+    'saratov': ['саратов', 'саратовская'],
+    'ulyanovsk': ['ульяновск', 'ульяновская'],
+    'orenburg': ['оренбург', 'оренбургская'],
+    'tyumen': ['тюмень', 'тюменская'],
+    'tomsk': ['томск', 'томская'],
+    'kemerovo': ['кемерово', 'кемеровская'],
+    'irkutsk': ['иркутск', 'иркутская'],
+    'kaliningrad': ['калининград', 'калининградская'],
+    'arkhangelsk': ['архангельск', 'архангельская'],
+    'murmansk': ['мурманск', 'мурманская'],
+    'vologda': ['вологда', 'вологодская'],
+    'pskov': ['псков', 'псковская'],
+    'novgorod': ['великий новгород', 'новгородская'],
+    'smolensk': ['смоленск', 'смоленская'],
+    'astrakhan': ['астрахань', 'астраханская'],
+    'kurgan': ['курган', 'курганская'],
+    'primorye': ['владивосток', 'приморский край'],
+    'khabarovsk': ['хабаровск', 'хабаровский'],
+    'sakhalin': ['сахалин', 'южно-сахалинск'],
+    'amur': ['благовещенск', 'амурская'],
+    'crimea': ['симферополь', 'крым', 'республика крым'],
+    'sevastopol': ['севастополь'],
+    'karelia': ['петрозаводск', 'карелия', 'республика карелия'],
+    'komi': ['сыктывкар', 'коми', 'республика коми'],
+}
 
 
 def detect_region_from_address(address: str) -> str:
     """
-    Определение региона по адресу объекта
+    Определение региона по адресу объекта.
+    Поддерживает все регионы России.
 
     Args:
         address: Адрес объявления
 
     Returns:
-        'msk' или 'spb' или None
+        Ключ региона (например 'msk', 'spb', 'tula') или None
     """
     if not address:
         return None
 
     address_lower = address.lower()
 
-    # Москва: ищем "Москва", "г. Москва", "Moscow"
-    if any(word in address_lower for word in ['москва', 'moscow', 'г москва', 'г.москва']):
-        return 'msk'
-    # Санкт-Петербург: ищем "Санкт-Петербург", "СПб", "Питер"
-    elif any(word in address_lower for word in ['санкт-петербург', 'спб', 'с-петербург', 'с.петербург', 'питер']):
-        return 'spb'
+    # Ищем совпадения с ключевыми словами
+    for region_key, keywords in ADDRESS_KEYWORDS_TO_REGION.items():
+        for keyword in keywords:
+            if keyword in address_lower:
+                logger.info(f"✓ Регион определен по адресу: {region_key} (ключевое слово: {keyword})")
+                return region_key
 
+    logger.warning(f"⚠️ Не удалось определить регион по адресу: {address}")
     return None
 
 
@@ -399,13 +556,165 @@ class PlaywrightParser(BaseCianParser):
         self.browser_pool = browser_pool
         self.using_pool = browser_pool is not None
 
-        # Маппинг регионов на коды Cian
+        # Полный маппинг регионов на коды ЦИАН (получено из API ЦИАН)
         self.region_codes = {
-            'spb': '2',  # Санкт-Петербург
-            'msk': '1',  # Москва
+            # Основные регионы
+            'msk': '1',           # Москва
+            'spb': '2',           # Санкт-Петербург
+
+            # Области вокруг крупных городов
+            'mo': '4593',         # Московская область
+            'lo': '4588',         # Ленинградская область
+
+            # Республики
+            'adygea': '4553',     # Республика Адыгея
+            'altai-republic': '4554',  # Республика Алтай
+            'bashkortostan': '4560',   # Республика Башкортостан
+            'buryatia': '4563',   # Республика Бурятия
+            'dagestan': '4568',   # Республика Дагестан
+            'ingushetia': '4571', # Республика Ингушетия
+            'kbr': '4573',        # Кабардино-Балкарская Республика
+            'kalmykia': '4575',   # Республика Калмыкия
+            'kchr': '4578',       # Карачаево-Черкесская Республика
+            'karelia': '4579',    # Республика Карелия
+            'komi': '4582',       # Республика Коми
+            'mariy-el': '4591',   # Республика Марий Эл
+            'mordovia': '4592',   # Республика Мордовия
+            'yakutia': '4610',    # Республика Саха (Якутия)
+            'osetia': '4613',     # Республика Северная Осетия - Алания
+            'tatarstan': '4618',  # Республика Татарстан
+            'tyva': '4622',       # Республика Тыва
+            'udmurtia': '4624',   # Удмуртская Республика
+            'khakassia': '4628',  # Республика Хакасия
+            'chechnya': '4631',   # Чеченская Республика
+            'chuvashia': '4633',  # Чувашская Республика
+            'crimea': '181462',   # Республика Крым
+
+            # Края
+            'altai': '4555',      # Алтайский край
+            'kamchatka': '4577',  # Камчатский край
+            'krasnodar': '4584',  # Краснодарский край
+            'krasnoyarsk': '4585', # Красноярский край
+            'perm': '4603',       # Пермский край
+            'primorye': '4604',   # Приморский край
+            'stavropol': '4615',  # Ставропольский край
+            'khabarovsk': '4627', # Хабаровский край
+            'zabaikalye': '187450', # Забайкальский край
+
+            # Области
+            'amur': '4556',       # Амурская область
+            'arkhangelsk': '4557', # Архангельская область
+            'astrakhan': '4558',  # Астраханская область
+            'belgorod': '4561',   # Белгородская область
+            'bryansk': '4562',    # Брянская область
+            'vladimir': '4564',   # Владимирская область
+            'volgograd': '4565',  # Волгоградская область
+            'vologda': '4566',    # Вологодская область
+            'voronezh': '4567',   # Воронежская область
+            'ivanovo': '4570',    # Ивановская область
+            'irkutsk': '4572',    # Иркутская область
+            'kaliningrad': '4574', # Калининградская область
+            'kaluga': '4576',     # Калужская область
+            'kemerovo': '4580',   # Кемеровская область
+            'kirov': '4581',      # Кировская область
+            'kostroma': '4583',   # Костромская область
+            'kurgan': '4586',     # Курганская область
+            'kursk': '4587',      # Курская область
+            'lipetsk': '4589',    # Липецкая область
+            'magadan': '4590',    # Магаданская область
+            'murmansk': '4594',   # Мурманская область
+            'nizhniy-novgorod': '4596', # Нижегородская область
+            'novgorod': '4597',   # Новгородская область
+            'novosibirsk': '4598', # Новосибирская область
+            'omsk': '4599',       # Омская область
+            'orenburg': '4600',   # Оренбургская область
+            'orel': '4601',       # Орловская область
+            'penza': '4602',      # Пензенская область
+            'pskov': '4605',      # Псковская область
+            'rostov': '4606',     # Ростовская область
+            'ryazan': '4607',     # Рязанская область
+            'samara': '4608',     # Самарская область
+            'saratov': '4609',    # Саратовская область
+            'sakhalin': '4611',   # Сахалинская область
+            'sverdlovsk': '4612', # Свердловская область
+            'smolensk': '4614',   # Смоленская область
+            'tambov': '4617',     # Тамбовская область
+            'tver': '4619',       # Тверская область
+            'tomsk': '4620',      # Томская область
+            'tula': '4621',       # Тульская область
+            'tyumen': '4623',     # Тюменская область
+            'ulyanovsk': '4625',  # Ульяновская область
+            'chelyabinsk': '4630', # Челябинская область
+            'yaroslavl': '4636',  # Ярославская область
+
+            # Автономные округа
+            'eao': '4569',        # Еврейская автономная область
+            'nao': '4595',        # Ненецкий автономный округ
+            'khanty-mansiysk': '4629', # Ханты-Мансийский автономный округ
+            'chukotka': '4634',   # Чукотский автономный округ
+            'yamalo-nenets': '4635', # Ямало-Ненецкий автономный округ
+
+            # Город федерального значения
+            'sevastopol': '184723', # Севастополь
         }
+
+        # Маппинг поддоменов ЦИАН на ключи region_codes
+        self.subdomain_to_region = {
+            'spb': 'spb', 'piter': 'spb', 'saint-petersburg': 'spb',
+            'msk': 'msk', 'moskva': 'msk', 'moscow': 'msk',
+            'mo': 'mo', 'moskovskaya-oblast': 'mo',
+            'lo': 'lo', 'leningradskaya-oblast': 'lo',
+            'ekaterinburg': 'sverdlovsk', 'ekb': 'sverdlovsk',
+            'novosibirsk': 'novosibirsk', 'nsk': 'novosibirsk',
+            'kazan': 'tatarstan', 'tatarstan': 'tatarstan',
+            'nizhniy-novgorod': 'nizhniy-novgorod', 'nn': 'nizhniy-novgorod',
+            'krasnodar': 'krasnodar', 'sochi': 'krasnodar',
+            'rostov': 'rostov', 'rostov-na-donu': 'rostov',
+            'samara': 'samara',
+            'chelyabinsk': 'chelyabinsk',
+            'voronezh': 'voronezh',
+            'omsk': 'omsk',
+            'krasnoyarsk': 'krasnoyarsk',
+            'tula': 'tula',
+            'tver': 'tver',
+            'kaliningrad': 'kaliningrad',
+            'tyumen': 'tyumen',
+            'irkutsk': 'irkutsk',
+            'perm': 'perm',
+            'ufa': 'bashkortostan', 'bashkortostan': 'bashkortostan',
+            'vladivostok': 'primorye', 'primorye': 'primorye',
+            'khabarovsk': 'khabarovsk',
+            'yaroslavl': 'yaroslavl',
+            'ryazan': 'ryazan',
+            'lipetsk': 'lipetsk',
+            'ivanovo': 'ivanovo',
+            'vladimir': 'vladimir',
+            'bryansk': 'bryansk',
+            'orel': 'orel',
+            'kursk': 'kursk',
+            'belgorod': 'belgorod',
+            'tambov': 'tambov',
+            'saratov': 'saratov',
+            'penza': 'penza',
+            'volgograd': 'volgograd',
+            'astrakhan': 'astrakhan',
+            'kaluga': 'kaluga',
+            'smolensk': 'smolensk',
+            'pskov': 'pskov',
+            'novgorod': 'novgorod',
+            'vologda': 'vologda',
+            'arkhangelsk': 'arkhangelsk',
+            'murmansk': 'murmansk',
+            'karelia': 'karelia',
+            'crimea': 'crimea', 'krym': 'crimea', 'simferopol': 'crimea',
+            'sevastopol': 'sevastopol',
+            'komi': 'komi',
+            'kirov': 'kirov',
+            'kostroma': 'kostroma',
+        }
+
         self.region = region
-        self.region_code = self.region_codes.get(region, '2')  # Default: SPB
+        self.region_code = self.region_codes.get(region, '1')  # Default: MSK (Moscow)
 
         logger.info(f"Регион: {region} (код: {self.region_code}), using_pool: {self.using_pool}")
 

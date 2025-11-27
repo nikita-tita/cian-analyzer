@@ -60,7 +60,7 @@ except ImportError as e:
         def detect_region_from_url(url):
             return None
         def detect_region_from_address(address):
-            return 'spb'  # fallback
+            return 'msk'  # fallback (основной регион ЦИАН)
 
 # Check if Playwright is available for PDF generation
 try:
@@ -836,8 +836,8 @@ def parse_url():
                 parsed_data['region'] = region
             else:
                 logger.warning(f"⚠️ Не удалось определить регион ни по URL, ни по адресу: {address}")
-                # Fallback на СПб
-                region = 'spb'
+                # Fallback на Москву (основной регион ЦИАН)
+                region = 'msk'
                 parsed_data['region'] = region
         else:
             parsed_data['region'] = region
@@ -962,14 +962,11 @@ def create_manual():
             'characteristics': {}
         }
 
-        # Пытаемся определить регион из адреса
-        address_lower = data['address'].lower()
-        if 'санкт-петербург' in address_lower or 'спб' in address_lower:
-            region = 'spb'
-        elif 'москва' in address_lower or 'мск' in address_lower:
-            region = 'msk'
-        else:
-            region = 'spb'  # По умолчанию
+        # Определяем регион из адреса (поддержка всех регионов)
+        region = detect_region_from_address(data['address'])
+        if not region:
+            logger.warning(f"⚠️ Не удалось определить регион для ручного ввода, используем: msk")
+            region = 'msk'  # По умолчанию Москва
 
         property_data['region'] = region
 
@@ -1100,8 +1097,8 @@ def find_similar():
                 address = target.get('address', '')
                 region = detect_region_from_address(address)
                 if not region:
-                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: spb")
-                    region = 'spb'
+                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: msk")
+                    region = 'msk'
 
         logger.info(f"🔍 Searching for similar properties (session: {session_id}, type: {search_type}, region: {region}, limit: {limit})")
 
@@ -1487,8 +1484,8 @@ def multi_source_search():
                 address = target.get('address', '')
                 region = detect_region_from_address(address)
                 if not region:
-                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: spb")
-                    region = 'spb'
+                    logger.warning(f"⚠️ Не удалось определить регион, используем fallback: msk")
+                    region = 'msk'
 
         logger.info(f"🔍 Multi-source search (sources: {sources}, region: {region}, strategy: {strategy}, limit: {limit_per_source})")
 
@@ -1640,7 +1637,7 @@ def add_comparable():
                 logger.info(f"✓ Регион аналога определен по адресу: {region}")
             else:
                 logger.warning(f"⚠️ Не удалось определить регион аналога по адресу: {address}")
-                region = 'spb'  # fallback
+                region = 'msk'  # fallback (основной регион ЦИАН)
 
         # КРИТИЧНО: Предупреждаем о несоответствии региона
         if region != target_region:
