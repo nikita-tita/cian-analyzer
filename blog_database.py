@@ -46,9 +46,16 @@ class BlogDatabase:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 is_published INTEGER DEFAULT 1,
-                view_count INTEGER DEFAULT 0
+                view_count INTEGER DEFAULT 0,
+                telegram_published INTEGER DEFAULT 0
             )
         ''')
+
+        # Add telegram_published column if it doesn't exist (migration)
+        try:
+            c.execute('ALTER TABLE blog_posts ADD COLUMN telegram_published INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         conn.commit()
         conn.close()
@@ -185,3 +192,46 @@ class BlogDatabase:
             'has_prev': page > 1,
             'has_next': page < total_pages
         }
+
+    def get_unpublished_telegram(self, limit: int = 1) -> List[Dict]:
+        """Get posts not yet published to Telegram"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        c.execute('''
+            SELECT * FROM blog_posts
+            WHERE is_published = 1 AND telegram_published = 0
+            ORDER BY created_at ASC
+            LIMIT ?
+        ''', (limit,))
+
+        rows = c.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def mark_telegram_published(self, post_id: int):
+        """Mark post as published to Telegram"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('''
+            UPDATE blog_posts
+            SET telegram_published = 1
+            WHERE id = ?
+        ''', (post_id,))
+
+        conn.commit()
+        conn.close()
+
+    def count_unpublished_telegram(self) -> int:
+        """Count posts not yet published to Telegram"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('SELECT COUNT(*) FROM blog_posts WHERE is_published = 1 AND telegram_published = 0')
+        count = c.fetchone()[0]
+        conn.close()
+
+        return count

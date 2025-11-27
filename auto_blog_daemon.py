@@ -46,7 +46,6 @@ def main(source: str = 'cian'):
     from yandex_journal_parser import YandexJournalParser
     from yandex_gpt import YandexGPT
     from blog_database import BlogDatabase
-    from telegram_publisher import TelegramPublisher
     from alert_bot import ParseResult, send_parse_report
 
     # Результат для отчёта
@@ -71,7 +70,6 @@ def main(source: str = 'cian'):
 
         gpt = YandexGPT()
         db = BlogDatabase()
-        tg = TelegramPublisher()
 
         # Текущее количество статей
         current_posts = db.get_all_posts()
@@ -147,23 +145,6 @@ def main(source: str = 'cian'):
                 result.articles_published_site += 1
                 logger.info(f"✓ Published to site: {rewritten['title']} (ID: {post_id})")
 
-                # Публикуем в Telegram канал
-                try:
-                    tg_success = tg.publish_post(
-                        title=rewritten['title'],
-                        content=rewritten['content'],
-                        slug=slug,
-                        excerpt=rewritten['excerpt']
-                    )
-                    if tg_success:
-                        result.articles_published_tg += 1
-                        logger.info(f"✓ Published to Telegram: {rewritten['title']}")
-                    else:
-                        result.errors.append(f"Не опубликовано в ТГ: {rewritten['title'][:30]}...")
-                except Exception as e:
-                    result.errors.append(f"Ошибка TG: {str(e)[:50]}")
-                    logger.error(f"Telegram publish failed: {e}")
-
             except Exception as e:
                 result.errors.append(f"Ошибка обработки: {str(e)[:50]}")
                 logger.error(f"Error processing article: {e}", exc_info=True)
@@ -171,8 +152,9 @@ def main(source: str = 'cian'):
 
         # Итоговая статистика
         final_posts = db.get_all_posts()
+        result.pending_telegram = db.count_unpublished_telegram()
         logger.info(f"Published {result.articles_published_site} new articles to site")
-        logger.info(f"Published {result.articles_published_tg} new articles to Telegram")
+        logger.info(f"Pending Telegram posts: {result.pending_telegram}")
         logger.info(f"Total posts in database: {len(final_posts)}")
         logger.info("Automated blog parsing completed")
         logger.info("=" * 60)

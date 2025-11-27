@@ -24,7 +24,7 @@ class ParseResult:
     articles_parsed: int = 0
     articles_rewritten: int = 0
     articles_published_site: int = 0
-    articles_published_tg: int = 0
+    pending_telegram: int = 0  # Статьи в очереди на публикацию в ТГ
     errors: List[str] = field(default_factory=list)
 
     @property
@@ -112,7 +112,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• Опубликовано в ТГ: {result.articles_published_tg}
+• В очереди на ТГ: {result.pending_telegram}
 
 🎉 Всё работает штатно!"""
 
@@ -135,7 +135,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• Опубликовано в ТГ: {result.articles_published_tg}
+• В очереди на ТГ: {result.pending_telegram}
 
 ❌ <b>Ошибки:</b>
 {errors_text}"""
@@ -159,7 +159,6 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• Опубликовано в ТГ: {result.articles_published_tg}
 
 ❌ <b>Ошибки:</b>
 {errors_text}
