@@ -126,6 +126,10 @@ class CianMagazineParserPlaywright:
                 page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 time.sleep(2)
 
+                # Скроллим для загрузки lazy-контента
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(1)
+
                 html = page.content()
                 soup = BeautifulSoup(html, 'html.parser')
 
@@ -133,11 +137,11 @@ class CianMagazineParserPlaywright:
                 title_elem = soup.find('h1')
                 title = title_elem.get_text(strip=True) if title_elem else None
 
-                # Ищем контент статьи - пробуем разные селекторы
+                # Ищем контент статьи - main содержит основной контент на CIAN
                 content_elem = (
-                    soup.find('article') or
+                    soup.find('main') or
                     soup.find('div', class_=re.compile(r'article|content|text|body', re.I)) or
-                    soup.find('main')
+                    soup.find('article')
                 )
 
                 if not content_elem:
@@ -151,8 +155,8 @@ class CianMagazineParserPlaywright:
 
                 for p in paragraphs:
                     text = p.get_text(strip=True)
-                    # Фильтруем короткие и служебные тексты
-                    if text and len(text) > 30:
+                    # Фильтруем короткие тексты и служебные (даты, кнопки)
+                    if text and len(text) > 50 and not re.match(r'^\d{1,2}\s', text):
                         content_parts.append(text)
 
                 content = '\n\n'.join(content_parts)
