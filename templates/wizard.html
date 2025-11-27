@@ -74,7 +74,7 @@
                             placeholder="https://www.cian.ru/sale/flat/123456789/"
                         >
                         <div class="form-text">
-                            <strong>Поддерживается:</strong> ЦИАН (Санкт-Петербург и Москва)
+                            <strong>Поддерживается:</strong> ЦИАН (вся Россия)
                         </div>
                     </div>
                     <button id="parse-btn" class="btn btn-dark btn-lg w-100">
@@ -98,6 +98,13 @@
                         <h5 class="mb-0">Введите данные объекта</h5>
                     </div>
                     <div class="card-body">
+                        <!-- Легенда и счётчик -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <small class="text-muted"><span class="text-danger">*</span> — обязательное поле</small>
+                            <small id="required-fields-counter" class="text-muted" style="display: none;">
+                                Осталось заполнить: <span class="fw-bold text-danger">0</span> полей
+                            </small>
+                        </div>
                         <form id="manual-property-form">
                             <div class="row">
                                 <!-- Адрес (обязательно) -->
@@ -111,8 +118,12 @@
                                         id="manual-address"
                                         placeholder="Санкт-Петербург, улица Ленина, 10"
                                         required
+                                        data-required="true"
+                                        data-min-length="5"
+                                        title="Укажите полный адрес (минимум 5 символов)"
                                     >
                                     <div class="form-text">Полный адрес для поиска похожих объектов</div>
+                                    <div class="invalid-feedback">Укажите адрес (минимум 5 символов)</div>
                                 </div>
 
                                 <!-- Цена -->
@@ -126,7 +137,12 @@
                                         id="manual-price"
                                         placeholder="15000000"
                                         required
+                                        data-required="true"
+                                        data-min="100000"
+                                        data-max="10000000000"
+                                        title="Укажите цену от 100 тыс. до 10 млрд ₽"
                                     >
+                                    <div class="invalid-feedback">Укажите цену (от 100 000 ₽)</div>
                                 </div>
 
                                 <!-- Площадь -->
@@ -141,7 +157,12 @@
                                         placeholder="75"
                                         step="0.1"
                                         required
+                                        data-required="true"
+                                        data-min="10"
+                                        data-max="1000"
+                                        title="Укажите площадь от 10 до 1000 м²"
                                     >
+                                    <div class="invalid-feedback">Укажите площадь (от 10 до 1000 м²)</div>
                                 </div>
 
                                 <!-- Комнаты -->
@@ -149,7 +170,7 @@
                                     <label for="manual-rooms" class="form-label fw-bold">
                                         Количество комнат <span class="text-danger">*</span>
                                     </label>
-                                    <select class="form-select" id="manual-rooms" required>
+                                    <select class="form-select" id="manual-rooms" required data-required="true" title="Выберите количество комнат">
                                         <option value="">Выберите...</option>
                                         <option value="Студия">Студия</option>
                                         <option value="1">1</option>
@@ -158,6 +179,7 @@
                                         <option value="4">4</option>
                                         <option value="5+">5+</option>
                                     </select>
+                                    <div class="invalid-feedback">Выберите количество комнат</div>
                                 </div>
 
                                 <!-- Этаж -->

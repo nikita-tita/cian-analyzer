@@ -24,10 +24,45 @@ const utils = {
         document.getElementById('loading-overlay').style.display = 'none';
     },
 
-    showToast(message, type = 'info') {
+    /**
+     * Show toast notification with configurable duration
+     * @param {string} message - Message to display
+     * @param {string} type - 'success', 'error', 'warning', 'info'
+     * @param {object} options - Optional: { duration, action: { text, onClick } }
+     */
+    showToast(message, type = 'info', options = {}) {
         const toast = document.getElementById('toast');
         const toastBody = document.getElementById('toast-body');
-        toastBody.textContent = message;
+
+        // Default durations based on type (in ms)
+        const defaultDurations = {
+            success: 5000,
+            info: 5000,
+            warning: 6000,
+            error: 8000  // Errors stay longer
+        };
+
+        const duration = options.duration || defaultDurations[type] || 5000;
+
+        // Build message with optional action button
+        if (options.action) {
+            toastBody.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${this.escapeHtml(message)}</span>
+                    <button class="btn btn-sm btn-outline-dark ms-2 toast-action-btn">${this.escapeHtml(options.action.text)}</button>
+                </div>
+            `;
+            // Attach click handler
+            const actionBtn = toastBody.querySelector('.toast-action-btn');
+            if (actionBtn && options.action.onClick) {
+                actionBtn.addEventListener('click', () => {
+                    options.action.onClick();
+                    bootstrap.Toast.getInstance(toast)?.hide();
+                });
+            }
+        } else {
+            toastBody.textContent = message;
+        }
 
         // Remove old toast type classes
         toast.classList.remove('toast-success', 'toast-error', 'toast-warning', 'toast-info');
@@ -35,7 +70,11 @@ const utils = {
         // Add new toast type class (for colored left border)
         toast.classList.add(`toast-${type}`);
 
-        const bsToast = new bootstrap.Toast(toast);
+        // Create toast with configured delay
+        const bsToast = new bootstrap.Toast(toast, {
+            delay: duration,
+            autohide: true
+        });
         bsToast.show();
     },
 
@@ -114,6 +153,45 @@ const utils = {
             headers['X-CSRFToken'] = state.csrfToken;
         }
         return headers;
+    },
+
+    /**
+     * Validate and normalize CIAN URL
+     * @param {string} url - URL to validate
+     * @returns {object} - { valid: boolean, url: string, error: string|null }
+     */
+    validateCianUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return { valid: false, url: null, error: 'invalid_cian_url' };
+        }
+
+        // Trim and lowercase for checking
+        const trimmedUrl = url.trim();
+
+        // Pattern for CIAN flat URLs (sale/flat with numeric ID)
+        // Supports any subdomain: www.cian.ru, spb.cian.ru, ekb.cian.ru, etc.
+        // Region is detected on backend from address, not from URL
+        const cianPattern = /^https?:\/\/([a-z0-9-]+\.)?cian\.ru\/sale\/flat\/\d+\/?$/i;
+
+        // First, try to normalize the URL
+        let normalizedUrl = trimmedUrl;
+
+        // If URL doesn't match pattern, try to fix common issues
+        if (!cianPattern.test(normalizedUrl)) {
+            // Check if it's a cian.ru URL without any subdomain
+            const noSubdomainPattern = /^https?:\/\/cian\.ru\/sale\/flat\/\d+\/?$/i;
+            if (noSubdomainPattern.test(normalizedUrl)) {
+                // Add www to the URL
+                normalizedUrl = normalizedUrl.replace(/^(https?:\/\/)cian\.ru/i, '$1www.cian.ru');
+            }
+        }
+
+        // Validate final URL
+        if (cianPattern.test(normalizedUrl)) {
+            return { valid: true, url: normalizedUrl, error: null };
+        }
+
+        return { valid: false, url: null, error: 'invalid_cian_url' };
     },
 
     /**
@@ -356,20 +434,173 @@ const screen1 = {
         document.getElementById('manual-input-btn').addEventListener('click', this.showManualForm.bind(this));
         document.getElementById('cancel-manual-btn').addEventListener('click', this.hideManualForm.bind(this));
         document.getElementById('manual-property-form').addEventListener('submit', this.submitManualForm.bind(this));
+
+        // Setup form validation
+        this.setupFormValidation();
     },
 
     showManualForm() {
         document.getElementById('manual-input-form').style.display = 'block';
         // Скроллим к форме
         document.getElementById('manual-input-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Update required fields counter
+        this.updateRequiredCounter();
     },
 
     hideManualForm() {
         document.getElementById('manual-input-form').style.display = 'none';
     },
 
+    // === FORM VALIDATION ===
+
+    requiredFields: [
+        { id: 'manual-address', name: 'Адрес', minLength: 5 },
+        { id: 'manual-price', name: 'Цена', min: 100000, max: 10000000000 },
+        { id: 'manual-area', name: 'Площадь', min: 10, max: 1000 },
+        { id: 'manual-rooms', name: 'Комнаты', isSelect: true }
+    ],
+
+    setupFormValidation() {
+        // Add blur validation to required fields
+        this.requiredFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                element.addEventListener('blur', () => this.validateField(field));
+                element.addEventListener('input', () => {
+                    // Remove error state on input
+                    element.classList.remove('is-invalid');
+                    this.updateRequiredCounter();
+                });
+                if (field.isSelect) {
+                    element.addEventListener('change', () => {
+                        element.classList.remove('is-invalid');
+                        this.updateRequiredCounter();
+                    });
+                }
+            }
+        });
+
+        // Initial counter update
+        this.updateRequiredCounter();
+    },
+
+    validateField(field) {
+        const element = document.getElementById(field.id);
+        if (!element) return true;
+
+        const value = element.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        if (field.isSelect) {
+            isValid = value !== '';
+            errorMessage = `Выберите ${field.name.toLowerCase()}`;
+        } else if (field.minLength) {
+            isValid = value.length >= field.minLength;
+            errorMessage = `${field.name}: минимум ${field.minLength} символов`;
+        } else if (field.min !== undefined) {
+            const numValue = parseFloat(value);
+            if (isNaN(numValue) || numValue < field.min) {
+                isValid = false;
+                errorMessage = `${field.name}: минимум ${field.min.toLocaleString('ru-RU')}`;
+            } else if (field.max && numValue > field.max) {
+                isValid = false;
+                errorMessage = `${field.name}: максимум ${field.max.toLocaleString('ru-RU')}`;
+            }
+        }
+
+        if (!isValid) {
+            element.classList.add('is-invalid');
+            element.classList.remove('is-valid');
+            // Update invalid-feedback text if exists
+            const feedback = element.parentElement.querySelector('.invalid-feedback');
+            if (feedback) feedback.textContent = errorMessage;
+        } else if (value) {
+            element.classList.remove('is-invalid');
+            element.classList.add('is-valid');
+        }
+
+        this.updateRequiredCounter();
+        return isValid;
+    },
+
+    validateAllFields() {
+        let allValid = true;
+        let firstInvalid = null;
+
+        this.requiredFields.forEach(field => {
+            const isValid = this.validateField(field);
+            if (!isValid && !firstInvalid) {
+                firstInvalid = document.getElementById(field.id);
+            }
+            if (!isValid) allValid = false;
+        });
+
+        // Scroll to first invalid field
+        if (firstInvalid) {
+            firstInvalid.focus();
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        return allValid;
+    },
+
+    getEmptyRequiredCount() {
+        let count = 0;
+        this.requiredFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                const value = element.value.trim();
+                if (!value || (field.min !== undefined && parseFloat(value) < field.min)) {
+                    count++;
+                }
+            }
+        });
+        return count;
+    },
+
+    updateRequiredCounter() {
+        const counter = document.getElementById('required-fields-counter');
+        if (!counter) return;
+
+        const emptyCount = this.getEmptyRequiredCount();
+        const countSpan = counter.querySelector('span');
+
+        if (emptyCount > 0) {
+            counter.style.display = 'block';
+            if (countSpan) {
+                // Склонение слова "поле"
+                let word = 'полей';
+                if (emptyCount === 1) word = 'поле';
+                else if (emptyCount >= 2 && emptyCount <= 4) word = 'поля';
+                countSpan.textContent = `${emptyCount} ${word}`;
+            }
+        } else {
+            counter.style.display = 'none';
+        }
+    },
+
     async submitManualForm(e) {
         e.preventDefault();
+
+        // Validate all required fields first
+        if (!this.validateAllFields()) {
+            const emptyCount = this.getEmptyRequiredCount();
+            utils.showToast(`Заполните обязательные поля (${emptyCount})`, 'warning', {
+                action: {
+                    text: 'Показать',
+                    onClick: () => {
+                        // Scroll to first invalid field
+                        const firstInvalid = document.querySelector('.is-invalid');
+                        if (firstInvalid) {
+                            firstInvalid.focus();
+                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                }
+            });
+            return;
+        }
 
         // Собираем данные из формы
         const rooms = document.getElementById('manual-rooms').value;
@@ -432,13 +663,22 @@ const screen1 = {
     },
 
     async parse() {
-        const url = document.getElementById('url-input').value.trim();
+        const rawUrl = document.getElementById('url-input').value.trim();
 
-        if (!url) {
+        if (!rawUrl) {
             utils.showToast('Введите URL объявления', 'warning');
             return;
         }
 
+        // Validate and normalize CIAN URL
+        const validation = utils.validateCianUrl(rawUrl);
+        if (!validation.valid) {
+            const errorData = getErrorMessage(validation.error);
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+            return;
+        }
+
+        const url = validation.url;
         pixelLoader.show('parsing');
 
         try {
@@ -753,13 +993,22 @@ const screen2 = {
     },
 
     async addComparable() {
-        const url = document.getElementById('add-comparable-input').value.trim();
+        const rawUrl = document.getElementById('add-comparable-input').value.trim();
 
-        if (!url) {
+        if (!rawUrl) {
             utils.showToast('Введите URL объявления', 'warning');
             return;
         }
 
+        // Validate and normalize CIAN URL
+        const validation = utils.validateCianUrl(rawUrl);
+        if (!validation.valid) {
+            const errorData = getErrorMessage(validation.error);
+            utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
+            return;
+        }
+
+        const url = validation.url;
         pixelLoader.show('searching');
 
         try {
