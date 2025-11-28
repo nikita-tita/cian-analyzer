@@ -2103,6 +2103,39 @@ class PlaywrightParser(BaseCianParser):
             logger.info("")
 
         # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВЕНЬ 0.5: ПОИСК ПО УЛИЦЕ (street_url из breadcrumbs)
+        # Самый точный способ найти аналоги - по geo-id улицы от ЦИАН
+        # URL вида: /kupit-1-komnatnuyu-kvartiru-moskva-proizvodstvennaya-ulica-021905
+        # ═══════════════════════════════════════════════════════════════════════════
+        street_url = target_property.get('street_url', '')
+        if street_url and len(final_results) < self.PREFERRED_RESULTS_THRESHOLD:
+            logger.info(f"🏠 УРОВЕНЬ 0.5: Поиск по улице (street_url)")
+            logger.info(f"   URL: {street_url[:100]}...")
+            try:
+                results_street = self.parse_search_page(street_url)
+                logger.info(f"   ✓ Найдено объявлений на улице: {len(results_street)}")
+
+                if results_street:
+                    # Валидируем и добавляем
+                    validated_street = self._validate_and_prepare_results(
+                        results_street, limit, target_property=target_property
+                    )
+                    # Добавляем только новые (не дубликаты)
+                    existing_urls = {r.get('url') for r in final_results}
+                    new_street_results = [r for r in validated_street if r.get('url') not in existing_urls]
+                    final_results.extend(new_street_results)
+                    logger.info(f"   ✅ УРОВЕНЬ 0.5: Добавлено {len(new_street_results)} аналогов с той же улицы")
+
+                    # Если достаточно аналогов - можно завершать
+                    if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
+                        logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+                        logger.info("=" * 80)
+                        return final_results[:limit]
+            except Exception as e:
+                logger.warning(f"   ⚠️ УРОВЕНЬ 0.5: Ошибка поиска по улице - {e}")
+            logger.info("")
+
+        # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 1: Поиск в том же районе/у того же метро
         # ═══════════════════════════════════════════════════════════════════════════
         logger.info("🎯 УРОВЕНЬ 1: Поиск аналогов в том же районе/у метро")

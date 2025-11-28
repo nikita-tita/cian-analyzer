@@ -149,6 +149,25 @@ class BaseCianParser(ABC):
                         if address_parts:
                             data['address'] = ', '.join(address_parts)
 
+            # НОВОЕ: Извлечение street_url из breadcrumbs для точного поиска аналогов
+            # URL вида: /kupit-1-komnatnuyu-kvartiru-moskva-proizvodstvennaya-ulica-021905
+            # Поддерживаемые типы: ulica, prospekt, pereulok, bulvar, shosse, naberezhnaya, ploshad, proezd, alleya
+            if not data.get('street_url'):
+                breadcrumbs_div = soup.find('div', {'data-name': 'OfferBreadcrumbs'})
+                if breadcrumbs_div:
+                    street_types = ['-ulica-', '-prospekt-', '-pereulok-', '-bulvar-', '-shosse-',
+                                    '-naberezhnaya-', '-ploshad-', '-proezd-', '-alleya-', '-tupik-']
+                    for link in breadcrumbs_div.find_all('a', href=True):
+                        href = link.get('href', '')
+                        # Ищем ссылку с улицей (содержит тип улицы и geo-id)
+                        has_street_type = any(st in href for st in street_types)
+                        has_geo_id = re.search(r'-\d{5,}$', href)
+                        if has_street_type and has_geo_id:
+                            street_url = href if href.startswith('http') else f"https://www.cian.ru{href}"
+                            data['street_url'] = street_url
+                            logger.info(f"✓ Найден street_url из breadcrumbs: {street_url[:80]}...")
+                            break
+
         # ЖК (Жилой комплекс)
         if not data.get('residential_complex'):
             # Пробуем разные варианты извлечения ЖК
