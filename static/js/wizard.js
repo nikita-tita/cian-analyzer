@@ -1820,117 +1820,78 @@ const screen3 = {
             return;
         }
 
-        // Группируем рекомендации по приоритету
-        const priorities = {
-            1: { label: 'КРИТИЧНО', emoji: '🔴', class: 'danger', recs: [] },
-            2: { label: 'ВАЖНО', emoji: '🟠', class: 'warning', recs: [] },
-            3: { label: 'СРЕДНЕ', emoji: '🟡', class: 'info', recs: [] },
-            4: { label: 'ИНФО', emoji: '🔵', class: 'secondary', recs: [] }
-        };
+        // Формируем компактный HTML — каждая рекомендация в одну строку с разворачиванием
+        let html = '<div class="recommendations-compact">';
 
-        recommendations.forEach(rec => {
-            const priority = rec.priority || 4;
-            if (priorities[priority]) {
-                priorities[priority].recs.push(rec);
+        recommendations.forEach((rec, index) => {
+            const icon = rec.icon || '💡';
+            const title = rec.title || '';
+            const summary = rec.summary || rec.title || '';
+            const message = rec.message || '';
+            const action = rec.action || '';
+            const expected = rec.expected_result || '';
+            const roi = rec.roi;
+            const financial = rec.financial_impact || {};
+            const recId = `rec-${index}`;
+
+            // Компактная строка рекомендации
+            html += `
+                <div class="rec-item mb-2">
+                    <div class="rec-header d-flex align-items-start"
+                         onclick="document.getElementById('${recId}').classList.toggle('show')"
+                         style="cursor: pointer; padding: 10px 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                        <span class="rec-icon me-2" style="font-size: 1.1em;">${icon}</span>
+                        <span class="rec-summary flex-grow-1" style="color: #333; line-height: 1.4;">${summary}</span>
+                        <span class="rec-toggle ms-2" style="color: #6c757d; font-size: 0.9em;">▼</span>
+                    </div>
+                    <div id="${recId}" class="rec-details collapse" style="padding: 12px 14px; background: #fff; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 6px 6px;">
+                        <div class="rec-detail-row mb-2">
+                            <strong style="color: #495057;">Подробнее:</strong>
+                            <p class="mb-1 mt-1" style="color: #666;">${message}</p>
+                        </div>
+                        <div class="rec-detail-row mb-2">
+                            <strong style="color: #495057;">Что делать:</strong>
+                            <p class="mb-1 mt-1" style="color: #666;">${action}</p>
+                        </div>
+                        <div class="rec-detail-row mb-2">
+                            <strong style="color: #28a745;">Результат:</strong>
+                            <p class="mb-0 mt-1" style="color: #28a745;">${expected}</p>
+                        </div>
+            `;
+
+            // ROI если есть
+            if (roi != null && Math.abs(roi) > 0) {
+                const roiClass = roi > 0 ? 'bg-success' : 'bg-danger';
+                html += `<div class="mb-2"><strong style="color: #495057;">ROI:</strong> <span class="badge ${roiClass}">${roi.toFixed(0)}%</span></div>`;
             }
+
+            // Финансовый эффект если есть
+            if (Object.keys(financial).length > 0) {
+                html += '<div class="rec-financial mt-2 p-2" style="background: #f8f9fa; border-radius: 4px;"><strong style="font-size: 0.9em;">Финансы:</strong><ul class="mb-0 mt-1" style="font-size: 0.85em; padding-left: 20px;">';
+                for (const [key, value] of Object.entries(financial)) {
+                    html += `<li>${key}: ${value}</li>`;
+                }
+                html += '</ul></div>';
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
         });
 
-        // Формируем HTML
-        let html = '';
-        for (let priority = 1; priority <= 4; priority++) {
-            const priorityData = priorities[priority];
-            const recs = priorityData.recs;
+        html += '</div>';
 
-            if (recs.length > 0) {
-                html += `
-                    <div class="recommendation-priority-group mb-4">
-                        <h6 class="mb-3">
-                            ${priorityData.emoji} <span class="badge bg-${priorityData.class}">${priorityData.label}</span>
-                        </h6>
-                `;
-
-                recs.forEach(rec => {
-                    const icon = rec.icon || '💡';
-                    const title = rec.title || '';
-                    const message = rec.message || '';
-                    const action = rec.action || '';
-                    const expected = rec.expected_result || '';
-                    const roi = rec.roi;
-                    const financial = rec.financial_impact || {};
-
-                    html += `
-                        <div class="card mb-3 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title">${icon} ${title}</h6>
-                                <p class="card-text"><strong>Проблема:</strong> ${message}</p>
-                                <p class="card-text"><strong>Действие:</strong> ${action}</p>
-                                <p class="card-text text-success"><strong>Ожидаемый результат:</strong> ${expected}</p>
-                    `;
-
-                    // ROI если есть
-                    if (roi != null && roi > 0) {
-                        html += `<p class="card-text"><strong>ROI:</strong> <span class="badge bg-success">${roi.toFixed(1)}%</span></p>`;
-                    }
-
-                    // Финансовый эффект если есть
-                    if (Object.keys(financial).length > 0) {
-                        html += '<div class="alert alert-light mt-2"><strong>Финансовый эффект:</strong><ul class="mb-0 mt-2">';
-
-                        // Маппинг технических названий на понятные
-                        const keyLabels = {
-                            'investment': 'Инвестиции',
-                            'views_increase_percent': 'Увеличение просмотров',
-                            'conversion_boost_percent': 'Увеличение конверсии',
-                            'estimated_time_reduction': 'Сокращение времени продажи',
-                            'expected_time': 'Ожидаемое время',
-                            'expected_time_months': 'Ожидаемое время',
-                            'торг_диапазон': 'Диапазон торга',
-                            'expected_value': 'Ожидаемый доход',
-                            'net_profit': 'Чистая прибыль',
-                            'probability_percent': 'Шансы продажи',
-                            'scenario': 'Сценарий',
-                            'difference': 'Разница',
-                            'explanation': 'Пояснение',
-                            'fast_scenario_expected': 'Быстрая продажа (ожидаемое)',
-                            'max_scenario_expected': 'Максимум (ожидаемое)'
-                        };
-
-                        for (const [key, value] of Object.entries(financial)) {
-                            const label = keyLabels[key] || key;
-
-                            if (typeof value === 'number') {
-                                if (Math.abs(value) > 1000) {
-                                    // Большие числа - это деньги
-                                    html += `<li><strong>${label}:</strong> ${utils.formatPrice(value)}</li>`;
-                                } else if (key.includes('percent')) {
-                                    // Проценты
-                                    html += `<li><strong>${label}:</strong> ${value}%</li>`;
-                                } else if (key.includes('months')) {
-                                    // Месяцы
-                                    html += `<li><strong>${label}:</strong> ${value} мес.</li>`;
-                                } else {
-                                    html += `<li><strong>${label}:</strong> ${value}</li>`;
-                                }
-                            } else {
-                                html += `<li><strong>${label}:</strong> ${value}</li>`;
-                            }
-                        }
-                        html += '</ul></div>';
-                    }
-
-                    html += `
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += `</div>`;
-            }
-        }
-
-        if (html === '') {
-            html = '<p class="text-muted">Нет рекомендаций для данного объекта</p>';
-        }
+        // Добавляем стили для анимации разворачивания
+        html += `
+            <style>
+                .rec-details.collapse:not(.show) { display: none; }
+                .rec-details.show { display: block; }
+                .rec-header:hover { background: #e9ecef !important; }
+                .rec-item .rec-header .rec-toggle { transition: transform 0.2s; }
+                .rec-item:has(.rec-details.show) .rec-toggle { transform: rotate(180deg); }
+            </style>
+        `;
 
         container.innerHTML = html;
     },
