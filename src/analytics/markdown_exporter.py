@@ -319,7 +319,7 @@ class MarkdownExporter:
             if max_price > fair_price * 1.03:
                 opportunities.append({
                     'title': 'Максимальная цена',
-                    'description': f'При идеальной подготовке (стейджинг, профессиональное фото, активное продвижение) можете продать за {self.format_price_millions(max_price)}.',
+                    'description': f'При идеальной подготовке (профессиональное фото, подготовка к показам, активное продвижение) можете продать за {self.format_price_millions(max_price)}.',
                     'benefit': f'Дополнительно +{self.format_price_millions(max_price - current_price)}'
                 })
 
@@ -540,7 +540,7 @@ class MarkdownExporter:
         md.append("")
         md.append("**Ваши действия:**")
         md.append(f"- Цена: {self.format_price_millions(premium_price)} ({self.format_number(premium_price)})")
-        md.append("- VIP-подготовка: стейджинг + профессиональная съемка + видео")
+        md.append("- VIP-подготовка: профессиональная съемка + видео + подготовка к показам")
         md.append("- Работа с риелтором для доступа к базе покупателей")
         md.append("- Терпение и готовность к долгому поиску \"своего\" покупателя")
         md.append("")
@@ -553,7 +553,7 @@ class MarkdownExporter:
 
         md.append("**Финансы:**")
         md.append(f"- Выручка: {self.format_number(premium_price)} (ожидаемая)")
-        md.append("- Расходы: ~40,000₽ (стейджинг + съемка + риелтор)")
+        md.append("- Расходы: ~40,000₽ (подготовка + съемка + риелтор)")
         md.append(f"- Чистая выручка: ~{self.format_number(premium_price - 40000)}")
         md.append(f"- **Преимущество:** +{self.format_number(premium_price - fast_price)} к сценарию А")
         md.append("")
