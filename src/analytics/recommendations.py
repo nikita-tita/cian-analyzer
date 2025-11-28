@@ -68,9 +68,44 @@ class RecommendationEngine:
     INFO = 4
 
     # Константы для расчетов
-    DESIGN_COST = 500_000  # Средняя стоимость дизайн-ремонта
     PHOTO_SESSION_COST = 15_000  # Профессиональная фотосессия
     OPPORTUNITY_RATE = 0.08  # Годовая ставка упущенной выгоды (дефолт)
+
+    # Стоимость ремонта за м² по уровням
+    RENOVATION_COST_PER_SQM = {
+        'черновая': 0,           # Начальная точка
+        'эконом': 30_000,        # Простой ремонт
+        'стандартная': 60_000,   # Стандартная отделка
+        'капитальная': 75_000,   # Капитальный ремонт
+        'улучшенная': 80_000,    # Улучшенная отделка
+        'премиум': 90_000,       # Премиум ремонт
+        'люкс': 120_000,         # Люкс отделка
+        'дизайнерская': 150_000, # Дизайнерский проект
+    }
+
+    # Стоимость демонтажа за м² (если нужно снести существующую отделку)
+    DEMOLITION_COST_PER_SQM = 15_000
+
+    # Стоимость хоумстейджинга (фиксированная)
+    HOMESTAGING_COST = 80_000
+
+    # Коэффициенты влияния уровня отделки на цену
+    REPAIR_COEFFICIENTS = {
+        'черновая': 0.90,
+        'эконом': 0.95,
+        'стандартная': 1.00,
+        'капитальная': 1.05,
+        'улучшенная': 1.08,
+        'премиум': 1.12,
+        'люкс': 1.15,
+        'дизайнерская': 1.18,
+    }
+
+    # Порядок уровней отделки (от низшего к высшему)
+    REPAIR_LEVELS_ORDER = [
+        'черновая', 'эконом', 'стандартная', 'капитальная',
+        'улучшенная', 'премиум', 'люкс', 'дизайнерская'
+    ]
 
     def __init__(self, analysis_result: Dict):
         """
@@ -224,84 +259,89 @@ class RecommendationEngine:
 
     def _check_improvements(self) -> List[Recommendation]:
         """
-        Проверка возможностей улучшения
+        Проверка возможностей улучшения отделки
 
-        Важные рекомендации по улучшениям с ROI
+        Рассчитывает ROI для разных вариантов:
+        1. Хоумстейджинг (минимальные затраты, ускорение продажи)
+        2. Переход на следующий уровень отделки
+        3. Сравнение всех вариантов с рекомендацией лучшего
         """
         recs = []
 
-        # Дизайн-ремонт
-        if not self.target.get('has_design', False):
-            area = self.target.get('total_area', 0)
-            current_price = self.target.get('price', 0)
+        area = self.target.get('total_area', 0)
+        current_price = self.target.get('price', 0)
+        current_repair = self.target.get('repair_level', 'стандартная')
 
-            # ИСПРАВЛЕНО: Реалистичная стоимость ремонта зависит от площади
-            # Средняя стоимость: 30-50 тыс/м² для дизайн-ремонта
-            cost_per_sqm = 40_000  # ₽/м²
-            cost = area * cost_per_sqm if area > 0 else self.DESIGN_COST
+        if not area or not current_price:
+            return recs
 
-            # ИСПРАВЛЕНО: Реалистичный прирост стоимости от премиум-ремонта: 5-10%
-            # (не 8% к цене/м², а 5-10% к общей стоимости)
-            realistic_premium = 0.08  # 8% прирост к стоимости
-            gain = current_price * realistic_premium if current_price > 0 else 0
+        # Нормализуем название уровня отделки
+        current_repair = current_repair.lower() if current_repair else 'стандартная'
+        if current_repair not in self.REPAIR_COEFFICIENTS:
+            current_repair = 'стандартная'
 
-            # ROI = (прирост - затраты) / затраты * 100%
-            roi = ((gain - cost) / cost * 100) if cost > 0 else 0
+        # Базовая цена (без учёта текущего ремонта)
+        current_coef = self.REPAIR_COEFFICIENTS.get(current_repair, 1.0)
+        base_price = current_price / current_coef if current_coef else current_price
 
-            # Только если ROI положительный (окупается)
-            if roi > 0:
-                net_profit = gain - cost
-                recs.append(Recommendation(
-                    priority=self.HIGH if roi > 20 else self.MEDIUM,
-                    icon='🎨',
-                    title='Дизайн-ремонт окупится',
-                    summary=f'Вложив {cost:,.0f} ₽ в ремонт, заработаете +{net_profit:,.0f} ₽',
-                    message=f'Инвестируя {cost:,.0f} ₽ в дизайнерскую отделку (~{cost_per_sqm:,.0f} ₽/м²), получите +{gain:,.0f} ₽ к стоимости.',
-                    action='Заказать дизайн-проект и ремонт',
-                    expected_result=f'ROI: {roi:.0f}%. Прирост стоимости: {realistic_premium*100:.0f}%.',
-                    roi=roi,
-                    category='improvement',
-                    financial_impact={
-                        'Инвестиция': f'{cost:,.0f} ₽',
-                        'Стоимость за м²': f'{cost_per_sqm:,.0f} ₽/м²',
-                        'Прирост стоимости': f'{gain:,.0f} ₽',
-                        'Чистая прибыль': f'{gain - cost:,.0f} ₽',
-                        'Срок окупаемости': 'При продаже'
-                    }
+        # Определяем текущий индекс уровня
+        try:
+            current_idx = self.REPAIR_LEVELS_ORDER.index(current_repair)
+        except ValueError:
+            current_idx = 2  # стандартная по умолчанию
+
+        # Нужен ли демонтаж (если уже есть отделка выше черновой)
+        needs_demolition = current_repair not in ['черновая', 'эконом']
+
+        # === Вариант 1: Хоумстейджинг ===
+        homestaging_rec = self._calc_homestaging_option(current_price, current_repair)
+        if homestaging_rec:
+            recs.append(homestaging_rec)
+
+        # === Варианты 2+: Переход на более высокий уровень ===
+        renovation_options = []
+
+        for target_level in self.REPAIR_LEVELS_ORDER[current_idx + 1:]:
+            option = self._calc_renovation_option(
+                area=area,
+                base_price=base_price,
+                current_repair=current_repair,
+                target_repair=target_level,
+                needs_demolition=needs_demolition
+            )
+            if option:
+                renovation_options.append(option)
+
+        # Сортируем по ROI и выбираем лучшие
+        profitable_options = [o for o in renovation_options if o['roi'] > 0]
+        unprofitable_options = [o for o in renovation_options if o['roi'] <= 0]
+
+        if profitable_options:
+            # Есть выгодные варианты — показываем лучший
+            best = max(profitable_options, key=lambda x: x['roi'])
+            recs.append(self._create_renovation_recommendation(best, is_profitable=True))
+
+            # Если есть ещё варианты — добавляем инфо о сравнении
+            if len(profitable_options) > 1:
+                recs.append(self._create_comparison_recommendation(profitable_options, is_profitable=True))
+        else:
+            # Нет выгодных вариантов — показываем сводку и рекомендацию
+            if unprofitable_options:
+                recs.append(self._create_no_renovation_recommendation(
+                    unprofitable_options, current_repair
                 ))
-            else:
-                # ROI отрицательный - не окупится
-                loss = cost - gain
-                recs.append(Recommendation(
-                    priority=self.MEDIUM,
-                    icon='🎨',
-                    title='Дизайн-ремонт не окупится',
-                    summary=f'Ремонт обойдётся в {cost:,.0f} ₽, а прибавит только {gain:,.0f} ₽ — убыток {loss:,.0f} ₽',
-                    message=f'Инвестиция {cost:,.0f} ₽ даст прирост всего {gain:,.0f} ₽. ROI: {roi:.0f}% (убыток {abs(gain - cost):,.0f} ₽).',
-                    action='Продавать как есть или сделать косметический ремонт',
-                    expected_result='Экономия средств на ремонте',
-                    roi=roi,
-                    category='improvement',
-                    financial_impact={
-                        'Инвестиция': f'{cost:,.0f} ₽',
-                        'Прирост стоимости': f'{gain:,.0f} ₽',
-                        'Чистый убыток': f'{cost - gain:,.0f} ₽',
-                        'Рекомендация': 'Не делать дорогой ремонт перед продажей'
-                    }
-                ))
 
-        # Парковка (если премиум и нет парковки)
+        # === Парковка (если премиум и нет парковки) ===
         if self.target.get('premium_location') and not self.target.get('parking'):
-            area = self.target.get('total_area', 0)
             base_price_per_sqm = self.fair_price_analysis.get('base_price_per_sqm', 0)
-            parking_premium = area * base_price_per_sqm * 0.04  # +4% за парковку
+            parking_premium = area * base_price_per_sqm * 0.04
 
             recs.append(Recommendation(
                 priority=self.HIGH,
                 icon='🚗',
                 title='Добавьте парковку',
                 summary=f'Парковка в премиум-локации добавит +{parking_premium:,.0f} ₽ к стоимости',
-                message=f'В премиум локации наличие парковки критично. Добавит {parking_premium:,.0f} ₽ к стоимости.',
+                message=f'В премиум локации наличие парковки критично.',
                 action='Арендовать или купить машиноместо в доме',
                 expected_result='Увеличение привлекательности для покупателей на 40%',
                 category='improvement',
@@ -311,21 +351,244 @@ class RecommendationEngine:
                 }
             ))
 
-        # Высокие потолки (если низкие и премиум)
-        ceiling = self.target.get('ceiling_height', 2.7)
-        if ceiling < 2.8 and self.target.get('total_area', 0) > 100:
-            recs.append(Recommendation(
-                priority=self.MEDIUM,
-                icon='📏',
-                title='Укажите высоту потолков',
-                summary='Если потолки выше 2.8м — укажите это в объявлении',
-                message='Если потолки выше 2.8м, обязательно укажите это в описании.',
-                action='Проверить фактическую высоту и добавить в характеристики',
-                expected_result='Дополнительная привлекательность для сегмента покупателей',
-                category='improvement'
-            ))
-
         return recs
+
+    def _calc_homestaging_option(self, current_price: float, current_repair: str) -> Optional[Recommendation]:
+        """Рассчитать вариант хоумстейджинга"""
+        # Хоумстейджинг не меняет цену, но ускоряет продажу на 1-2 месяца
+        cost = self.HOMESTAGING_COST
+
+        # Экономия = стоимость денег во времени
+        time_saved_months = 1.5
+        monthly_rate = self.opportunity_rate / 12
+        time_value = current_price * monthly_rate * time_saved_months
+
+        # ROI от ускорения продажи
+        roi = ((time_value - cost) / cost * 100) if cost > 0 else 0
+
+        # Хоумстейджинг особенно полезен для стандартной и ниже отделки
+        is_recommended = current_repair in ['черновая', 'эконом', 'стандартная', 'капитальная']
+
+        if not is_recommended:
+            return None
+
+        return Recommendation(
+            priority=self.MEDIUM if roi > 0 else self.INFO,
+            icon='🏠',
+            title='Хоумстейджинг',
+            summary=f'Вложив {cost:,.0f} ₽, ускорите продажу на 1-2 месяца',
+            message=(
+                f'Хоумстейджинг (декор, освещение, мелкий ремонт) не повышает цену, '
+                f'но ускоряет продажу на 1-2 месяца. Экономия на упущенной выгоде: {time_value:,.0f} ₽.'
+            ),
+            action='Заказать услугу хоумстейджинга или сделать самостоятельно',
+            expected_result='Ускорение продажи без крупных вложений',
+            roi=roi,
+            category='improvement',
+            financial_impact={
+                'Инвестиция': f'{cost:,.0f} ₽',
+                'Прирост цены': '0 ₽ (не влияет на цену)',
+                'Ускорение продажи': f'{time_saved_months} мес.',
+                'Экономия на упущенной выгоде': f'{time_value:,.0f} ₽',
+                'Чистая выгода': f'{time_value - cost:,.0f} ₽'
+            }
+        )
+
+    def _calc_renovation_option(
+        self,
+        area: float,
+        base_price: float,
+        current_repair: str,
+        target_repair: str,
+        needs_demolition: bool
+    ) -> Optional[Dict]:
+        """Рассчитать вариант перехода на другой уровень отделки"""
+
+        target_cost_per_sqm = self.RENOVATION_COST_PER_SQM.get(target_repair, 0)
+        if not target_cost_per_sqm:
+            return None
+
+        # Стоимость ремонта
+        renovation_cost = area * target_cost_per_sqm
+
+        # Добавляем демонтаж если нужно
+        demolition_cost = 0
+        if needs_demolition:
+            demolition_cost = area * self.DEMOLITION_COST_PER_SQM
+
+        total_cost = renovation_cost + demolition_cost
+
+        # Новая цена после ремонта
+        target_coef = self.REPAIR_COEFFICIENTS.get(target_repair, 1.0)
+        new_price = base_price * target_coef
+
+        # Прирост цены
+        current_coef = self.REPAIR_COEFFICIENTS.get(current_repair, 1.0)
+        current_price_calc = base_price * current_coef
+        price_gain = new_price - current_price_calc
+
+        # ROI
+        roi = ((price_gain - total_cost) / total_cost * 100) if total_cost > 0 else 0
+        net_profit = price_gain - total_cost
+
+        return {
+            'target_repair': target_repair,
+            'renovation_cost': renovation_cost,
+            'demolition_cost': demolition_cost,
+            'total_cost': total_cost,
+            'cost_per_sqm': target_cost_per_sqm,
+            'price_gain': price_gain,
+            'new_price': new_price,
+            'roi': roi,
+            'net_profit': net_profit,
+            'needs_demolition': needs_demolition
+        }
+
+    def _create_renovation_recommendation(self, option: Dict, is_profitable: bool) -> Recommendation:
+        """Создать рекомендацию по ремонту"""
+        target = option['target_repair']
+        cost = option['total_cost']
+        gain = option['price_gain']
+        roi = option['roi']
+        net = option['net_profit']
+
+        level_names = {
+            'черновая': 'черновую',
+            'эконом': 'эконом',
+            'стандартная': 'стандартную',
+            'капитальная': 'капитальную',
+            'улучшенная': 'улучшенную',
+            'премиум': 'премиум',
+            'люкс': 'люкс',
+            'дизайнерская': 'дизайнерскую'
+        }
+        target_name = level_names.get(target, target)
+
+        if is_profitable:
+            return Recommendation(
+                priority=self.HIGH if roi > 20 else self.MEDIUM,
+                icon='🎨',
+                title=f'Ремонт до уровня «{target}» окупится',
+                summary=f'Вложив {cost:,.0f} ₽, заработаете +{net:,.0f} ₽ (ROI: {roi:.0f}%)',
+                message=(
+                    f'Сделав {target_name} отделку за {cost:,.0f} ₽, '
+                    f'увеличите стоимость на {gain:,.0f} ₽. Чистая прибыль: {net:,.0f} ₽.'
+                ),
+                action=f'Сделать ремонт до уровня «{target}»',
+                expected_result=f'ROI: {roi:.0f}%. Прирост стоимости: {gain:,.0f} ₽',
+                roi=roi,
+                category='improvement',
+                financial_impact={
+                    'Целевой уровень': target.capitalize(),
+                    'Стоимость ремонта': f'{option["renovation_cost"]:,.0f} ₽',
+                    'Демонтаж': f'{option["demolition_cost"]:,.0f} ₽' if option['needs_demolition'] else 'Не требуется',
+                    'Итого инвестиция': f'{cost:,.0f} ₽',
+                    'Прирост цены': f'{gain:,.0f} ₽',
+                    'Чистая прибыль': f'{net:,.0f} ₽',
+                    'ROI': f'{roi:.0f}%'
+                }
+            )
+        else:
+            return Recommendation(
+                priority=self.MEDIUM,
+                icon='🎨',
+                title=f'Ремонт до «{target}» не окупится',
+                summary=f'Вложение {cost:,.0f} ₽ даст прирост только {gain:,.0f} ₽ — убыток {abs(net):,.0f} ₽',
+                message=(
+                    f'Переход на {target_name} отделку обойдётся в {cost:,.0f} ₽, '
+                    f'но цена вырастет только на {gain:,.0f} ₽. '
+                    f'Лучше продавать как есть или сделать хоумстейджинг.'
+                ),
+                action='Продавать как есть или ограничиться хоумстейджингом',
+                expected_result='Экономия на ремонте, который не окупится',
+                roi=roi,
+                category='improvement',
+                financial_impact={
+                    'Целевой уровень': target.capitalize(),
+                    'Стоимость ремонта': f'{option["renovation_cost"]:,.0f} ₽',
+                    'Демонтаж': f'{option["demolition_cost"]:,.0f} ₽' if option['needs_demolition'] else 'Не требуется',
+                    'Итого инвестиция': f'{cost:,.0f} ₽',
+                    'Прирост цены': f'{gain:,.0f} ₽',
+                    'Убыток': f'{abs(net):,.0f} ₽',
+                    'ROI': f'{roi:.0f}%',
+                    'Рекомендация': 'Не делать дорогой ремонт'
+                }
+            )
+
+    def _create_comparison_recommendation(self, options: List[Dict], is_profitable: bool = True) -> Recommendation:
+        """Создать рекомендацию со сравнением вариантов"""
+        comparison_lines = []
+        sorted_opts = sorted(options, key=lambda x: -x['roi'])[:3]
+
+        for opt in sorted_opts:
+            if is_profitable:
+                comparison_lines.append(
+                    f"• {opt['target_repair'].capitalize()}: вложить {opt['total_cost']:,.0f} ₽ → прибыль {opt['net_profit']:,.0f} ₽ (ROI {opt['roi']:.0f}%)"
+                )
+            else:
+                comparison_lines.append(
+                    f"• {opt['target_repair'].capitalize()}: вложить {opt['total_cost']:,.0f} ₽ → убыток {abs(opt['net_profit']):,.0f} ₽ (ROI {opt['roi']:.0f}%)"
+                )
+
+        return Recommendation(
+            priority=self.INFO,
+            icon='📊',
+            title='Сравнение вариантов ремонта',
+            summary='Есть несколько выгодных вариантов — смотрите детали' if is_profitable else 'Ни один вариант ремонта не окупится',
+            message=('Выгодные варианты:\n' if is_profitable else 'Варианты ремонта (все убыточные):\n') + '\n'.join(comparison_lines),
+            action='Выбрать оптимальный вариант исходя из бюджета и сроков' if is_profitable else 'Продавать как есть или сделать хоумстейджинг',
+            expected_result='Осознанный выбор уровня отделки',
+            category='improvement',
+            financial_impact={
+                f'Вариант {i+1} ({opt["target_repair"]})': f'ROI {opt["roi"]:.0f}%'
+                for i, opt in enumerate(sorted_opts)
+            }
+        )
+
+    def _create_no_renovation_recommendation(self, options: List[Dict], current_repair: str) -> Recommendation:
+        """Создать рекомендацию когда ремонт не окупается"""
+        # Сортируем по ROI (наименее убыточный первый)
+        sorted_opts = sorted(options, key=lambda x: -x['roi'])
+
+        # Формируем сводку по вариантам
+        comparison_lines = []
+        for opt in sorted_opts[:3]:
+            comparison_lines.append(
+                f"• {opt['target_repair'].capitalize()}: {opt['total_cost']:,.0f} ₽ → убыток {abs(opt['net_profit']):,.0f} ₽"
+            )
+
+        # Рекомендация зависит от текущего уровня
+        if current_repair in ['черновая', 'эконом']:
+            action = 'Продавать как есть по сниженной цене или сделать минимальный косметический ремонт'
+            result = 'Экономия на ремонте, который не окупится. Быстрее выйти из сделки.'
+        else:
+            action = 'Продавать в текущем состоянии или ограничиться хоумстейджингом'
+            result = 'Хоумстейджинг ускорит продажу без крупных вложений'
+
+        return Recommendation(
+            priority=self.MEDIUM,
+            icon='🎨',
+            title='Ремонт перед продажей не окупится',
+            summary=f'При текущей отделке «{current_repair}» любой ремонт убыточен — лучше продавать как есть',
+            message=(
+                f'Проанализированы варианты улучшения отделки. '
+                f'Ни один не окупится из-за высокой стоимости работ:\n' +
+                '\n'.join(comparison_lines)
+            ),
+            action=action,
+            expected_result=result,
+            roi=sorted_opts[0]['roi'] if sorted_opts else 0,
+            category='improvement',
+            financial_impact={
+                'Текущая отделка': current_repair.capitalize(),
+                'Лучший вариант': f"{sorted_opts[0]['target_repair'].capitalize()} (ROI {sorted_opts[0]['roi']:.0f}%)" if sorted_opts else 'Нет',
+                'Наш совет': 'Хоумстейджинг или продажа как есть',
+                **{
+                    f"{opt['target_repair'].capitalize()}": f"Убыток {abs(opt['net_profit']):,.0f} ₽"
+                    for opt in sorted_opts[:3]
+                }
+            }
+        )
 
     def _check_presentation(self) -> List[Recommendation]:
         """
