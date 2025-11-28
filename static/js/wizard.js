@@ -1469,6 +1469,9 @@ const screen3 = {
 
             document.getElementById('analysis-results').style.display = 'block';
 
+            // ВЕРДИКТ — главный вывод (первым!)
+            this.renderVerdict(analysis);
+
             // Сводная информация
             this.renderSummary(analysis);
 
@@ -1511,6 +1514,88 @@ const screen3 = {
                 `;
             }
         }
+    },
+
+    renderVerdict(analysis) {
+        const container = document.getElementById('verdict-block');
+        const target = analysis.target_property;
+        const fairPrice = analysis.fair_price_analysis;
+
+        // Если нет данных для расчёта - скрываем блок
+        if (!fairPrice || fairPrice.status === 'insufficient_data') {
+            container.innerHTML = '';
+            return;
+        }
+
+        const currentPrice = target.price || 0;
+        const marketPrice = fairPrice.fair_price_total || 0;
+        const diffAmount = fairPrice.price_diff_amount || 0;
+        const diffPercent = fairPrice.price_diff_percent || 0;
+
+        // Определяем статус
+        let statusBadge, statusClass, recommendation;
+        if (fairPrice.is_overpriced) {
+            statusBadge = '⚠️ ПЕРЕОЦЕНЕНА';
+            statusClass = 'overpriced';
+            recommendation = 'Рекомендуем снизить цену для быстрой продажи или приготовиться к торгу';
+        } else if (fairPrice.is_underpriced) {
+            statusBadge = '💰 ВЫГОДНАЯ ЦЕНА';
+            statusClass = 'underpriced';
+            recommendation = 'Цена ниже рынка — высокие шансы на быструю продажу или возможность поднять цену';
+        } else {
+            statusBadge = '✓ В РЫНКЕ';
+            statusClass = 'fair';
+            recommendation = 'Цена соответствует рынку — объект конкурентоспособен';
+        }
+
+        // Форматируем адрес
+        const addressParts = [];
+        if (target.address) addressParts.push(target.address);
+        if (target.total_area) addressParts.push(`${target.total_area} м²`);
+        if (target.rooms) addressParts.push(`${target.rooms}-комн.`);
+        const subtitle = addressParts.join(' • ');
+
+        container.innerHTML = `
+            <div class="verdict-card" style="border: 2px solid #1A1A1A; background: #fff;">
+                <div class="verdict-header" style="background: #F9FAFB; padding: 16px 20px; border-bottom: 1px solid #E5E7EB;">
+                    <div>
+                        <span style="font-size: 20px; margin-right: 8px;">🏠</span>
+                        <span style="font-weight: 600; font-size: 15px;">Ваша квартира</span>
+                    </div>
+                    <div style="color: #6B7280; font-size: 13px; margin-top: 4px;">${subtitle}</div>
+                </div>
+
+                <div class="verdict-body" style="padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 16px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 12px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Цена продавца</div>
+                            <div style="font-size: 22px; font-weight: 700; color: #1A1A1A;">${utils.formatPrice(currentPrice)}</div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-size: 12px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Рыночная цена</div>
+                            <div style="font-size: 22px; font-weight: 700; color: #1A1A1A;">${utils.formatPrice(marketPrice)}</div>
+                        </div>
+                    </div>
+
+                    <div style="background: #F3F4F6; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 13px; color: #6B7280;">Разница</span>
+                        <span style="font-weight: 700; font-size: 16px;">
+                            ${diffAmount > 0 ? '+' : ''}${utils.formatPrice(diffAmount)}
+                            (${diffAmount > 0 ? '+' : ''}${utils.formatNumber(diffPercent, 0)}%)
+                        </span>
+                    </div>
+                </div>
+
+                <div style="padding: 16px; text-align: center; border-top: 1px solid #E5E7EB;">
+                    <div class="verdict-status-badge ${statusClass}" style="display: inline-block; padding: 8px 20px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; ${statusClass === 'overpriced' ? 'background: #1A1A1A; color: #fff;' : statusClass === 'underpriced' ? 'background: #F3F4F6; color: #1A1A1A; border: 1px solid #1A1A1A;' : 'background: #fff; color: #1A1A1A; border: 2px solid #1A1A1A;'}">
+                        ${statusBadge}
+                    </div>
+                    <div style="font-size: 13px; color: #4A4A4A; line-height: 1.5; max-width: 400px; margin: 0 auto;">
+                        ${recommendation}
+                    </div>
+                </div>
+            </div>
+        `;
     },
 
     renderSummary(analysis) {
