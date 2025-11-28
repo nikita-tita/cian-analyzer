@@ -10,7 +10,7 @@ import logging
 import urllib.request
 import urllib.parse
 import json
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -406,8 +406,8 @@ class ManualPropertyInput(BaseModel):
     total_area: float = Field(..., gt=1, lt=10000, description="Общая площадь в м²")
     rooms: str = Field(..., description="Количество комнат")
     floor: str = Field(default='', max_length=20, description="Этаж в формате N/M")
-    living_area: float = Field(default=None, gt=0, lt=10000, description="Жилая площадь в м²")
-    kitchen_area: float = Field(default=None, gt=0, lt=500, description="Площадь кухни в м²")
+    living_area: Optional[float] = Field(default=None, gt=0, lt=10000, description="Жилая площадь в м²")
+    kitchen_area: Optional[float] = Field(default=None, gt=0, lt=500, description="Площадь кухни в м²")
     repair_level: str = Field(default='стандартная', max_length=50)
     view_type: str = Field(default='улица', max_length=50)
 

@@ -93,6 +93,22 @@ const utils = {
     },
 
     /**
+     * Parse number from input, handling locale differences (comma vs dot)
+     * Fixes issue where Russian locale uses comma as decimal separator
+     * @param {string} value - Input value to parse
+     * @returns {number|null} - Parsed number or null if invalid/empty
+     */
+    parseLocalizedNumber(value) {
+        if (value === null || value === undefined) return null;
+        const str = String(value).trim();
+        if (str === '') return null;
+        // Replace comma with dot for Russian locale compatibility
+        const normalized = str.replace(',', '.');
+        const num = parseFloat(normalized);
+        return isNaN(num) ? null : num;
+    },
+
+    /**
      * SECURITY: Escape HTML to prevent XSS
      * Используется для текста, который не должен содержать HTML
      */
@@ -624,10 +640,10 @@ const screen1 = {
             return;
         }
 
-        // Собираем данные из формы
+        // Собираем данные из формы (используем parseLocalizedNumber для поддержки русской локали)
         const rooms = document.getElementById('manual-rooms').value;
-        const total_area = parseFloat(document.getElementById('manual-area').value);
-        const price_raw = parseFloat(document.getElementById('manual-price').value);
+        const total_area = utils.parseLocalizedNumber(document.getElementById('manual-area').value);
+        const price_raw = utils.parseLocalizedNumber(document.getElementById('manual-price').value);
 
         const formData = {
             address: document.getElementById('manual-address').value.trim(),
@@ -635,8 +651,8 @@ const screen1 = {
             total_area: total_area,
             rooms: rooms,
             floor: document.getElementById('manual-floor').value.trim(),
-            living_area: parseFloat(document.getElementById('manual-living-area').value) || null,
-            kitchen_area: parseFloat(document.getElementById('manual-kitchen-area').value) || null,
+            living_area: utils.parseLocalizedNumber(document.getElementById('manual-living-area').value),
+            kitchen_area: utils.parseLocalizedNumber(document.getElementById('manual-kitchen-area').value),
             repair_level: document.getElementById('manual-repair').value || 'стандартная',
             view_type: document.getElementById('manual-view').value || 'улица'
         };

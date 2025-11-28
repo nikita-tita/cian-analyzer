@@ -167,11 +167,12 @@
                                         Жилая площадь (м²)
                                     </label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputmode="decimal"
                                         class="form-control"
                                         id="manual-living-area"
                                         placeholder="55"
-                                        step="0.1"
+                                        pattern="[0-9]*[.,]?[0-9]*"
                                     >
                                 </div>
 
@@ -181,11 +182,12 @@
                                         Площадь кухни (м²)
                                     </label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputmode="decimal"
                                         class="form-control"
                                         id="manual-kitchen-area"
                                         placeholder="12"
-                                        step="0.1"
+                                        pattern="[0-9]*[.,]?[0-9]*"
                                     >
                                 </div>
 

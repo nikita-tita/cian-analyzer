@@ -351,6 +351,16 @@ body {
     font-size: 16px;
 }
 
+/* Select dropdown - ensure clickability */
+.form-select {
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    appearance: menulist;
+}
+
 .form-control:focus, .form-select:focus {
     border-color: var(--black);
     box-shadow: none;
