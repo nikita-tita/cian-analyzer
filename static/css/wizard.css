@@ -1688,6 +1688,57 @@ canvas {
     line-height: 1.4;
 }
 
+/* Tooltips */
+.metric-label[data-tooltip] {
+    position: relative;
+    cursor: help;
+    border-bottom: 1px dotted var(--gray-medium);
+}
+
+.metric-label[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--black);
+    color: var(--white);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+    white-space: normal;
+    width: max-content;
+    max-width: 220px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.metric-label[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--black);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    z-index: 100;
+}
+
+.metric-label[data-tooltip]:hover::after,
+.metric-label[data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
     .quality-indicator {
@@ -1698,5 +1749,16 @@ canvas {
         flex-direction: column;
         align-items: flex-start;
         gap: 4px;
+    }
+
+    .metric-label[data-tooltip]::after {
+        max-width: 180px;
+        left: 0;
+        transform: none;
+    }
+
+    .metric-label[data-tooltip]::before {
+        left: 20px;
+        transform: none;
     }
 }

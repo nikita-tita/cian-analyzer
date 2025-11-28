@@ -1723,19 +1723,19 @@ const screen3 = {
                 <div class="scenario-description">${scenario.description}</div>
                 <div class="scenario-metrics">
                     <div class="metric-item">
-                        <div class="metric-label">Начальная цена</div>
+                        <div class="metric-label" data-tooltip="Цена, с которой вы выйдете на рынок">Начальная цена</div>
                         <div class="metric-value">${utils.formatPrice(scenario.start_price)}</div>
                     </div>
                     <div class="metric-item">
-                        <div class="metric-label">Ожидаемая итоговая</div>
+                        <div class="metric-label" data-tooltip="Средняя цена продажи с учётом возможного торга">Ожидаемая итоговая</div>
                         <div class="metric-value text-success">${utils.formatPrice(scenario.expected_final_price)}</div>
                     </div>
                     <div class="metric-item">
-                        <div class="metric-label">Шансы продажи</div>
+                        <div class="metric-label" data-tooltip="Вероятность продать за указанный срок">Шансы продажи</div>
                         <div class="metric-value">${Math.round(scenario.base_probability / 10)} из 10</div>
                     </div>
                     <div class="metric-item">
-                        <div class="metric-label">Чистый доход</div>
+                        <div class="metric-label" data-tooltip="Сумма на руки: цена минус комиссии, налоги и упущенная выгода">Чистый доход</div>
                         <div class="metric-value">${utils.formatPrice(scenario.financials.net_after_opportunity)}</div>
                     </div>
                 </div>
