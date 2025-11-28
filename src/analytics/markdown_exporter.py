@@ -188,17 +188,63 @@ class MarkdownExporter:
                     for rec in recs:
                         icon = rec.get('icon', '💡')
                         title = rec.get('title', '')
+                        summary = rec.get('summary', '')
                         message = rec.get('message', '')
                         action = rec.get('action', '')
+                        expected_result = rec.get('expected_result', '')
                         roi = rec.get('roi', 0)
+                        financial_impact = rec.get('financial_impact', {})
+                        category = rec.get('category', '')
 
                         md.append(f"**{icon} {title}**")
+
+                        # Краткое описание
+                        if summary:
+                            md.append(f"> {summary}")
+                            md.append("")
+
+                        # Детали
                         if message:
-                            md.append(f"- {message}")
+                            # Для многострочных сообщений (сравнение вариантов)
+                            if '\n' in message:
+                                md.append("**Детали:**")
+                                for line in message.split('\n'):
+                                    md.append(f"{line}")
+                            else:
+                                md.append(f"- {message}")
+
+                        # Финансовые детали - разворачиваем полностью
+                        if financial_impact:
+                            md.append("")
+                            md.append("**Финансы:**")
+
+                            # Для категории improvement (ремонт) - выводим таблицей
+                            if category == 'improvement' and len(financial_impact) > 3:
+                                md.append("")
+                                md.append("| Параметр | Значение |")
+                                md.append("|----------|----------|")
+                                for key, value in financial_impact.items():
+                                    md.append(f"| {key} | {value} |")
+                            else:
+                                # Для остальных - списком
+                                for key, value in financial_impact.items():
+                                    md.append(f"- {key}: {value}")
+
+                        # Действие
                         if action:
-                            md.append(f"- **Действие:** {action}")
-                        if roi and roi > 0:
-                            md.append(f"- **Потенциальная выгода:** {self.format_number(roi)}")
+                            md.append("")
+                            md.append(f"**Что делать:** {action}")
+
+                        # Ожидаемый результат
+                        if expected_result:
+                            md.append(f"**Результат:** {expected_result}")
+
+                        # ROI если есть и не в financial_impact
+                        if roi and roi != 0 and 'ROI' not in str(financial_impact):
+                            md.append(f"**ROI:** {roi:.0f}%")
+
+                        md.append("")
+                        md.append("---")
                         md.append("")
 
         md.append("Детальный план действий смотрите в разделе \"План продажи\" ниже.")
