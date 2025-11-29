@@ -922,12 +922,23 @@ def create_manual():
     """
     try:
         data = request.json
+        logger.info(f"[create-manual] Получен запрос от {request.remote_addr}")
+        logger.debug(f"[create-manual] Данные: {data}")
+
+        if not data:
+            logger.error("[create-manual] Пустые данные в запросе")
+            return jsonify({
+                'status': 'error',
+                'error_type': 'empty_request',
+                'message': 'Данные не получены'
+            }), 400
 
         # SECURITY: Валидация входных данных через Pydantic
         try:
             validated = ManualPropertyInput(**data)
+            logger.info(f"[create-manual] Валидация пройдена: {validated.address}")
         except PydanticValidationError as e:
-            logger.warning(f"Validation error from {request.remote_addr}: {e}")
+            logger.warning(f"[create-manual] Validation error from {request.remote_addr}: {e}")
             # Форматируем ошибки для пользователя
             errors = []
             for error in e.errors():
@@ -977,13 +988,23 @@ def create_manual():
 
         # Создаем сессию
         session_id = str(uuid.uuid4())
-        session_storage.set(session_id, {
-            'target_property': property_data,
-            'comparables': [],
-            'created_at': datetime.now().isoformat(),
-            'step': 1
-        })
+        try:
+            session_storage.set(session_id, {
+                'target_property': property_data,
+                'comparables': [],
+                'created_at': datetime.now().isoformat(),
+                'step': 1
+            })
+            logger.info(f"[create-manual] Сессия создана: {session_id}")
+        except Exception as storage_err:
+            logger.error(f"[create-manual] Ошибка сохранения сессии: {storage_err}", exc_info=True)
+            return jsonify({
+                'status': 'error',
+                'error_type': 'storage_error',
+                'message': 'Ошибка сохранения данных. Попробуйте ещё раз.'
+            }), 500
 
+        logger.info(f"[create-manual] Успешно создан объект: {property_data['title']}")
         return jsonify({
             'status': 'success',
             'data': property_data,
@@ -992,7 +1013,7 @@ def create_manual():
         })
 
     except Exception as e:
-        logger.error(f"Ошибка создания вручную: {e}", exc_info=True)
+        logger.error(f"[create-manual] Необработанная ошибка: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)

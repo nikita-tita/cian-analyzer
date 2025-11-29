@@ -467,6 +467,9 @@ const navigation = {
 
 // Экран 1: Парсинг
 const screen1 = {
+    // Флаг защиты от двойных кликов
+    isSubmitting: false,
+
     init() {
         document.getElementById('parse-btn').addEventListener('click', this.parse.bind(this));
         document.getElementById('manual-input-btn').addEventListener('click', this.showManualForm.bind(this));
@@ -621,9 +624,18 @@ const screen1 = {
     async submitManualForm(e) {
         e.preventDefault();
 
+        // Защита от двойных кликов
+        if (this.isSubmitting) {
+            console.warn('[submitManualForm] Уже выполняется отправка, игнорируем');
+            return;
+        }
+
+        console.log('[submitManualForm] Начало отправки формы');
+
         // Validate all required fields first
         if (!this.validateAllFields()) {
             const emptyCount = this.getEmptyRequiredCount();
+            console.log('[submitManualForm] Валидация не пройдена, пустых полей:', emptyCount);
             utils.showToast(`Заполните обязательные поля (${emptyCount})`, 'warning', {
                 action: {
                     text: 'Показать',
@@ -637,6 +649,13 @@ const screen1 = {
                     }
                 }
             });
+            return;
+        }
+
+        // Проверяем CSRF токен
+        if (!state.csrfToken) {
+            console.error('[submitManualForm] CSRF токен отсутствует!');
+            utils.showToast('Ошибка безопасности. Перезагрузите страницу.', 'error');
             return;
         }
 
@@ -657,16 +676,53 @@ const screen1 = {
             view_type: document.getElementById('manual-view').value || 'улица'
         };
 
+        console.log('[submitManualForm] Данные формы:', formData);
+
+        // Блокируем повторные отправки
+        this.isSubmitting = true;
+        const submitBtn = document.querySelector('#manual-property-form button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Отправка...';
+        }
+
         pixelLoader.show('parsing');
 
         try {
+            console.log('[submitManualForm] Отправка запроса на /api/create-manual');
             const response = await fetch('/api/create-manual', {
                 method: 'POST',
                 headers: utils.getCsrfHeaders(),
                 body: JSON.stringify(formData)
             });
 
+            console.log('[submitManualForm] Ответ сервера:', response.status, response.statusText);
+
+            // Проверяем HTTP статус
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[submitManualForm] HTTP ошибка:', response.status, errorText);
+
+                // Пытаемся распарсить JSON ошибку
+                let errorMessage = `Ошибка сервера (${response.status})`;
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    if (errorJson.message) errorMessage = errorJson.message;
+                    if (errorJson.errors) errorMessage += ': ' + errorJson.errors.join('; ');
+                } catch (parseErr) {
+                    // Не JSON, используем текст
+                    if (errorText.includes('CSRF')) {
+                        errorMessage = 'Сессия истекла. Перезагрузите страницу.';
+                    }
+                }
+
+                utils.showToast(errorMessage, 'error');
+                return;
+            }
+
             const result = await response.json();
+            console.log('[submitManualForm] Результат:', result);
 
             if (result.status === 'success') {
                 state.sessionId = result.session_id;
@@ -689,6 +745,7 @@ const screen1 = {
                 pixelLoader.complete();
                 utils.showToast('Объект создан!', 'success');
             } else {
+                console.warn('[submitManualForm] Сервер вернул ошибку:', result);
                 // Use error_type if available (for structured errors), fallback to message
                 const errorKey = result.error_type || result.message || 'parsing_error';
                 const errorData = getErrorMessage(errorKey);
@@ -702,10 +759,16 @@ const screen1 = {
                 }
             }
         } catch (error) {
-            console.error('Manual input error:', error);
+            console.error('[submitManualForm] Исключение:', error);
             const errorData = getErrorMessage('network_error');
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
+            // Разблокируем кнопку и форму
+            this.isSubmitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtn.dataset.originalText || 'Продолжить с этими данными';
+            }
             pixelLoader.hide();
         }
     },
