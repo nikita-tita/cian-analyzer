@@ -30,6 +30,7 @@ class ParseResult:
     articles_rewritten: int = 0
     articles_published_site: int = 0
     pending_telegram: int = 0  # Статьи в очереди на публикацию в ТГ
+    published_titles: List[str] = field(default_factory=list)  # Названия опубликованных статей
     errors: List[str] = field(default_factory=list)
 
     @property
@@ -152,6 +153,13 @@ class AlertBot:
         """Отправить отчёт об успешном парсинге"""
         now = datetime.now().strftime("%d.%m.%Y %H:%M")
 
+        # Формируем список опубликованных статей
+        published_list = ""
+        if result.published_titles:
+            published_list = "\n\n📝 <b>Опубликовано:</b>\n"
+            for i, title in enumerate(result.published_titles, 1):
+                published_list += f"{i}. {title}\n"
+
         message = f"""✅ <b>Парсинг {result.source} завершён успешно</b>
 
 📅 {now}
@@ -161,7 +169,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}
+• В очереди на ТГ: {result.pending_telegram}{published_list}
 
 🎉 Всё работает штатно!"""
 
@@ -175,6 +183,13 @@ class AlertBot:
         if len(result.errors) > 5:
             errors_text += f"\n• ...и ещё {len(result.errors) - 5} ошибок"
 
+        # Формируем список опубликованных статей
+        published_list = ""
+        if result.published_titles:
+            published_list = "\n\n📝 <b>Опубликовано:</b>\n"
+            for i, title in enumerate(result.published_titles, 1):
+                published_list += f"{i}. {title}\n"
+
         message = f"""⚠️ <b>Парсинг {result.source} завершён с ошибками</b>
 
 📅 {now}
@@ -184,7 +199,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}
+• В очереди на ТГ: {result.pending_telegram}{published_list}
 
 ❌ <b>Ошибки:</b>
 {errors_text}"""

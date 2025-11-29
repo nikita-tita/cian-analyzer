@@ -143,6 +143,7 @@ def main(source: str = 'cian'):
                 )
 
                 result.articles_published_site += 1
+                result.published_titles.append(rewritten['title'])
                 logger.info(f"✓ Published to site: {rewritten['title']} (ID: {post_id})")
 
             except Exception as e:
