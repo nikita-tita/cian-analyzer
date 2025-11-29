@@ -1,0 +1,13 @@
+# Telegram Bot Dependencies для Housler
+
+# Основная библиотека для Telegram ботов
+python-telegram-bot==20.7
+
+# Работа с переменными окружения
+python-dotenv==1.0.0
+
+# HTTP запросы к API
+requests==2.31.0
+
+# Опционально: async HTTP клиент (если нужна лучшая производительность)
+# aiohttp==3.9.1
