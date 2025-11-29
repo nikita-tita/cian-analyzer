@@ -6,14 +6,19 @@ Alert Bot для уведомлений о работе крон-задач
 import os
 import requests
 import logging
+import json
 from datetime import datetime
 from typing import Optional, List
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Токен бота для алертов (отдельный от публикации в канал)
-ALERT_BOT_TOKEN = "8107613087:AAH6CZ7b1mHVfCoa8vZOwrpLRSoCbILHqV0"
+# Токен бота для алертов (из переменных окружения)
+ALERT_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+
+# Файл для кэширования chat_id
+CHAT_ID_CACHE_FILE = Path(__file__).parent / ".telegram_chat_id"
 
 
 @dataclass
@@ -47,13 +52,38 @@ class ParseResult:
 class AlertBot:
     def __init__(self, chat_id: Optional[str] = None):
         self.bot_token = ALERT_BOT_TOKEN
-        self.chat_id = chat_id  # Будет установлен после первого сообщения боту
+        self.chat_id = chat_id or self._load_chat_id()
 
-    def _get_chat_id(self) -> Optional[str]:
-        """Получить chat_id из последних обновлений бота"""
-        if self.chat_id:
-            return self.chat_id
+    def _load_chat_id(self) -> Optional[str]:
+        """
+        Загрузить chat_id из разных источников (приоритет):
+        1. Переменная окружения TELEGRAM_CHAT_ID
+        2. Кэш-файл .telegram_chat_id
+        3. API getUpdates
+        """
+        # 1. Проверяем переменную окружения
+        env_chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+        if env_chat_id:
+            logger.info(f"Using chat_id from environment: {env_chat_id}")
+            self._save_chat_id(env_chat_id)
+            return env_chat_id
 
+        # 2. Проверяем кэш-файл
+        try:
+            if CHAT_ID_CACHE_FILE.exists():
+                cached_data = json.loads(CHAT_ID_CACHE_FILE.read_text())
+                cached_chat_id = cached_data.get('chat_id', '').strip()
+                if cached_chat_id:
+                    logger.info(f"Using cached chat_id: {cached_chat_id}")
+                    return cached_chat_id
+        except Exception as e:
+            logger.warning(f"Failed to read cached chat_id: {e}")
+
+        # 3. Пытаемся получить из API
+        return self._fetch_chat_id_from_api()
+
+    def _fetch_chat_id_from_api(self) -> Optional[str]:
+        """Получить chat_id из Telegram API getUpdates"""
         try:
             url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
             response = requests.get(url, timeout=10)
@@ -63,11 +93,30 @@ class AlertBot:
                     # Берём последнее сообщение
                     for update in reversed(data['result']):
                         if 'message' in update:
-                            self.chat_id = str(update['message']['chat']['id'])
-                            return self.chat_id
+                            chat_id = str(update['message']['chat']['id'])
+                            logger.info(f"Fetched chat_id from API: {chat_id}")
+                            self._save_chat_id(chat_id)
+                            return chat_id
         except Exception as e:
-            logger.error(f"Failed to get chat_id: {e}")
+            logger.error(f"Failed to fetch chat_id from API: {e}")
         return None
+
+    def _save_chat_id(self, chat_id: str) -> None:
+        """Сохранить chat_id в кэш-файл"""
+        try:
+            CHAT_ID_CACHE_FILE.write_text(json.dumps({
+                'chat_id': chat_id,
+                'updated_at': datetime.now().isoformat()
+            }))
+            logger.debug(f"Saved chat_id to cache: {chat_id}")
+        except Exception as e:
+            logger.warning(f"Failed to save chat_id to cache: {e}")
+
+    def _get_chat_id(self) -> Optional[str]:
+        """Получить chat_id (обратная совместимость)"""
+        if not self.chat_id:
+            self.chat_id = self._load_chat_id()
+        return self.chat_id
 
     def send_alert(self, message: str, parse_mode: str = "HTML") -> bool:
         """Отправить алерт"""

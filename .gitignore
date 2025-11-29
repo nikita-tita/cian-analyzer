@@ -72,6 +72,7 @@ cookies.txt
 *.cookie
 *.cookies
 session_*.txt
+.telegram_chat_id
 
 # Production database - should not be overwritten by deploys
 blog.db
