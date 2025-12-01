@@ -203,4 +203,9 @@ def register_blog_routes(app):
         """Serve Yandex.Webmaster verification file"""
         return send_from_directory('static', 'yandex_a22640ce66beb879.html')
 
+    @app.route('/yandex_9fef2cb7f5de280d.html')
+    def yandex_verification_2():
+        """Serve Yandex.Webmaster verification file"""
+        return send_from_directory('static', 'yandex_9fef2cb7f5de280d.html')
+
     logger.info("Blog routes registered")
