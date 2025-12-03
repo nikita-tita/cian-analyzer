@@ -49,6 +49,8 @@ services:
     volumes:
       # Монтируем logs для персистентности
       - ./logs:/app/logs
+      # ВАЖНО: blog.db должен сохраняться между деплоями
+      - /var/www/housler_data/blog.db:/app/blog.db
     networks:
       - housler-network
     healthcheck:

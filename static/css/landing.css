@@ -477,17 +477,18 @@ a.btn-primary:hover {
     border-top: 1px solid var(--color-border);
 }
 
-.footer-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 32px;
+.footer-main {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 64px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--color-border);
 }
 
-.footer-left {
+.footer-brand-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
 }
 
 .footer-brand {
@@ -496,22 +497,59 @@ a.btn-primary:hover {
     letter-spacing: -0.02em;
 }
 
-.footer-text {
+.footer-tagline {
+    font-size: 14px;
+    color: var(--color-text-light);
+    line-height: 1.5;
+}
+
+.footer-contacts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+
+.footer-contact-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.footer-contact-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.footer-contact-value a {
+    font-size: 14px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.footer-contact-value a:hover {
+    color: var(--color-accent);
+}
+
+.footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+}
+
+.footer-copyright {
     font-size: 14px;
     color: var(--color-text-light);
 }
 
-.footer-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
 .footer-links {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-end;
+    gap: 24px;
 }
 
 .footer-links a {
@@ -525,10 +563,29 @@ a.btn-primary:hover {
     color: var(--color-text);
 }
 
-.footer-bottom {
-    text-align: center;
-    padding-top: 24px;
-    border-top: 1px solid var(--color-border);
+/* Legacy footer classes for backwards compatibility */
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+}
+
+.footer-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.footer-text {
+    font-size: 14px;
+    color: var(--color-text-light);
+}
+
+.footer-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 }
 
 .footer-bottom p {
@@ -643,8 +700,26 @@ a.btn-primary:hover {
         text-align: center;
     }
 
+    .footer-main {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+
+    .footer-contacts {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    .footer-bottom {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+
     .footer-links {
-        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 16px;
     }
 
     /* Enable swipe mode for mobile */
