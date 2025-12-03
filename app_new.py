@@ -575,6 +575,27 @@ def privacy_policy():
     return render_template('privacy_policy.html')
 
 
+@app.route('/doc/clients/soglasiya/advertising-agreement/')
+@app.route('/doc/clients/soglasiya/advertising-agreement')
+def advertising_consent_clients():
+    """Advertising consent page for clients"""
+    return render_template('advertising_consent.html', canonical_path='/doc/clients/soglasiya/advertising-agreement/')
+
+
+@app.route('/doc/realtors/soglasiya/advertising-agreement/')
+@app.route('/doc/realtors/soglasiya/advertising-agreement')
+def advertising_consent_realtors():
+    """Advertising consent page for realtors"""
+    return render_template('advertising_consent.html', canonical_path='/doc/realtors/soglasiya/advertising-agreement/')
+
+
+@app.route('/doc/agencies/soglasiya/advertising-agreement/')
+@app.route('/doc/agencies/soglasiya/advertising-agreement')
+def advertising_consent_agencies():
+    """Advertising consent page for agencies"""
+    return render_template('advertising_consent.html', canonical_path='/doc/agencies/soglasiya/advertising-agreement/')
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
