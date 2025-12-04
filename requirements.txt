@@ -14,6 +14,9 @@ lxml>=4.9.0
 # Markdown processing
 markdown2>=2.4.0
 
+# HTML sanitization (XSS prevention)
+bleach>=6.0.0
+
 # Utilities
 python-dotenv>=1.0.0
 fake-useragent>=1.4.0

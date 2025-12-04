@@ -120,16 +120,26 @@ class BlogDatabase:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
 
-        query = '''
-            SELECT * FROM blog_posts
-            WHERE is_published = 1
-            ORDER BY published_at DESC
-        '''
+        # Validate and sanitize limit/offset to prevent SQL injection
+        params = []
+        if limit is not None:
+            limit = int(limit)  # Ensure integer
+            offset = int(offset)  # Ensure integer
+            query = '''
+                SELECT * FROM blog_posts
+                WHERE is_published = 1
+                ORDER BY published_at DESC
+                LIMIT ? OFFSET ?
+            '''
+            params = [limit, offset]
+        else:
+            query = '''
+                SELECT * FROM blog_posts
+                WHERE is_published = 1
+                ORDER BY published_at DESC
+            '''
 
-        if limit:
-            query += f' LIMIT {limit} OFFSET {offset}'
-
-        c.execute(query)
+        c.execute(query, params)
         rows = c.fetchall()
         conn.close()
 

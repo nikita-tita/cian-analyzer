@@ -2068,6 +2068,9 @@ def cache_clear():
     """
     API: Очистка кэша (для админов)
 
+    Headers:
+        X-Admin-Key: <ADMIN_API_KEY from .env>
+
     Body:
         {
             "pattern": "*"  # optional, default: все
@@ -2080,8 +2083,28 @@ def cache_clear():
         }
     """
     try:
+        # Check admin authentication
+        admin_key = os.environ.get('ADMIN_API_KEY')
+        provided_key = request.headers.get('X-Admin-Key')
+
+        if not admin_key:
+            logger.warning("ADMIN_API_KEY not configured, cache clear disabled")
+            return jsonify({
+                'status': 'error',
+                'message': 'Admin API not configured'
+            }), 503
+
+        if not provided_key or provided_key != admin_key:
+            logger.warning(f"Unauthorized cache clear attempt from IP: {request.remote_addr}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Unauthorized'
+            }), 401
+
         pattern = request.json.get('pattern', '*') if request.json else '*'
         deleted = property_cache.clear_all(pattern)
+
+        logger.info(f"Cache cleared by admin, pattern: {pattern}, deleted: {deleted}")
 
         return jsonify({
             'status': 'success',
@@ -2331,8 +2354,36 @@ def send_telegram_message(text: str) -> bool:
         return False
 
 
+def _sanitize_telegram_html(text: str) -> str:
+    """Escape HTML special chars for safe Telegram message"""
+    if not text:
+        return ''
+    return (text
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;'))
+
+
+def _validate_phone(phone: str) -> bool:
+    """Validate phone number format"""
+    import re
+    # Remove all non-digit chars except + at start
+    cleaned = re.sub(r'[^\d+]', '', phone)
+    # Should have 10-15 digits, optionally starting with +
+    return bool(re.match(r'^\+?\d{10,15}$', cleaned))
+
+
+def _validate_name(name: str) -> bool:
+    """Validate name - letters, spaces, hyphens only, 2-100 chars"""
+    import re
+    if len(name) < 2 or len(name) > 100:
+        return False
+    # Allow unicode letters, spaces, hyphens, apostrophes
+    return bool(re.match(r"^[\w\s\-']+$", name, re.UNICODE))
+
+
 @app.route('/api/client-request', methods=['POST'])
-@csrf.exempt  # Публичная форма, CSRF не требуется
+@csrf.exempt  # Публичная форма с rate limiting
 def client_request():
     """
     Обработка заявки от клиента (вариативная форма)
@@ -2340,6 +2391,14 @@ def client_request():
     """
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Неверный формат данных'}), 400
+
+        # Honeypot field - if filled, it's a bot
+        if data.get('website') or data.get('url') or data.get('email_confirm'):
+            logger.warning(f"Bot detected via honeypot from IP: {request.remote_addr}")
+            # Return success to not reveal detection
+            return jsonify({'success': True, 'message': 'Заявка принята'}), 200
 
         operation = data.get('operation', '').strip()
         property_type = data.get('property_type', '').strip()
@@ -2347,11 +2406,25 @@ def client_request():
         phone = data.get('phone', '').strip()
         contact_method = data.get('contact_method', '').strip()
 
-        # Валидация обязательных полей
-        if not operation or not property_type or not name or not phone or not contact_method:
-            return jsonify({'error': 'Заполните все поля'}), 400
+        # Strict whitelist validation for enum fields
+        valid_operations = {'buy', 'sell', 'rent'}
+        valid_property_types = {'residential', 'commercial'}
+        valid_contact_methods = {'call', 'whatsapp', 'telegram'}
 
-        # Маппинг значений для читаемости
+        if operation not in valid_operations:
+            return jsonify({'error': 'Неверная операция'}), 400
+        if property_type not in valid_property_types:
+            return jsonify({'error': 'Неверный тип недвижимости'}), 400
+        if contact_method not in valid_contact_methods:
+            return jsonify({'error': 'Неверный способ связи'}), 400
+
+        # Validate name and phone
+        if not name or not _validate_name(name):
+            return jsonify({'error': 'Введите корректное имя (2-100 символов)'}), 400
+        if not phone or not _validate_phone(phone):
+            return jsonify({'error': 'Введите корректный номер телефона'}), 400
+
+        # Маппинг значений для читаемости (safe - from whitelist)
         operation_map = {
             'buy': 'Купить',
             'sell': 'Продать',
@@ -2367,9 +2440,13 @@ def client_request():
             'telegram': 'Telegram'
         }
 
-        operation_text = operation_map.get(operation, operation)
-        property_text = property_map.get(property_type, property_type)
-        contact_text = contact_map.get(contact_method, contact_method)
+        operation_text = operation_map[operation]
+        property_text = property_map[property_type]
+        contact_text = contact_map[contact_method]
+
+        # Sanitize user input for Telegram HTML
+        safe_name = _sanitize_telegram_html(name)
+        safe_phone = _sanitize_telegram_html(phone)
 
         # Логируем заявку
         logger.info(f"=== НОВАЯ ЗАЯВКА ОТ КЛИЕНТА ===")
@@ -2378,9 +2455,10 @@ def client_request():
         logger.info(f"Имя: {name}")
         logger.info(f"Телефон: {phone}")
         logger.info(f"Способ связи: {contact_text}")
+        logger.info(f"IP: {request.remote_addr}")
         logger.info(f"================================")
 
-        # Формируем сообщение для Telegram
+        # Формируем сообщение для Telegram (with sanitized user input)
         timestamp = datetime.now().strftime('%d.%m.%Y %H:%M')
         telegram_message = f"""🏠 <b>Новая заявка с сайта HOUSLER</b>
 
@@ -2388,8 +2466,8 @@ def client_request():
 <b>Тип недвижимости:</b> {property_text}
 
 <b>Контактные данные:</b>
-• Имя: {name}
-• Телефон: {phone}
+• Имя: {safe_name}
+• Телефон: {safe_phone}
 • Связаться через: {contact_text}
 
 <i>📅 {timestamp}</i>"""

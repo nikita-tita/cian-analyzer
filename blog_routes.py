@@ -8,6 +8,23 @@ import os
 from datetime import datetime
 import logging
 import markdown2
+import bleach
+
+# Allowed HTML tags and attributes for blog content (safe subset)
+ALLOWED_TAGS = [
+    'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'code', 'div', 'em',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'ol',
+    'p', 'pre', 'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead',
+    'tr', 'u', 'ul', 'sup', 'sub', 'del', 'ins', 'figure', 'figcaption'
+]
+ALLOWED_ATTRS = {
+    '*': ['class', 'id'],
+    'a': ['href', 'title', 'target', 'rel'],
+    'img': ['src', 'alt', 'title', 'width', 'height'],
+    'td': ['colspan', 'rowspan'],
+    'th': ['colspan', 'rowspan', 'scope'],
+}
+ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +69,19 @@ def register_blog_routes(app):
             except Exception as e:
                 logger.warning(f"Could not increment view count for {slug}: {e}")
 
-            # Convert markdown to HTML
+            # Convert markdown to HTML and sanitize to prevent XSS
             if post.get('content'):
-                post['content_html'] = markdown2.markdown(
+                raw_html = markdown2.markdown(
                     post['content'],
                     extras=['fenced-code-blocks', 'tables', 'break-on-newline', 'target-blank-links']
+                )
+                # Sanitize HTML to remove any malicious scripts/attributes
+                post['content_html'] = bleach.clean(
+                    raw_html,
+                    tags=ALLOWED_TAGS,
+                    attributes=ALLOWED_ATTRS,
+                    protocols=ALLOWED_PROTOCOLS,
+                    strip=True
                 )
 
             # Get recent posts for sidebar
