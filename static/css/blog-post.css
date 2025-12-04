@@ -198,6 +198,23 @@
     text-align: center;
 }
 
+/* Source link - subtle reference to original article */
+.blog-post-source {
+    margin-bottom: 1.5rem;
+}
+
+.blog-post-source .source-link {
+    color: #999;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.blog-post-source .source-link:hover {
+    color: #666;
+    text-decoration: underline;
+}
+
 /* Related Posts */
 .related-posts {
     max-width: 1200px;

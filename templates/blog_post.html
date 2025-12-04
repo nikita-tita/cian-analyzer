@@ -150,6 +150,11 @@
                 </div>
 
                 <div class="blog-post-footer">
+                    {% if post.original_url %}
+                    <div class="blog-post-source">
+                        <a href="{{ post.original_url }}" target="_blank" rel="noopener noreferrer nofollow" class="source-link">Ссылка на первоисточник публикации</a>
+                    </div>
+                    {% endif %}
                     <a href="/blog" class="back-to-blog">← Все статьи</a>
                 </div>
 
