@@ -596,6 +596,34 @@ def advertising_consent_agencies():
     return render_template('advertising_consent.html', canonical_path='/doc/agencies/soglasiya/advertising-agreement/')
 
 
+@app.route('/doc')
+@app.route('/doc/')
+def docs_index():
+    """Documents main page"""
+    return render_template('docs_index.html')
+
+
+@app.route('/doc/clients')
+@app.route('/doc/clients/')
+def docs_clients():
+    """Documents for clients"""
+    return render_template('docs_clients.html')
+
+
+@app.route('/doc/realtors')
+@app.route('/doc/realtors/')
+def docs_realtors():
+    """Documents for realtors"""
+    return render_template('docs_realtors.html')
+
+
+@app.route('/doc/agents')
+@app.route('/doc/agents/')
+def docs_agents():
+    """Documents for agencies"""
+    return render_template('docs_agents.html')
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
