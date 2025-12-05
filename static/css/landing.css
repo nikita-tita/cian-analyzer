@@ -882,11 +882,11 @@ a.btn-primary:hover {
 }
 
 .product-features li::before {
-    content: "✓";
+    content: "—";
     position: absolute;
     left: 0;
     color: var(--color-primary);
-    font-weight: 600;
+    font-weight: 400;
 }
 
 .product-link {
