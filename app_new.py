@@ -7,8 +7,6 @@ from flask import Flask, render_template, request, jsonify, session
 import os
 import uuid
 import logging
-import urllib.request
-import urllib.parse
 import json
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -16,7 +14,15 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
 
-logging.basicConfig(level=logging.INFO)
+# Централизованная конфигурация
+from src.config import settings
+from src.config.regions import detect_region_from_url, detect_region_from_address
+
+# Централизованные сервисы
+from src.services.validation import validate_url, sanitize_string
+from src.exceptions import URLValidationError, SSRFError
+
+logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -29,7 +35,6 @@ logger = logging.getLogger(__name__)
 try:
     # Импортируем parser infrastructure
     from src.parsers import get_global_registry
-    from src.parsers.playwright_parser import detect_region_from_url, detect_region_from_address
     from src.parsers.browser_pool import BrowserPool
 
     # Импортируем основной парсер
@@ -48,7 +53,7 @@ except ImportError as e:
     logger.error(f"Failed to import ParserRegistry: {e}")
     # Fallback на старый PlaywrightParser
     try:
-        from src.parsers.playwright_parser import PlaywrightParser, detect_region_from_url, detect_region_from_address
+        from src.parsers.playwright_parser import PlaywrightParser
         from src.parsers.browser_pool import BrowserPool
         PARSER_REGISTRY_AVAILABLE = False
         logger.warning("⚠️ Fallback: Using legacy PlaywrightParser (только ЦИАН)")
@@ -57,10 +62,6 @@ except ImportError as e:
         from src.parsers.simple_parser import SimpleParser
         PARSER_REGISTRY_AVAILABLE = False
         BrowserPool = None
-        def detect_region_from_url(url):
-            return None
-        def detect_region_from_address(address):
-            return 'msk'  # fallback (основной регион ЦИАН)
 
 # Check if Playwright is available for PDF generation
 try:
@@ -92,33 +93,30 @@ except ImportError as e:
 
 app = Flask(__name__)
 
-# SECURITY: Secret key from environment (CRITICAL FIX)
-# Generate with: openssl rand -hex 32
-app.secret_key = os.getenv('SECRET_KEY')
+# SECURITY: Secret key from configuration
+app.secret_key = settings.SECRET_KEY
 if not app.secret_key:
-    logger.error("SECRET_KEY not set in environment! Using temporary key for development only.")
-    if os.getenv('FLASK_ENV') == 'production':
+    logger.error("SECRET_KEY not set! Using temporary key for development only.")
+    if settings.is_production:
         raise RuntimeError('SECRET_KEY must be set in production environment')
     # Development fallback (will be different on each restart)
     app.secret_key = os.urandom(24)
 
 # SECURITY: CSRF Protection (защита от Cross-Site Request Forgery)
 csrf = CSRFProtect(app)
-# Настройка CSRF
 app.config['WTF_CSRF_TIME_LIMIT'] = None  # Token doesn't expire (session-based)
-app.config['WTF_CSRF_SSL_STRICT'] = os.getenv('FLASK_ENV') == 'production'
+app.config['WTF_CSRF_SSL_STRICT'] = settings.is_production
 app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
 logger.info("CSRF protection enabled")
 
-# Инициализация Redis кэша
-# В продакшене параметры берутся из env переменных
+# Инициализация Redis кэша (настройки из централизованного конфига)
 property_cache = init_cache(
-    host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(os.getenv('REDIS_PORT', 6380)),
-    db=int(os.getenv('REDIS_DB', 0)),
-    password=os.getenv('REDIS_PASSWORD'),
-    namespace=os.getenv('REDIS_NAMESPACE', 'housler'),
-    enabled=os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    db=settings.REDIS_DB,
+    password=settings.REDIS_PASSWORD,
+    namespace=settings.REDIS_NAMESPACE,
+    enabled=settings.REDIS_ENABLED
 )
 
 # Хранилище сессий с поддержкой Redis
@@ -128,18 +126,15 @@ session_storage = get_session_storage()
 # Ограничивает количество одновременно открытых браузеров
 # Защищает от DoS атак и утечек памяти
 browser_pool = None
-# Отключаем browser pool для локальной разработки (конфликт с Flask debug mode)
-use_browser_pool = os.getenv('USE_BROWSER_POOL', 'false').lower() == 'true'
-if PARSER_REGISTRY_AVAILABLE and use_browser_pool:
-    max_browsers = int(os.getenv('MAX_BROWSERS', '3'))  # Production: 3-5 браузеров
+if PARSER_REGISTRY_AVAILABLE and settings.USE_BROWSER_POOL:
     browser_pool = BrowserPool(
-        max_browsers=max_browsers,
+        max_browsers=settings.MAX_BROWSERS,
         max_age_seconds=3600,  # 1 час
-        headless=True,
+        headless=settings.PARSER_HEADLESS,
         block_resources=True
     )
     browser_pool.start()
-    logger.info(f"Browser pool initialized with max_browsers={max_browsers}")
+    logger.info(f"Browser pool initialized with max_browsers={settings.MAX_BROWSERS}")
 else:
     logger.info("Browser pool disabled (for local dev or parsers not available)")
 
@@ -158,13 +153,14 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════
 # DUPLICATE DETECTOR INITIALIZATION
 # Детекция дубликатов при поиске аналогов из разных источников
+# Настройки из централизованного конфига (settings)
 # ═══════════════════════════════════════════════════════════════════════════
 duplicate_detector = DuplicateDetector(
-    strict_price_tolerance=0.02,      # ±2% для строгого совпадения
-    probable_price_tolerance=0.10,    # ±10% для вероятного дубликата
-    possible_price_tolerance=0.15,    # ±15% для возможного дубликата
-    area_tolerance=0.5,               # ±0.5 м² для строгого совпадения
-    possible_area_tolerance=1.0       # ±1 м² для возможного дубликата
+    strict_price_tolerance=settings.DUPLICATE_STRICT_PRICE_TOLERANCE,
+    probable_price_tolerance=settings.DUPLICATE_PROBABLE_PRICE_TOLERANCE,
+    possible_price_tolerance=settings.DUPLICATE_POSSIBLE_PRICE_TOLERANCE,
+    area_tolerance=settings.DUPLICATE_AREA_TOLERANCE,
+    possible_area_tolerance=settings.DUPLICATE_POSSIBLE_AREA_TOLERANCE
 )
 logger.info("✓ Duplicate Detector инициализирован")
 
@@ -177,6 +173,18 @@ try:
     logger.info("✓ Blog routes зарегистрированы")
 except ImportError as e:
     logger.warning(f"⚠️ Blog routes недоступны: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONTACTS BLUEPRINT REGISTRATION
+# ═══════════════════════════════════════════════════════════════════════════
+try:
+    from src.routes import contacts_bp
+    # CSRF exempt для публичных форм (защита через rate limiting и honeypot)
+    csrf.exempt(contacts_bp)
+    app.register_blueprint(contacts_bp)
+    logger.info("✓ Contacts Blueprint зарегистрирован")
+except ImportError as e:
+    logger.warning(f"⚠️ Contacts Blueprint недоступен: {e}")
 
 
 def get_parser_for_url(url: str, region: str = 'spb'):
@@ -269,14 +277,14 @@ def get_rate_limit_key():
 # Используем Redis для распределенного rate limiting (если доступен)
 limiter = Limiter(
     app=app,
-    key_func=get_rate_limit_key,  # Используем улучшенный ключ
-    storage_uri=f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6380)}/{os.getenv('REDIS_DB', 0)}" if os.getenv('REDIS_ENABLED', 'false').lower() == 'true' else 'memory://',
-    default_limits=["200 per day", "50 per hour"],
+    key_func=get_rate_limit_key,
+    storage_uri=settings.rate_limit_storage_uri,
+    default_limits=[settings.RATELIMIT_DEFAULT],
     storage_options={"socket_connect_timeout": 30},
-    strategy="moving-window"  # Более строгая стратегия
+    strategy="moving-window"
 )
 
-logger.info(f"Rate limiting initialized: {limiter._storage_uri[:20]}...")
+logger.info(f"Rate limiting initialized with storage: {'redis' if settings.REDIS_ENABLED else 'memory'}")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # TASK QUEUE INITIALIZATION (Async Operations)
@@ -295,106 +303,9 @@ if TASK_QUEUE_AVAILABLE:
         logger.error(f"❌ Failed to initialize task queue: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SECURITY UTILITIES (CRITICAL FIX)
+# PYDANTIC MODELS
+# Валидация входных данных с помощью Pydantic
 # ═══════════════════════════════════════════════════════════════════════════
-
-from urllib.parse import urlparse
-import ipaddress
-
-# Whitelist разрешенных доменов для парсинга (защита от SSRF)
-ALLOWED_DOMAINS = [
-    'www.cian.ru',
-    'cian.ru',
-    'spb.cian.ru',
-    'moscow.cian.ru',
-    'www.domclick.ru',
-    'domclick.ru'
-]
-
-def validate_url(url: str) -> None:
-    """
-    Validate URL для защиты от SSRF атак
-
-    Args:
-        url: URL для проверки
-
-    Raises:
-        ValueError: если URL опасен
-
-    Защита от:
-    - Internal network scanning
-    - File:// protocol
-    - Localhost/private IP access
-    - Arbitrary domain access
-    """
-    if not url:
-        raise ValueError('URL не может быть пустым')
-
-    # Парсим URL
-    try:
-        parsed = urlparse(url)
-    except Exception as e:
-        raise ValueError(f'Невалидный URL: {e}')
-
-    # Проверяем протокол
-    if parsed.scheme not in ['http', 'https']:
-        raise ValueError(f'Запрещенный протокол: {parsed.scheme}. Разрешены только http/https')
-
-    # Проверяем наличие hostname
-    if not parsed.hostname:
-        raise ValueError('URL должен содержать hostname')
-
-    # Проверяем whitelist доменов
-    hostname_lower = parsed.hostname.lower()
-    if not any(hostname_lower == domain or hostname_lower.endswith('.' + domain)
-               for domain in ALLOWED_DOMAINS):
-        raise ValueError(f'Домен {parsed.hostname} не разрешен. Разрешены только: {", ".join(ALLOWED_DOMAINS)}')
-
-    # Блокируем private/internal IP адреса
-    try:
-        ip = ipaddress.ip_address(parsed.hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
-            raise ValueError(f'Запрещен доступ к internal IP: {ip}')
-    except ValueError:
-        # Не IP адрес - это нормально, продолжаем
-        pass
-
-    # Дополнительные проверки
-    if len(url) > 2048:
-        raise ValueError('URL слишком длинный (max 2048 символов)')
-
-    # Блокируем подозрительные паттерны
-    suspicious_patterns = ['localhost', '127.', '192.168.', '10.', '172.16.', '@']
-    for pattern in suspicious_patterns:
-        if pattern in url.lower():
-            raise ValueError(f'URL содержит подозрительный паттерн: {pattern}')
-
-
-def sanitize_string(text: str, max_length: int = 1000) -> str:
-    """
-    Sanitize строку от потенциально опасного контента
-
-    Args:
-        text: Строка для очистки
-        max_length: Максимальная длина
-
-    Returns:
-        Очищенная строка
-    """
-    if not text:
-        return ''
-
-    # Обрезаем до максимальной длины
-    text = str(text).strip()[:max_length]
-
-    # Удаляем null bytes
-    text = text.replace('\x00', '')
-
-    # Удаляем control characters кроме \n, \r, \t
-    text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
-
-    return text
-
 
 # Pydantic models для валидации входных данных
 from pydantic import BaseModel, Field, validator, ValidationError as PydanticValidationError
@@ -625,6 +536,7 @@ def docs_agents():
 
 
 @app.route('/health', methods=['GET'])
+@limiter.exempt  # Health check не должен ограничиваться - Docker healthcheck каждые 30 сек
 def health_check():
     """
     Health check endpoint для мониторинга
@@ -786,6 +698,7 @@ def get_csrf_token():
 
 
 @app.route('/metrics', methods=['GET'])
+@limiter.exempt  # Metrics endpoint для мониторинга - не ограничиваем
 def metrics():
     """
     Prometheus-compatible metrics endpoint
@@ -826,7 +739,7 @@ def calculator():
 
 
 @app.route('/api/parse', methods=['POST'])
-@limiter.limit("10 per minute")  # Expensive operation - парсинг
+@limiter.limit(settings.RATELIMIT_PARSE)  # Expensive operation - парсинг
 def parse_url():
     """
     API: Парсинг URL целевого объекта (Экран 1)
@@ -854,9 +767,9 @@ def parse_url():
         # SECURITY: Валидация URL (защита от SSRF)
         try:
             validate_url(url)
-        except ValueError as e:
+        except (URLValidationError, SSRFError) as e:
             logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
-            return jsonify({'status': 'error', 'message': str(e)}), 400
+            return jsonify({'status': 'error', 'message': str(e)}), e.http_status
 
         # Автоопределение региона по URL
         region = detect_region_from_url(url)
@@ -943,7 +856,7 @@ def parse_url():
 
 
 @app.route('/api/create-manual', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit(settings.RATELIMIT_PARSE)
 def create_manual():
     """
     API: Создание объекта вручную без парсинга (Экран 1)
@@ -1118,7 +1031,7 @@ def update_target():
 
 
 @app.route('/api/find-similar', methods=['POST'])
-@limiter.limit("15 per minute")  # Expensive - поиск и парсинг аналогов
+@limiter.limit(settings.RATELIMIT_SEARCH)  # Expensive - поиск и парсинг аналогов
 def find_similar():
     """
     API: Автоматический поиск похожих объектов (Экран 2)
@@ -1498,7 +1411,7 @@ def find_similar():
 
 
 @app.route('/api/multi-source-search', methods=['POST'])
-@limiter.limit("10 per minute")  # Expensive - мультиисточниковый поиск
+@limiter.limit(settings.RATELIMIT_SEARCH)  # Expensive - мультиисточниковый поиск
 def multi_source_search():
     """
     API: Мультиисточниковый поиск аналогов (ЦИАН + ДомКлик одновременно)
@@ -1655,9 +1568,9 @@ def add_comparable():
         # SECURITY: Валидация URL (защита от SSRF)
         try:
             validate_url(url)
-        except ValueError as e:
+        except (URLValidationError, SSRFError) as e:
             logger.warning(f"URL validation failed: {e} (from {request.remote_addr})")
-            return jsonify({'status': 'error', 'message': str(e)}), 400
+            return jsonify({'status': 'error', 'message': str(e)}), e.http_status
 
         # Получаем регион целевого объекта
         session_data = session_storage.get(session_id)
@@ -1851,7 +1764,7 @@ def include_comparable():
 
 
 @app.route('/api/analyze', methods=['POST'])
-@limiter.limit("20 per minute")  # Анализ - менее expensive
+@limiter.limit(settings.RATELIMIT_ANALYZE)  # Анализ - менее expensive
 def analyze():
     """
     API: Полный анализ (Экран 3)
@@ -2285,236 +2198,10 @@ def view_report(session_id):
         return f"Ошибка генерации отчета: {str(e)}", 500
 
 
-@app.route('/api/contact-request', methods=['POST'])
-def contact_request():
-    """
-    Обработка заявки на контакт от клиента
-    """
-    try:
-        data = request.get_json()
-
-        name = data.get('name', '').strip()
-        phone = data.get('phone', '').strip()
-        email = data.get('email', '').strip()
-        comment = data.get('comment', '').strip()
-        session_id = data.get('session_id', '')
-
-        # Валидация обязательных полей
-        if not name or not phone:
-            return jsonify({'error': 'Имя и телефон обязательны'}), 400
-
-        # Логируем заявку
-        logger.info(f"=== НОВАЯ ЗАЯВКА НА КОНТАКТ ===")
-        logger.info(f"Имя: {name}")
-        logger.info(f"Телефон: {phone}")
-        logger.info(f"Email: {email if email else 'не указан'}")
-        logger.info(f"Комментарий: {comment if comment else 'нет'}")
-        logger.info(f"Session ID: {session_id}")
-        logger.info(f"================================")
-
-        # TODO: Здесь можно добавить:
-        # - Отправку email уведомления
-        # - Отправку в CRM
-        # - Отправку в Telegram
-        # - Сохранение в базу данных
-
-        # Пока просто возвращаем успех
-        return jsonify({
-            'success': True,
-            'message': 'Заявка принята'
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
-        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
-
-
-# Telegram Bot configuration for client requests
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')  # Will be set on first message
-
-
-def send_telegram_message(text: str) -> bool:
-    """
-    Отправляет сообщение в Telegram бота
-    """
-    try:
-        # Получаем chat_id из последнего сообщения боту (если не задан)
-        chat_id = TELEGRAM_CHAT_ID
-        if not chat_id:
-            # Пробуем получить chat_id из getUpdates
-            updates_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-            try:
-                req = urllib.request.Request(updates_url)
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    data = json.loads(response.read().decode('utf-8'))
-                    if data.get('ok') and data.get('result'):
-                        # Берем chat_id из последнего сообщения
-                        for update in reversed(data['result']):
-                            if 'message' in update:
-                                chat_id = str(update['message']['chat']['id'])
-                                break
-            except Exception as e:
-                logger.warning(f"Не удалось получить chat_id: {e}")
-                return False
-
-        if not chat_id:
-            logger.error("Chat ID не найден. Напишите боту /start чтобы активировать.")
-            return False
-
-        # Отправляем сообщение
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            'chat_id': chat_id,
-            'text': text,
-            'parse_mode': 'HTML'
-        }
-
-        data = urllib.parse.urlencode(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, method='POST')
-
-        with urllib.request.urlopen(req, timeout=10) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result.get('ok', False)
-
-    except Exception as e:
-        logger.error(f"Ошибка отправки в Telegram: {e}")
-        return False
-
-
-def _sanitize_telegram_html(text: str) -> str:
-    """Escape HTML special chars for safe Telegram message"""
-    if not text:
-        return ''
-    return (text
-            .replace('&', '&amp;')
-            .replace('<', '&lt;')
-            .replace('>', '&gt;'))
-
-
-def _validate_phone(phone: str) -> bool:
-    """Validate phone number format"""
-    import re
-    # Remove all non-digit chars except + at start
-    cleaned = re.sub(r'[^\d+]', '', phone)
-    # Should have 10-15 digits, optionally starting with +
-    return bool(re.match(r'^\+?\d{10,15}$', cleaned))
-
-
-def _validate_name(name: str) -> bool:
-    """Validate name - letters, spaces, hyphens only, 2-100 chars"""
-    import re
-    if len(name) < 2 or len(name) > 100:
-        return False
-    # Allow unicode letters, spaces, hyphens, apostrophes
-    return bool(re.match(r"^[\w\s\-']+$", name, re.UNICODE))
-
-
-@app.route('/api/client-request', methods=['POST'])
-@csrf.exempt  # Публичная форма с rate limiting
-def client_request():
-    """
-    Обработка заявки от клиента (вариативная форма)
-    Отправляет данные в Telegram бота
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Неверный формат данных'}), 400
-
-        # Honeypot field - if filled, it's a bot
-        if data.get('website') or data.get('url') or data.get('email_confirm'):
-            logger.warning(f"Bot detected via honeypot from IP: {request.remote_addr}")
-            # Return success to not reveal detection
-            return jsonify({'success': True, 'message': 'Заявка принята'}), 200
-
-        operation = data.get('operation', '').strip()
-        property_type = data.get('property_type', '').strip()
-        name = data.get('name', '').strip()
-        phone = data.get('phone', '').strip()
-        contact_method = data.get('contact_method', '').strip()
-
-        # Strict whitelist validation for enum fields
-        valid_operations = {'buy', 'sell', 'rent'}
-        valid_property_types = {'residential', 'commercial'}
-        valid_contact_methods = {'call', 'whatsapp', 'telegram'}
-
-        if operation not in valid_operations:
-            return jsonify({'error': 'Неверная операция'}), 400
-        if property_type not in valid_property_types:
-            return jsonify({'error': 'Неверный тип недвижимости'}), 400
-        if contact_method not in valid_contact_methods:
-            return jsonify({'error': 'Неверный способ связи'}), 400
-
-        # Validate name and phone
-        if not name or not _validate_name(name):
-            return jsonify({'error': 'Введите корректное имя (2-100 символов)'}), 400
-        if not phone or not _validate_phone(phone):
-            return jsonify({'error': 'Введите корректный номер телефона'}), 400
-
-        # Маппинг значений для читаемости (safe - from whitelist)
-        operation_map = {
-            'buy': 'Купить',
-            'sell': 'Продать',
-            'rent': 'Сдать в аренду'
-        }
-        property_map = {
-            'residential': 'Жилая недвижимость',
-            'commercial': 'Коммерческая недвижимость'
-        }
-        contact_map = {
-            'call': 'Позвонить',
-            'whatsapp': 'WhatsApp',
-            'telegram': 'Telegram'
-        }
-
-        operation_text = operation_map[operation]
-        property_text = property_map[property_type]
-        contact_text = contact_map[contact_method]
-
-        # Sanitize user input for Telegram HTML
-        safe_name = _sanitize_telegram_html(name)
-        safe_phone = _sanitize_telegram_html(phone)
-
-        # Логируем заявку
-        logger.info(f"=== НОВАЯ ЗАЯВКА ОТ КЛИЕНТА ===")
-        logger.info(f"Операция: {operation_text}")
-        logger.info(f"Тип недвижимости: {property_text}")
-        logger.info(f"Имя: {name}")
-        logger.info(f"Телефон: {phone}")
-        logger.info(f"Способ связи: {contact_text}")
-        logger.info(f"IP: {request.remote_addr}")
-        logger.info(f"================================")
-
-        # Формируем сообщение для Telegram (with sanitized user input)
-        timestamp = datetime.now().strftime('%d.%m.%Y %H:%M')
-        telegram_message = f"""🏠 <b>Новая заявка с сайта HOUSLER</b>
-
-<b>Операция:</b> {operation_text}
-<b>Тип недвижимости:</b> {property_text}
-
-<b>Контактные данные:</b>
-• Имя: {safe_name}
-• Телефон: {safe_phone}
-• Связаться через: {contact_text}
-
-<i>📅 {timestamp}</i>"""
-
-        # Отправляем в Telegram
-        telegram_sent = send_telegram_message(telegram_message)
-
-        if not telegram_sent:
-            logger.warning("Заявка не была отправлена в Telegram")
-            # Все равно возвращаем успех - заявка залогирована
-
-        return jsonify({
-            'success': True,
-            'message': 'Заявка принята'
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
-        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+# ═══════════════════════════════════════════════════════════════════════════
+# CONTACT ROUTES - перенесены в src/routes/contacts.py
+# Маршруты /api/contact-request и /api/client-request теперь в contacts_bp
+# ═══════════════════════════════════════════════════════════════════════════
 
 
 async def _generate_pdf_from_html(html_content: str) -> bytes:

@@ -12,12 +12,11 @@ from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests
 
+# Импортируем исключения из единого места
+from ..exceptions import ParsingError
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class ParsingError(Exception):
-    """Ошибка парсинга"""
 
 
 class BaseCianParser(ABC):

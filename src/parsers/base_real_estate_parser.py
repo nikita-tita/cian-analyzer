@@ -261,6 +261,5 @@ class BaseRealEstateParser(ABC):
         }
 
 
-class ParsingError(Exception):
-    """Ошибка парсинга"""
-    pass
+# ParsingError импортируется из src.exceptions для обратной совместимости
+# Убрано дублирование - см. src/exceptions.py

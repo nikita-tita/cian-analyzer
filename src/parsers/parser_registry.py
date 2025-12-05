@@ -121,8 +121,8 @@ class ParserRegistry:
         # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Для ЦИАН определяем регион из URL
         region = None
         if source_name == 'cian' and url:
-            # Импортируем функцию определения региона
-            from .playwright_parser import detect_region_from_url
+            # Импортируем функцию определения региона из централизованного модуля
+            from src.config.regions import detect_region_from_url
             region = detect_region_from_url(url)
             logger.info(f"✓ Регион определен из URL: {region or 'не определен'}")
 
