@@ -904,6 +904,25 @@ a.btn-primary:hover {
     gap: 10px;
 }
 
+.product-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.product-btn {
+    width: 100%;
+    text-align: center;
+    margin-top: 8px;
+}
+
 @media (max-width: 968px) {
     .calc-promo-grid {
         grid-template-columns: repeat(3, 1fr);
