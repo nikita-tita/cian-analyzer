@@ -91,6 +91,26 @@
     --gray-dark: #333333;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* === ALIASES === */
+    /* Aliases for landing.css compatibility */
+    --color-text: var(--black);
+    --color-text-light: var(--gray-600);
+    --color-border: var(--gray-300);
+    --color-bg: var(--white);
+    --color-bg-gray: var(--gray-100);
+    --color-accent: var(--black);
+
+    /* Aliases for unified-minimal.css compatibility */
+    --color-black: var(--black);
+    --color-white: var(--white);
+    --color-gray-light: var(--gray-100);
+    --color-gray-border: var(--gray-300);
+    --color-gray-text: var(--gray-600);
+
+    /* Border aliases */
+    --border-thin: 1px solid var(--black);
+    --border-thin-gray: 1px solid var(--gray-300);
 }
 
 /* === BASE COMPONENT STYLES === */

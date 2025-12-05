@@ -822,7 +822,7 @@
         <div class="verdict-card">
             <div class="verdict-header">
                 <div>
-                    <span class="verdict-header-icon">🏠</span>
+                    <span class="verdict-header-icon"></span>
                     <span class="verdict-header-title">Ваша квартира</span>
                 </div>
                 <div class="verdict-header-subtitle">
@@ -855,17 +855,17 @@
 
             <div class="verdict-status">
                 {% if fair_price_analysis.is_overpriced %}
-                <div class="verdict-status-badge overpriced">⚠️ ПЕРЕОЦЕНЕНА</div>
+                <div class="verdict-status-badge overpriced">ПЕРЕОЦЕНЕНА</div>
                 <div class="verdict-recommendation">
                     Рекомендуем снизить цену для быстрой продажи или приготовиться к торгу
                 </div>
                 {% elif fair_price_analysis.is_underpriced %}
-                <div class="verdict-status-badge underpriced">💰 ВЫГОДНАЯ ЦЕНА</div>
+                <div class="verdict-status-badge underpriced">ВЫГОДНАЯ ЦЕНА</div>
                 <div class="verdict-recommendation">
                     Цена ниже рынка — высокие шансы на быструю продажу или возможность поднять цену
                 </div>
                 {% else %}
-                <div class="verdict-status-badge fair">✓ В РЫНКЕ</div>
+                <div class="verdict-status-badge fair">В РЫНКЕ</div>
                 <div class="verdict-recommendation">
                     Цена соответствует рынку — объект конкурентоспособен
                 </div>
@@ -1124,7 +1124,7 @@
                 <div class="scenario-card {% if scenario.is_recommended %}recommended{% endif %}">
                     <div class="scenario-header">
                         <div class="scenario-title">
-                            <span class="scenario-icon">{{ scenario.icon or '📊' }}</span>
+                            <span class="scenario-icon">{{ scenario.icon or '' }}</span>
                             <span class="scenario-name">{{ scenario.name }}</span>
                             {% if scenario.is_recommended %}
                             <span class="scenario-badge">Рекомендуем</span>

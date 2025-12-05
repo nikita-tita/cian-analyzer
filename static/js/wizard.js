@@ -1520,7 +1520,7 @@ const screen3 = {
     },
 
     displayAnalysis(analysis) {
-        console.log('📊 Отображение анализа:', analysis);
+        console.log('[Analysis] Отображение анализа:', analysis);
 
         try {
             // Валидация структуры данных
@@ -1542,7 +1542,7 @@ const screen3 = {
             }
 
             if (analysis.fair_price_analysis.status === 'insufficient_data') {
-                console.warn('⚠️ Недостаточно данных для расчета справедливой цены');
+                console.warn('[Warning] Недостаточно данных для расчета справедливой цены');
                 // Продолжаем показ результатов, но с предупреждением
             }
 
@@ -1584,7 +1584,7 @@ const screen3 = {
             if (summaryInfo) {
                 summaryInfo.innerHTML = `
                     <div class="alert alert-warning">
-                        <h5>⚠️ Ошибка отображения результатов</h5>
+                        <h5>Ошибка отображения результатов</h5>
                         <p><strong>Причина:</strong> ${error.message}</p>
                         <p>Пожалуйста, проверьте данные и попробуйте снова, или обратитесь в поддержку.</p>
                         <hr>
@@ -1614,15 +1614,15 @@ const screen3 = {
         // Определяем статус
         let statusBadge, statusClass, recommendation;
         if (fairPrice.is_overpriced) {
-            statusBadge = '⚠️ ПЕРЕОЦЕНЕНА';
+            statusBadge = 'ПЕРЕОЦЕНЕНА';
             statusClass = 'overpriced';
             recommendation = 'Рекомендуем снизить цену для быстрой продажи или приготовиться к торгу';
         } else if (fairPrice.is_underpriced) {
-            statusBadge = '💰 ВЫГОДНАЯ ЦЕНА';
+            statusBadge = 'ВЫГОДНАЯ ЦЕНА';
             statusClass = 'underpriced';
             recommendation = 'Цена ниже рынка — высокие шансы на быструю продажу или возможность поднять цену';
         } else {
-            statusBadge = '✓ В РЫНКЕ';
+            statusBadge = 'В РЫНКЕ';
             statusClass = 'fair';
             recommendation = 'Цена соответствует рынку — объект конкурентоспособен';
         }
@@ -1638,7 +1638,6 @@ const screen3 = {
             <div class="verdict-card" style="border: 2px solid #1A1A1A; background: #fff;">
                 <div class="verdict-header" style="background: #F9FAFB; padding: 16px 20px; border-bottom: 1px solid #E5E7EB;">
                     <div>
-                        <span style="font-size: 20px; margin-right: 8px;">🏠</span>
                         <span style="font-weight: 600; font-size: 15px;">Ваша квартира</span>
                     </div>
                     <div style="color: #6B7280; font-size: 13px; margin-top: 4px;">${subtitle}</div>
@@ -1713,7 +1712,7 @@ const screen3 = {
         if (fairPrice.status === 'insufficient_data') {
             container.innerHTML = `
                 <div class="alert alert-warning">
-                    <h5>⚠️ Недостаточно данных для расчета</h5>
+                    <h5>Недостаточно данных для расчета</h5>
                     <p>${fairPrice.detailed_report || 'Недостаточно аналогов для расчета справедливой цены'}</p>
                 </div>
             `;
@@ -2130,15 +2129,15 @@ const screen3 = {
 
                         <div style="border-top: 1px solid var(--gray-300); padding-top: var(--spacing-lg); margin-bottom: var(--spacing-lg);">
                             <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
-                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="color: var(--black); font-weight: 600; font-size: var(--text-lg);">—</span>
                                 <span style="font-size: var(--text-sm);">Никаких авансов и предоплат</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
-                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="color: var(--black); font-weight: 600; font-size: var(--text-lg);">—</span>
                                 <span style="font-size: var(--text-sm);">Оплата после успешной сделки</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
-                                <span style="color: #28a745; font-size: var(--text-lg);">✓</span>
+                                <span style="color: var(--black); font-weight: 600; font-size: var(--text-lg);">—</span>
                                 <span style="font-size: var(--text-sm);">Полное сопровождение до ключей</span>
                             </div>
                         </div>

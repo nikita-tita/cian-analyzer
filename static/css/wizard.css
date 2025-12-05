@@ -1,15 +1,5 @@
 /* Premium Black & White Design */
-
-:root {
-    --black: #000000;
-    --white: #FFFFFF;
-    --gray-light: #F5F5F5;
-    --gray-medium: #999999;
-    --gray-dark: #333333;
-    --border-color: #E0E0E0;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
+/* Variables defined in design-system.css */
 
 * {
     margin: 0;
@@ -1080,18 +1070,15 @@ canvas {
 }
 
 .pixel-icon.agent::after {
-    content: '⚙️';
-    font-size: 28px;
+    content: '';
 }
 
 .pixel-icon.house::after {
-    content: '🏠';
-    font-size: 28px;
+    content: '';
 }
 
 .pixel-icon.document::after {
-    content: '📊';
-    font-size: 28px;
+    content: '';
 }
 
 @keyframes pixelPulse {
@@ -1182,8 +1169,7 @@ canvas {
 }
 
 .pixel-progress-step.completed .pixel-progress-step-dot::after {
-    content: '✓';
-    font-size: 12px;
+    content: '';
 }
 
 .pixel-progress-step-label {
