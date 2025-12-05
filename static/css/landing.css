@@ -405,11 +405,11 @@ a.btn-primary:hover {
 /* Why Housler */
 .why-description {
     text-align: center;
-    font-size: var(--text-xl);
-    line-height: var(--leading-relaxed);
+    font-size: 20px;
+    line-height: 1.7;
     max-width: 900px;
-    margin: 0 auto var(--spacing-2xl);
-    color: var(--color-text-light);
+    margin: 0 auto;
+    color: var(--color-text);
 }
 
 /* CTA Section */
@@ -824,6 +824,7 @@ a.btn-primary:hover {
     display: grid;
     grid-template-columns: 1fr;
     gap: 24px;
+    margin-top: var(--spacing-xl);
 }
 
 @media (min-width: 640px) {
@@ -913,11 +914,11 @@ a.btn-primary:hover {
     display: inline-block;
     background: var(--gray-200);
     color: var(--gray-700);
-    font-size: var(--text-xs);
+    font-size: 12px;
     font-weight: 600;
     padding: 6px 12px;
-    border-radius: var(--border-radius-sm);
-    margin-bottom: var(--spacing-md);
+    border-radius: 20px;
+    margin-bottom: 16px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
