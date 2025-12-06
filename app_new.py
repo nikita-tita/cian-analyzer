@@ -535,6 +535,13 @@ def docs_agents():
     return render_template('docs_agents.html')
 
 
+@app.route('/mining')
+@app.route('/mining/')
+def mining():
+    """Gas-powered generation for mining page"""
+    return render_template('mining.html')
+
+
 @app.route('/health', methods=['GET'])
 @limiter.exempt  # Health check не должен ограничиваться - Docker healthcheck каждые 30 сек
 def health_check():
