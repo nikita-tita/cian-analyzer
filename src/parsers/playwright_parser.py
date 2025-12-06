@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
 
 from .base_parser import BaseCianParser
+from ..exceptions import CaptchaError, ContentBlockedError
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ try:
     VALIDATION_AVAILABLE = True
 except ImportError:
     VALIDATION_AVAILABLE = False
-    logger.warning("⚠️ Валидатор данных недоступен - фильтрация отключена")
+    logger.warning("Валидатор данных недоступен - фильтрация отключена")
 
 
 # Глобальный маппинг поддоменов ЦИАН на коды регионов (для detect_region_from_url)
@@ -122,22 +123,22 @@ def detect_region_from_url(url: str) -> str:
 
         # www.cian.ru = Москва (дефолтный регион)
         if subdomain == 'www':
-            logger.info(f"✓ URL www.cian.ru определен как МОСКВА (дефолтный регион)")
+            logger.info(f"URL www.cian.ru определен как МОСКВА (дефолтный регион)")
             return 'msk'
 
         # Ищем поддомен в маппинге
         if subdomain in SUBDOMAIN_TO_REGION:
             region = SUBDOMAIN_TO_REGION[subdomain]
-            logger.info(f"✓ Регион определен по поддомену: {subdomain} -> {region}")
+            logger.info(f"Регион определен по поддомену: {subdomain} -> {region}")
             return region
 
         # Если поддомен неизвестен, возвращаем его как есть (возможно новый регион)
-        logger.warning(f"⚠️ Неизвестный поддомен: {subdomain}, используем как ключ региона")
+        logger.warning(f"Неизвестный поддомен: {subdomain}, используем как ключ региона")
         return subdomain
 
     # cian.ru без поддомена = Москва
     if 'cian.ru' in url_lower:
-        logger.info(f"✓ URL cian.ru без поддомена определен как МОСКВА")
+        logger.info(f"URL cian.ru без поддомена определен как МОСКВА")
         return 'msk'
 
     # Резервные проверки для старого формата URL
@@ -146,7 +147,7 @@ def detect_region_from_url(url: str) -> str:
     if any(word in url_lower for word in ['moskva', 'moscow', '/msk/']):
         return 'msk'
 
-    logger.warning(f"⚠️ Не удалось определить регион по URL: {url}")
+    logger.warning(f"Не удалось определить регион по URL: {url}")
     return None
 
 
@@ -236,10 +237,10 @@ def detect_region_from_address(address: str) -> str:
     for region_key, keywords in ADDRESS_KEYWORDS_TO_REGION.items():
         for keyword in keywords:
             if keyword in address_lower:
-                logger.info(f"✓ Регион определен по адресу: {region_key} (ключевое слово: {keyword})")
+                logger.info(f"Регион определен по адресу: {region_key} (ключевое слово: {keyword})")
                 return region_key
 
-    logger.warning(f"⚠️ Не удалось определить регион по адресу: {address}")
+    logger.warning(f"Не удалось определить регион по адресу: {address}")
     return None
 
 
@@ -738,11 +739,11 @@ class PlaywrightParser(BaseCianParser):
             if self.using_pool:
                 logger.info("Acquiring browser from pool...")
                 self.browser, self.context = self.browser_pool.acquire(timeout=30.0)
-                logger.info("✓ Браузер получен из пула")
+                logger.info("Браузер получен из пула")
                 return
 
             # Иначе создаем собственный браузер (legacy режим)
-            logger.info("🚀 Запуск Playwright браузера...")
+            logger.info("Запуск Playwright браузера...")
             self.playwright = sync_playwright().start()
 
             self.browser = self.playwright.chromium.launch(
@@ -778,7 +779,7 @@ class PlaywrightParser(BaseCianParser):
                     lambda route: route.abort()
                 )
 
-            logger.info("✓ Браузер запущен и готов к работе")
+            logger.info("Браузер запущен и готов к работе")
 
         except Exception as e:
             logger.error(f"Ошибка при запуске браузера: {e}")
@@ -795,7 +796,7 @@ class PlaywrightParser(BaseCianParser):
                 self.browser_pool.release(self.browser)
                 self.browser = None
                 self.context = None
-                logger.info("✓ Browser returned to pool")
+                logger.info("Browser returned to pool")
                 return
             except Exception as e:
                 logger.error(f"Error returning browser to pool: {e}")
@@ -835,6 +836,55 @@ class PlaywrightParser(BaseCianParser):
             logger.warning(f"Ошибки при закрытии браузера: {', '.join(errors)}")
         else:
             logger.info("Браузер закрыт")
+
+    def _check_for_captcha_or_block(self, html: str, url: str) -> None:
+        """
+        Проверяет HTML на наличие капчи или блокировки.
+        Вызывает исключение если обнаружена проблема.
+
+        Args:
+            html: HTML контент страницы
+            url: URL для диагностики
+
+        Raises:
+            CaptchaError: если страница содержит активную капчу
+            ContentBlockedError: если контент заблокирован
+        """
+        html_lower = html.lower()
+
+        # Признаки активной капчи (не просто наличие скрипта, а блокирующей капчи)
+        captcha_blocking_signs = [
+            'g-recaptcha' in html_lower and 'offertitle' not in html_lower,
+            'captcha-form' in html_lower,
+            'please verify you are human' in html_lower,
+            'подтвердите, что вы не робот' in html_lower,
+            'пройдите проверку' in html_lower and 'offertitle' not in html_lower,
+        ]
+
+        if any(captcha_blocking_signs):
+            logger.warning(f"Обнаружена блокирующая капча для {url}")
+            raise CaptchaError(url)
+
+        # Признаки блокировки доступа
+        block_signs = [
+            'доступ заблокирован' in html_lower,
+            'access denied' in html_lower,
+            'доступ запрещен' in html_lower,
+            'вы заблокированы' in html_lower,
+        ]
+
+        if any(block_signs):
+            logger.warning(f"Обнаружена блокировка доступа для {url}")
+            raise ContentBlockedError(url, reason="access_denied")
+
+        # Проверка на пустую страницу (есть HTML но нет контента)
+        content_indicators = ['offertitle', 'offerprice', 'application/ld+json']
+        has_content = any(ind in html_lower for ind in content_indicators)
+
+        if not has_content and len(html) > 10000:
+            # Большая страница без контента - возможно редирект или ошибка
+            logger.warning(f"Страница загружена ({len(html)} bytes) но контент не найден: {url}")
+            raise ContentBlockedError(url, reason="no_content_found")
 
     def _get_page_content(self, url: str, max_retries: int = 3) -> Optional[str]:
         """
@@ -900,21 +950,31 @@ class PlaywrightParser(BaseCianParser):
                 if not html or len(html) < self.MIN_HTML_SIZE:
                     raise ValueError(f"Получен пустой или слишком короткий HTML ({len(html) if html else 0} символов)")
 
-                logger.info(f"✓ Страница загружена ({len(html)} символов)")
+                # Проверка на капчу/блокировку в HTML
+                self._check_for_captcha_or_block(html, url)
+
+                logger.info(f"Страница загружена ({len(html)} символов)")
                 return html
+
+            except (CaptchaError, ContentBlockedError) as e:
+                # Специфичные ошибки капчи/блокировки - увеличиваем задержку
+                last_error = e
+                logger.warning(f"Попытка {attempt}/{max_retries}: {type(e).__name__}")
+                if attempt < max_retries:
+                    time.sleep(10)
 
             except Exception as e:
                 last_error = e
-                logger.warning(f"⚠️ Попытка {attempt}/{max_retries} не удалась: {e}")
+                logger.warning(f"Попытка {attempt}/{max_retries} не удалась: {e}")
 
-                # Если это капча или блокировка - увеличиваем задержку
+                # Если это капча или блокировка в exception - увеличиваем задержку
                 if 'captcha' in str(e).lower() or '403' in str(e) or '429' in str(e):
-                    logger.warning(f"   🚫 Обнаружена блокировка/капча, увеличиваем задержку")
+                    logger.warning(f"Обнаружена блокировка/капча, увеличиваем задержку")
                     if attempt < max_retries:
-                        time.sleep(10)  # Ждем 10 секунд перед повтором
+                        time.sleep(10)
 
                 if attempt == max_retries:
-                    logger.error(f"❌ Все {max_retries} попытки исчерпаны для {url}")
+                    logger.error(f"Все {max_retries} попытки исчерпаны для {url}")
                     raise last_error
 
             finally:
@@ -940,7 +1000,7 @@ class PlaywrightParser(BaseCianParser):
 
         html = self._get_page_content(url)
         if not html:
-            logger.warning("⚠️ DEBUG: _get_page_content вернул пустой HTML")
+            logger.warning("DEBUG: _get_page_content вернул пустой HTML")
             return []
 
         soup = BeautifulSoup(html, 'lxml')
@@ -954,10 +1014,10 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"Найдено {len(cards)} карточек объявлений на странице")
 
         if len(cards) == 0:
-            logger.warning("⚠️ DEBUG: На странице не найдено ни одной карточки объявления")
-            logger.warning(f"⚠️ DEBUG: Размер HTML: {len(html)} байт")
+            logger.warning("DEBUG: На странице не найдено ни одной карточки объявления")
+            logger.warning(f"DEBUG: Размер HTML: {len(html)} байт")
             # Сохраним первые 2000 символов HTML для диагностики
-            logger.debug(f"⚠️ DEBUG: Начало HTML: {html[:2000]}")
+            logger.debug(f"DEBUG: Начало HTML: {html[:2000]}")
 
         listings = []
         for i, card in enumerate(cards):
@@ -966,14 +1026,14 @@ class PlaywrightParser(BaseCianParser):
                 if listing_data.get('title'):
                     listings.append(listing_data)
                     if i < 3:  # Логируем первые 3 для отладки
-                        logger.debug(f"✓ Карточка {i+1} спарсена: {listing_data.get('title', '')[:80]}")
+                        logger.debug(f"Карточка {i+1} спарсена: {listing_data.get('title', '')[:80]}")
                 else:
                     logger.debug(f"✗ Карточка {i+1}: отсутствует title, пропущена")
             except Exception as e:
                 logger.warning(f"Ошибка при парсинге карточки {i+1}: {e}")
                 continue
 
-        logger.info(f"✓ Успешно спарсено {len(listings)} объявлений из {len(cards)} карточек")
+        logger.info(f"Успешно спарсено {len(listings)} объявлений из {len(cards)} карточек")
 
         # Логируем статистику успешных селекторов
         stats = selector.get_stats()
@@ -1171,10 +1231,10 @@ class PlaywrightParser(BaseCianParser):
             Список валидных и подготовленных результатов
         """
         if not results:
-            logger.info("⚠️ DEBUG: _validate_and_prepare_results получил пустой список результатов")
+            logger.info("DEBUG: _validate_and_prepare_results получил пустой список результатов")
             return []
 
-        logger.info(f"🔍 DEBUG: Начинаем валидацию {len(results)} результатов (enable_validation={enable_validation})")
+        logger.info(f"DEBUG: Начинаем валидацию {len(results)} результатов (enable_validation={enable_validation})")
 
         # Маппинг полей для Pydantic моделей
         for result in results:
@@ -1209,7 +1269,7 @@ class PlaywrightParser(BaseCianParser):
                 else:
                     region_excluded += 1
                     logger.warning(
-                        f"⚠️ Исключен аналог из другого региона: "
+                        f"Исключен аналог из другого региона: "
                         f"{result_region} (ожидался {self.region}), "
                         f"адрес: {result_address[:80] if result_address else 'не указан'}"
                     )
@@ -1218,7 +1278,7 @@ class PlaywrightParser(BaseCianParser):
                 # Это предотвращает попадание аналогов из других регионов в отчет
                 region_excluded += 1
                 logger.warning(
-                    f"⚠️ Исключен аналог с неопределенным регионом, "
+                    f"Исключен аналог с неопределенным регионом, "
                     f"URL: {result_url[:80] if result_url else 'не указан'}, "
                     f"адрес: {result_address[:80] if result_address else 'не указан'}"
                 )
@@ -1267,7 +1327,7 @@ class PlaywrightParser(BaseCianParser):
                     if price_ratio > price_ratio_threshold:
                         unreasonable_count += 1
                         logger.warning(
-                            f"⚠️ Исключен неразумный аналог: цена отличается в {price_ratio:.1f} раз "
+                            f"Исключен неразумный аналог: цена отличается в {price_ratio:.1f} раз "
                             f"(аналог {comp_price:,} ₽ vs целевой {target_price:,} ₽), "
                             f"URL: {result.get('url', '')[:60]}..."
                         )
@@ -1278,7 +1338,7 @@ class PlaywrightParser(BaseCianParser):
                     if area_ratio > area_ratio_threshold:
                         unreasonable_count += 1
                         logger.warning(
-                            f"⚠️ Исключен неразумный аналог: площадь отличается в {area_ratio:.1f} раз "
+                            f"Исключен неразумный аналог: площадь отличается в {area_ratio:.1f} раз "
                             f"(аналог {comp_area} м² vs целевой {target_area} м²), "
                             f"URL: {result.get('url', '')[:60]}..."
                         )
@@ -1292,7 +1352,7 @@ class PlaywrightParser(BaseCianParser):
                     if price_per_sqm_diff > price_sqm_threshold:
                         unreasonable_count += 1
                         logger.warning(
-                            f"⚠️ Исключен по цене/м²: отличие {price_per_sqm_diff*100:.0f}% "
+                            f"Исключен по цене/м²: отличие {price_per_sqm_diff*100:.0f}% "
                             f"(аналог {comp_price_per_sqm:,.0f} ₽/м² vs целевой {target_price_per_sqm:,.0f} ₽/м²), "
                             f"адрес: {result.get('address', '')[:50]}"
                         )
@@ -1324,7 +1384,7 @@ class PlaywrightParser(BaseCianParser):
                     if is_valid:
                         validated.append(result)
                         logger.debug(
-                            f"✓ Результат {i+1}: валиден "
+                            f"Результат {i+1}: валиден "
                             f"(полнота: {details.get('completeness', 0):.0f}%)"
                         )
                     else:
@@ -1345,14 +1405,14 @@ class PlaywrightParser(BaseCianParser):
                     f"(исключено {excluded_count} некачественных)"
                 )
             else:
-                logger.info(f"✓ Все {len(validated)} результатов прошли валидацию")
+                logger.info(f"Все {len(validated)} результатов прошли валидацию")
 
             results = validated
         else:
-            logger.info(f"⚠️ DEBUG: Валидация отключена или недоступна (VALIDATION_AVAILABLE={VALIDATION_AVAILABLE})")
+            logger.info(f"DEBUG: Валидация отключена или недоступна (VALIDATION_AVAILABLE={VALIDATION_AVAILABLE})")
 
         # Ограничиваем количество
-        logger.info(f"✓ Возвращаем {min(len(results), limit)} результатов (limit={limit})")
+        logger.info(f"Возвращаем {min(len(results), limit)} результатов (limit={limit})")
         return results[:limit]
 
     def search_similar_in_building(self, target_property: Dict, limit: int = 20) -> List[Dict]:
@@ -1366,7 +1426,7 @@ class PlaywrightParser(BaseCianParser):
         Returns:
             Список похожих объявлений из того же ЖК
         """
-        logger.info("🔍 Начинаем поиск похожих квартир в том же ЖК...")
+        logger.info("Начинаем поиск похожих квартир в том же ЖК...")
 
         residential_complex = target_property.get('residential_complex') or ''
         residential_complex_url = target_property.get('residential_complex_url') or ''
@@ -1396,32 +1456,32 @@ class PlaywrightParser(BaseCianParser):
 
                     # Ищем ссылку на каталог квартир ЖК
                     catalog_links = soup.find_all('a', href=True)
-                    logger.info(f"🔍 DEBUG: Найдено {len(catalog_links)} ссылок на странице ЖК")
+                    logger.info(f"DEBUG: Найдено {len(catalog_links)} ссылок на странице ЖК")
                     for link in catalog_links:
                         href = link.get('href')
 
                         if ('/kupit-kvartiru-zhiloy-kompleks-' in href or
                                 ('/cat.php' in href and 'newobject' in href)):
                             residential_complex_url = href if href.startswith('http') else f"https://www.cian.ru{href}"
-                            logger.info(f"   ✓ Найдена ссылка на каталог: {residential_complex_url[:100]}")
+                            logger.info(f"   Найдена ссылка на каталог: {residential_complex_url[:100]}")
                             break
                 else:
-                    logger.warning(f"⚠️ DEBUG: Не удалось загрузить HTML страницы ЖК: {residential_complex_url}")
+                    logger.warning(f"DEBUG: Не удалось загрузить HTML страницы ЖК: {residential_complex_url}")
 
             # Парсим страницу с объявлениями ЖК
-            logger.info(f"🔍 DEBUG: Парсим страницу ЖК: {residential_complex_url}")
+            logger.info(f"DEBUG: Парсим страницу ЖК: {residential_complex_url}")
             results = self.parse_search_page(residential_complex_url)
 
             if results:
-                logger.info(f"✓ Найдено {len(results)} объявлений через прямую ссылку на ЖК")
+                logger.info(f"Найдено {len(results)} объявлений через прямую ссылку на ЖК")
                 # Валидация и подготовка
                 return self._validate_and_prepare_results(results, limit, target_property=target_property)
             else:
-                logger.warning("⚠️ По прямой ссылке ничего не найдено, пробуем текстовый поиск")
+                logger.warning("По прямой ссылке ничего не найдено, пробуем текстовый поиск")
 
         # ПРИОРИТЕТ 2: Текстовый поиск по названию ЖК (fallback)
         if not residential_complex:
-            logger.warning("⚠️ Не указан ЖК, используется поиск по адресу")
+            logger.warning("Не указан ЖК, используется поиск по адресу")
             # Пробуем извлечь из адреса
             import re
             match = re.search(r'ЖК\s+([А-Яа-яёЁ\s\-\d]+?)(?:,|$)', address or '')
@@ -1429,7 +1489,7 @@ class PlaywrightParser(BaseCianParser):
                 residential_complex = match.group(1).strip()
             else:
                 # Если нет ЖК - используем старый метод
-                logger.warning("⚠️ ЖК не найден, используется широкий поиск")
+                logger.warning("ЖК не найден, используется широкий поиск")
                 return self.search_similar(target_property, limit)
 
         logger.info(f"📍 Текстовый поиск по ЖК: {residential_complex}")
@@ -1467,7 +1527,7 @@ class PlaywrightParser(BaseCianParser):
         # Парсим результаты
         results = self.parse_search_page(url)
 
-        logger.info(f"🔍 DEBUG: parse_search_page вернул {len(results)} результатов для текстового поиска")
+        logger.info(f"DEBUG: parse_search_page вернул {len(results)} результатов для текстового поиска")
 
         # Фильтруем результаты - оставляем только те, что точно из этого ЖК
         filtered_results = []
@@ -1491,7 +1551,7 @@ class PlaywrightParser(BaseCianParser):
             # Полное совпадение (приоритет)
             if rc_lower in result_title or rc_lower in result_address:
                 filtered_results.append(result)
-                logger.info(f"     ✓ Добавлена (полное совпадение)")
+                logger.info(f"     Добавлена (полное совпадение)")
                 continue
 
             # Частичное совпадение - проверяем основные слова
@@ -1505,11 +1565,11 @@ class PlaywrightParser(BaseCianParser):
 
                 if matching_in_title >= 2 or matching_in_address >= 2:
                     filtered_results.append(result)
-                    logger.info(f"     ✓ Добавлена (частичное совпадение: {matching_in_title} в title, {matching_in_address} в address)")
+                    logger.info(f"     Добавлена (частичное совпадение: {matching_in_title} в title, {matching_in_address} в address)")
                 elif i < 5:
                     logger.info(f"     ✗ Пропущена (мало совпадений: {matching_in_title} в title, {matching_in_address} в address)")
 
-        logger.info(f"✓ Найдено {len(filtered_results)} похожих объявлений после фильтрации по ЖК '{residential_complex}'")
+        logger.info(f"Найдено {len(filtered_results)} похожих объявлений после фильтрации по ЖК '{residential_complex}'")
 
         # Валидация и подготовка с ОСЛАБЛЕННЫМИ фильтрами для ЖК
         # В ЖК цена/м² одинакова, поэтому площадь менее важна
@@ -1531,7 +1591,7 @@ class PlaywrightParser(BaseCianParser):
         # Метод 1: Проверка URL
         url = target_property.get('url', '')
         if '/newobject/' in url or 'newobject' in url:
-            logger.info(f"   🔍 Определен как новостройка (по URL)")
+            logger.info(f"   Определен как новостройка (по URL)")
             return True
 
         # Метод 2: Проверка года сдачи (если в будущем или близко к настоящему)
@@ -1544,10 +1604,10 @@ class PlaywrightParser(BaseCianParser):
             try:
                 year = int(build_year)
                 if year >= current_year:  # Сдача в будущем = новостройка
-                    logger.info(f"   🔍 Определен как новостройка (год сдачи {year} >= {current_year})")
+                    logger.info(f"   Определен как новостройка (год сдачи {year} >= {current_year})")
                     return True
                 elif year >= current_year - 2:  # Сдан недавно (последние 2 года)
-                    logger.info(f"   🔍 Определен как новостройка (сдан недавно: {year})")
+                    logger.info(f"   Определен как новостройка (сдан недавно: {year})")
                     return True
             except (ValueError, TypeError):
                 pass
@@ -1555,7 +1615,7 @@ class PlaywrightParser(BaseCianParser):
         # Метод 3: Проверка статуса объекта
         object_status = target_property.get('object_status', '').lower()
         if 'новостр' in object_status or 'строит' in object_status:
-            logger.info(f"   🔍 Определен как новостройка (статус: {object_status})")
+            logger.info(f"   Определен как новостройка (статус: {object_status})")
             return True
 
         # Метод 4: Эвристика - без отделки + высокая цена за м²
@@ -1563,11 +1623,11 @@ class PlaywrightParser(BaseCianParser):
         price_per_sqm = target_property.get('price_per_sqm', 0) or target_property.get('price', 0) / max(target_property.get('total_area', 1), 1)
 
         if 'без отделки' in repair_level and price_per_sqm > 200_000:  # Премиум без отделки = скорее всего новостройка
-            logger.info(f"   🔍 Определен как новостройка (без отделки + цена {price_per_sqm:,.0f} ₽/м²)")
+            logger.info(f"   Определен как новостройка (без отделки + цена {price_per_sqm:,.0f} ₽/м²)")
             return True
 
         # По умолчанию считаем вторичкой
-        logger.info(f"   🔍 Определен как вторичка (не найдено признаков новостройки)")
+        logger.info(f"   Определен как вторичка (не найдено признаков новостройки)")
         return False
 
     def _get_segment_tolerances(self, target_price: float) -> tuple[float, float, str]:
@@ -1747,7 +1807,7 @@ class PlaywrightParser(BaseCianParser):
 
         url = f"{self.base_url}/cat.php?" + '&'.join([f"{k}={v}" for k, v in search_params.items()])
 
-        logger.debug(f"   🔍 Поиск по адресу: {search_query}")
+        logger.debug(f"   Поиск по адресу: {search_query}")
 
         results = self.parse_search_page(url)
 
@@ -1795,7 +1855,7 @@ class PlaywrightParser(BaseCianParser):
         # type=4 - новостройки, type=1 - вторичка
         if is_new_building:
             search_params['type'] = '4'  # 4 = новостройка в Cian API
-            logger.info(f"   🏗️ Целевой объект - НОВОСТРОЙКА, фильтруем поиск (type=4)")
+            logger.info(f"   Целевой объект - НОВОСТРОЙКА, фильтруем поиск (type=4)")
         else:
             search_params['type'] = '1'  # 1 = вторичка в Cian API
             logger.info(f"   🏠 Целевой объект - ВТОРИЧКА, фильтруем поиск (type=1)")
@@ -1879,19 +1939,19 @@ class PlaywrightParser(BaseCianParser):
             if 'монолит' in house_type:
                 if 'кирпич' in house_type:
                     search_params['building_type'] = '5'  # Кирпично-монолитный
-                    logger.info(f"   🏗️ Фильтр типа дома: кирпично-монолитный")
+                    logger.info(f"   Фильтр типа дома: кирпично-монолитный")
                 else:
                     search_params['building_type'] = '4'  # Монолитный
-                    logger.info(f"   🏗️ Фильтр типа дома: монолитный")
+                    logger.info(f"   Фильтр типа дома: монолитный")
             elif 'кирпич' in house_type:
                 search_params['building_type'] = '1'  # Кирпичный
-                logger.info(f"   🏗️ Фильтр типа дома: кирпичный")
+                logger.info(f"   Фильтр типа дома: кирпичный")
             elif 'панел' in house_type:
                 search_params['building_type'] = '2'  # Панельный
-                logger.info(f"   🏗️ Фильтр типа дома: панельный")
+                logger.info(f"   Фильтр типа дома: панельный")
             elif 'блочн' in house_type:
                 search_params['building_type'] = '3'  # Блочный
-                logger.info(f"   🏗️ Фильтр типа дома: блочный")
+                logger.info(f"   Фильтр типа дома: блочный")
 
         # PATCH: Фильтр по году постройки (для вторички, ±10 лет)
         if not is_new_building and target_property:
@@ -1948,7 +2008,7 @@ class PlaywrightParser(BaseCianParser):
         target_address = target_property.get('address') or ''.lower().strip()
 
         if not target_metro and not target_address:
-            logger.info("   ℹ️ Нет данных о локации целевого объекта, фильтрация пропущена")
+            logger.info("   Нет данных о локации целевого объекта, фильтрация пропущена")
             return results
 
         filtered = []
@@ -2026,7 +2086,7 @@ class PlaywrightParser(BaseCianParser):
             Список похожих объявлений
         """
         logger.info("=" * 80)
-        logger.info("🔍 НАЧИНАЕМ МНОГОУРОВНЕВЫЙ ПОИСК АНАЛОГОВ (ДОРАБОТКА #5)")
+        logger.info("НАЧИНАЕМ МНОГОУРОВНЕВЫЙ ПОИСК АНАЛОГОВ (ДОРАБОТКА #5)")
         logger.info("=" * 80)
 
         # Формируем критерии поиска
@@ -2080,25 +2140,25 @@ class PlaywrightParser(BaseCianParser):
         residential_complex = target_property.get('residential_complex', '')
 
         if is_new_building and residential_complex:
-            logger.info(f"🏗️ УРОВЕНЬ 0: Новостройка - пробуем поиск по ЖК '{residential_complex}'")
+            logger.info(f"УРОВЕНЬ 0: Новостройка - пробуем поиск по ЖК '{residential_complex}'")
             try:
                 results_level0 = self.search_similar_in_building(target_property, limit=limit)
                 if len(results_level0) >= self.MIN_RESULTS_THRESHOLD:
-                    logger.info(f"   ✅ УРОВЕНЬ 0: Нашли достаточно аналогов в ЖК ({len(results_level0)} шт.)")
+                    logger.info(f"   УРОВЕНЬ 0: Нашли достаточно аналогов в ЖК ({len(results_level0)} шт.)")
                     validated_level0 = self._validate_and_prepare_results(results_level0, limit, target_property=target_property)
                     final_results.extend(validated_level0)
-                    logger.info(f"   ✅ УРОВЕНЬ 0 ЗАВЕРШЁН: {len(validated_level0)} аналогов из того же ЖК")
+                    logger.info(f"   УРОВЕНЬ 0 ЗАВЕРШЁН: {len(validated_level0)} аналогов из того же ЖК")
                     logger.info("=" * 80)
                     return final_results[:limit]
                 else:
-                    logger.warning(f"   ⚠️ УРОВЕНЬ 0: В ЖК найдено мало аналогов ({len(results_level0)} шт.), переходим к широкому поиску")
+                    logger.warning(f"   УРОВЕНЬ 0: В ЖК найдено мало аналогов ({len(results_level0)} шт.), переходим к широкому поиску")
                     # Добавляем то что нашли, и продолжаем
                     if results_level0:
                         validated_level0 = self._validate_and_prepare_results(results_level0, limit, target_property=target_property)
                         final_results.extend(validated_level0)
-                        logger.info(f"   ✓ Добавлено {len(validated_level0)} аналогов из ЖК")
+                        logger.info(f"   Добавлено {len(validated_level0)} аналогов из ЖК")
             except Exception as e:
-                logger.warning(f"   ⚠️ УРОВЕНЬ 0: Ошибка поиска по ЖК - {e}")
+                logger.warning(f"   УРОВЕНЬ 0: Ошибка поиска по ЖК - {e}")
                 logger.info(f"   → Переходим к широкому поиску")
             logger.info("")
 
@@ -2113,7 +2173,7 @@ class PlaywrightParser(BaseCianParser):
             logger.info(f"   URL: {street_url[:100]}...")
             try:
                 results_street = self.parse_search_page(street_url)
-                logger.info(f"   ✓ Найдено объявлений на улице: {len(results_street)}")
+                logger.info(f"   Найдено объявлений на улице: {len(results_street)}")
 
                 if results_street:
                     # Валидируем и добавляем
@@ -2124,15 +2184,15 @@ class PlaywrightParser(BaseCianParser):
                     existing_urls = {r.get('url') for r in final_results}
                     new_street_results = [r for r in validated_street if r.get('url') not in existing_urls]
                     final_results.extend(new_street_results)
-                    logger.info(f"   ✅ УРОВЕНЬ 0.5: Добавлено {len(new_street_results)} аналогов с той же улицы")
+                    logger.info(f"   УРОВЕНЬ 0.5: Добавлено {len(new_street_results)} аналогов с той же улицы")
 
                     # Если достаточно аналогов - можно завершать
                     if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
-                        logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+                        logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
                         logger.info("=" * 80)
                         return final_results[:limit]
             except Exception as e:
-                logger.warning(f"   ⚠️ УРОВЕНЬ 0.5: Ошибка поиска по улице - {e}")
+                logger.warning(f"   УРОВЕНЬ 0.5: Ошибка поиска по улице - {e}")
             logger.info("")
 
         # ═══════════════════════════════════════════════════════════════════════════
@@ -2147,15 +2207,15 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   URL: {url_level1[:100]}...")
 
         results_level1 = self.parse_search_page(url_level1)
-        logger.info(f"   ✓ Найдено объявлений: {len(results_level1)}")
+        logger.info(f"   Найдено объявлений: {len(results_level1)}")
 
         # ═══════════════════════════════════════════════════════════════════════════
         # КРИТИЧЕСКИЙ ФИКС БАГ #2: PROGRESSIVE FILTER RELAXATION
         # Если 0 результатов → убираем доп. фильтры (год/класс/этажи/отделка)
         # ═══════════════════════════════════════════════════════════════════════════
         if len(results_level1) == 0:
-            logger.warning("⚠️ Уровень 1 дал 0 результатов!")
-            logger.warning("⚠️ Пробуем БЕЗ фильтров (год/класс/этажи/отделка)...")
+            logger.warning("Уровень 1 дал 0 результатов!")
+            logger.warning("Пробуем БЕЗ фильтров (год/класс/этажи/отделка)...")
 
             # Строим URL ТОЛЬКО с критическими фильтрами
             search_params_relaxed = {
@@ -2173,7 +2233,7 @@ class PlaywrightParser(BaseCianParser):
             is_new_building = self._is_new_building(target_property)
             if is_new_building:
                 search_params_relaxed['type'] = '4'
-                logger.info(f"   🏗️ Тип: НОВОСТРОЙКА (type=4)")
+                logger.info(f"   Тип: НОВОСТРОЙКА (type=4)")
             else:
                 search_params_relaxed['type'] = '1'
                 logger.info(f"   🏠 Тип: ВТОРИЧКА (type=1)")
@@ -2189,25 +2249,25 @@ class PlaywrightParser(BaseCianParser):
             logger.info(f"   🔄 Relaxed URL: {url_relaxed[:100]}...")
 
             results_level1 = self.parse_search_page(url_relaxed)
-            logger.info(f"   ✅ После снятия доп. фильтров найдено: {len(results_level1)} объявлений")
+            logger.info(f"   После снятия доп. фильтров найдено: {len(results_level1)} объявлений")
 
         # Фильтруем по локации (строгий режим - только совпадение метро)
         if target_metro or target_address:
             filtered_level1 = self._filter_by_location(results_level1, target_property, strict=True)
-            logger.info(f"   ✓ После фильтрации по локации: {len(filtered_level1)} объявлений")
+            logger.info(f"   После фильтрации по локации: {len(filtered_level1)} объявлений")
         else:
             filtered_level1 = results_level1
-            logger.info(f"   ℹ️ Фильтрация по локации пропущена (нет данных о метро/адресе)")
+            logger.info(f"   Фильтрация по локации пропущена (нет данных о метро/адресе)")
 
         # Валидация и добавление
         validated_level1 = self._validate_and_prepare_results(filtered_level1, limit, target_property=target_property)
         final_results.extend(validated_level1)
-        logger.info(f"   ✅ УРОВЕНЬ 1: Добавлено {len(validated_level1)} валидных аналогов")
+        logger.info(f"   УРОВЕНЬ 1: Добавлено {len(validated_level1)} валидных аналогов")
         logger.info("")
 
         # Проверяем, достаточно ли аналогов
         if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
-            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
 
@@ -2226,7 +2286,7 @@ class PlaywrightParser(BaseCianParser):
             if parsed_addr.get('street'):
                 nearby_houses = self._generate_nearby_houses(parsed_addr, radius=5)
                 logger.info(f"   📍 Улица: {parsed_addr.get('street')}, дом: {parsed_addr.get('house')}{parsed_addr.get('building', '')}")
-                logger.info(f"   🏘️ Проверяем {len(nearby_houses)} вариантов соседних домов...")
+                logger.info(f"   Проверяем {len(nearby_houses)} вариантов соседних домов...")
 
                 existing_urls = {r.get('url') for r in final_results}
                 houses_checked = 0
@@ -2235,7 +2295,7 @@ class PlaywrightParser(BaseCianParser):
                 for house_variant in nearby_houses:
                     # Прерываем если уже достаточно аналогов
                     if len(final_results) + len(new_results_level15) >= self.PREFERRED_RESULTS_THRESHOLD:
-                        logger.info(f"   ✅ Достаточно аналогов, прерываем поиск по домам")
+                        logger.info(f"   Достаточно аналогов, прерываем поиск по домам")
                         break
 
                     # Ищем по конкретному адресу
@@ -2257,16 +2317,16 @@ class PlaywrightParser(BaseCianParser):
                                 existing_urls.add(r.get('url'))
 
                 final_results.extend(new_results_level15)
-                logger.info(f"   ✅ УРОВЕНЬ 1.5: Проверено {houses_checked} домов, найдено в {houses_with_results}")
-                logger.info(f"   ✅ УРОВЕНЬ 1.5: Добавлено {len(new_results_level15)} новых аналогов из соседних домов")
+                logger.info(f"   УРОВЕНЬ 1.5: Проверено {houses_checked} домов, найдено в {houses_with_results}")
+                logger.info(f"   УРОВЕНЬ 1.5: Добавлено {len(new_results_level15)} новых аналогов из соседних домов")
                 logger.info("")
             else:
-                logger.info(f"   ⚠️ Не удалось распарсить адрес: {target_address}")
+                logger.info(f"   Не удалось распарсить адрес: {target_address}")
                 logger.info("")
 
         # Проверяем после уровня 1.5
         if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
-            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
 
@@ -2289,7 +2349,7 @@ class PlaywrightParser(BaseCianParser):
                 for metro_station in nearby_metros[1:]:  # Пропускаем исходную станцию
                     # Прерываем если достаточно аналогов
                     if len(final_results) + len(new_results_level16) >= self.PREFERRED_RESULTS_THRESHOLD:
-                        logger.info(f"   ✅ Достаточно аналогов, прерываем поиск по метро")
+                        logger.info(f"   Достаточно аналогов, прерываем поиск по метро")
                         break
 
                     # Фильтруем уже найденные по этой станции
@@ -2309,12 +2369,12 @@ class PlaywrightParser(BaseCianParser):
                                 existing_urls.add(r.get('url'))
 
                 final_results.extend(new_results_level16)
-                logger.info(f"   ✅ УРОВЕНЬ 1.6: Добавлено {len(new_results_level16)} аналогов с соседних станций")
+                logger.info(f"   УРОВЕНЬ 1.6: Добавлено {len(new_results_level16)} аналогов с соседних станций")
                 logger.info("")
 
         # Проверяем после уровня 1.6
         if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
-            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
 
@@ -2354,7 +2414,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   URL: {url_level2[:100]}...")
 
         results_level2 = self.parse_search_page(url_level2)
-        logger.info(f"   ✓ Найдено объявлений: {len(results_level2)}")
+        logger.info(f"   Найдено объявлений: {len(results_level2)}")
 
         # Валидируем БЕЗ фильтра локации
         validated_level2 = self._validate_and_prepare_results(results_level2, limit, target_property=target_property)
@@ -2364,19 +2424,19 @@ class PlaywrightParser(BaseCianParser):
         new_results_level2 = [r for r in validated_level2 if r.get('url') not in existing_urls]
 
         final_results.extend(new_results_level2)
-        logger.info(f"   ✅ УРОВЕНЬ 2: Добавлено {len(new_results_level2)} новых аналогов из города")
+        logger.info(f"   УРОВЕНЬ 2: Добавлено {len(new_results_level2)} новых аналогов из города")
         logger.info("")
 
         # Проверяем снова
         if len(final_results) >= 5:
-            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
 
         # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 3: Сверхрасширенный поиск (допуски +50% + ослабленный фильтр комнат)
         # ═══════════════════════════════════════════════════════════════════════════
-        logger.info(f"🚀 УРОВЕНЬ 3: Расширяем диапазоны поиска (+50% к допускам, ±1 комната)")
+        logger.info(f"УРОВЕНЬ 3: Расширяем диапазоны поиска (+50% к допускам, ±1 комната)")
         logger.info(f"   (текущее количество: {len(final_results)}, нужно минимум 5)")
 
         expanded_price_tolerance = price_tolerance * 1.5
@@ -2415,7 +2475,7 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   URL: {url_level3[:100]}...")
 
         results_level3 = self.parse_search_page(url_level3)
-        logger.info(f"   ✓ Найдено объявлений: {len(results_level3)}")
+        logger.info(f"   Найдено объявлений: {len(results_level3)}")
 
         validated_level3 = self._validate_and_prepare_results(results_level3, limit, target_property=target_property)
 
@@ -2424,12 +2484,12 @@ class PlaywrightParser(BaseCianParser):
         new_results_level3 = [r for r in validated_level3 if r.get('url') not in existing_urls]
 
         final_results.extend(new_results_level3)
-        logger.info(f"   ✅ УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
+        logger.info(f"   УРОВЕНЬ 3: Добавлено {len(new_results_level3)} новых аналогов")
         logger.info("")
 
         # Проверяем снова
         if len(final_results) >= 5:
-            logger.info(f"✅ Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
             logger.info("=" * 80)
             return final_results[:limit]
 
@@ -2462,12 +2522,12 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   URL: {url_fallback[:100]}...")
 
         results_fallback = self.parse_search_page(url_fallback)
-        logger.info(f"   ✓ Найдено объявлений: {len(results_fallback)}")
+        logger.info(f"   Найдено объявлений: {len(results_fallback)}")
 
         # Фильтруем по локации (нестрогий режим)
         if target_metro or target_address:
             filtered_fallback = self._filter_by_location(results_fallback, target_property, strict=False)
-            logger.info(f"   ✓ После фильтрации по локации (нестрогий режим): {len(filtered_fallback)} объявлений")
+            logger.info(f"   После фильтрации по локации (нестрогий режим): {len(filtered_fallback)} объявлений")
         else:
             filtered_fallback = results_fallback
 
@@ -2478,7 +2538,7 @@ class PlaywrightParser(BaseCianParser):
         new_results_fallback = [r for r in validated_fallback if r.get('url') not in existing_urls]
 
         final_results.extend(new_results_fallback)
-        logger.info(f"   ✅ УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
+        logger.info(f"   УРОВЕНЬ 4 (FALLBACK): Добавлено {len(new_results_fallback)} новых аналогов")
         logger.info("")
 
         # ═══════════════════════════════════════════════════════════════════════════
@@ -2516,7 +2576,7 @@ class PlaywrightParser(BaseCianParser):
             final_results.sort(key=sort_key)
             same_rc_count = sum(1 for r in final_results if target_rc in r.get('title', '').lower() or target_rc in r.get('address', '').lower())
             if same_rc_count > 0:
-                logger.info(f"🏘️ Приоритизация: {same_rc_count} аналогов из того же ЖК '{target_property.get('residential_complex')}' выше в списке")
+                logger.info(f"Приоритизация: {same_rc_count} аналогов из того же ЖК '{target_property.get('residential_complex')}' выше в списке")
 
         # Итоговый результат (фильтрация по региону уже выполнена в _validate_and_prepare_results)
         logger.info("=" * 80)
@@ -2554,12 +2614,12 @@ class PlaywrightParser(BaseCianParser):
                 logger.info(f"   - Разброс: {spread:.0f}%")
 
                 if spread > 50:
-                    logger.warning(f"⚠️ ВНИМАНИЕ: Разброс цен {spread:.0f}% превышает 50%!")
+                    logger.warning(f"ВНИМАНИЕ: Разброс цен {spread:.0f}% превышает 50%!")
                     logger.warning(f"   Рекомендуется ручная проверка аналогов")
                 elif spread > 30:
-                    logger.warning(f"⚠️ Разброс цен {spread:.0f}% умеренно высокий")
+                    logger.warning(f"Разброс цен {spread:.0f}% умеренно высокий")
                 else:
-                    logger.info(f"✓ Разброс цен {spread:.0f}% в допустимых пределах")
+                    logger.info(f"Разброс цен {spread:.0f}% в допустимых пределах")
 
         logger.info("=" * 80)
 

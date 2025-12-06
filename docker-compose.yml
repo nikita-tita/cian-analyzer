@@ -45,6 +45,9 @@ services:
       # Flask
       FLASK_ENV: production
       FLASK_DEBUG: "false"
+      # Parser (BrowserPool enabled for better performance)
+      USE_BROWSER_POOL: "true"
+      MAX_BROWSERS: 3
     depends_on:
       redis:
         condition: service_healthy

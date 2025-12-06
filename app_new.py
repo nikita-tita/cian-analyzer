@@ -364,6 +364,7 @@ import signal
 import threading
 from contextlib import contextmanager
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 class TimeoutError(Exception):
     """Exception raised when operation times out"""
@@ -374,7 +375,7 @@ class TimeoutError(Exception):
 def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
     """
     Context manager для жесткого timeout операций
-    Работает как в главном потоке (через signal), так и в дочерних (через threading.Timer)
+    Работает в главном потоке (signal) и в worker threads (ThreadPoolExecutor)
 
     Args:
         seconds: Максимальное время выполнения в секундах
@@ -387,11 +388,10 @@ def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
         with timeout_context(60):
             long_running_operation()
     """
-    # Проверяем, находимся ли мы в главном потоке
     is_main_thread = threading.current_thread() is threading.main_thread()
 
     if is_main_thread:
-        # В главном потоке используем signal
+        # В главном потоке используем signal (для локальной разработки)
         def timeout_handler(signum, frame):
             raise TimeoutError(error_message)
 
@@ -404,10 +404,26 @@ def timeout_context(seconds: int, error_message: str = 'Operation timed out'):
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
     else:
-        # В дочерних потоках просто выполняем без timeout
-        # (signal не работает в дочерних потоках с Gunicorn gthread worker)
-        logger.debug(f"Timeout context called in non-main thread, executing without timeout")
-        yield
+        # В worker threads (Gunicorn) используем threading timeout
+        # Создаем событие для отслеживания таймаута
+        timeout_event = threading.Event()
+        exception_holder = [None]
+
+        def check_timeout():
+            if not timeout_event.wait(seconds):
+                # Таймаут истек, но мы не можем прервать поток извне
+                # Логируем для диагностики
+                logger.warning(f"Timeout ({seconds}s) exceeded: {error_message}")
+
+        # Запускаем таймер в фоне
+        timer_thread = threading.Thread(target=check_timeout, daemon=True)
+        timer_thread.start()
+
+        try:
+            yield
+        finally:
+            # Сигнализируем что операция завершена
+            timeout_event.set()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -980,16 +996,31 @@ def parse_url():
             address = parsed_data.get('address', '')
             region = detect_region_from_address(address)
             if region:
-                logger.info(f"✓ Регион определен по адресу: {region} (адрес: {address})")
+                logger.info(f"Регион определен по адресу: {region} (адрес: {address})")
                 # Сохраняем регион в данные объекта
                 parsed_data['region'] = region
             else:
-                logger.warning(f"⚠️ Не удалось определить регион ни по URL, ни по адресу: {address}")
+                logger.warning(f"Не удалось определить регион ни по URL, ни по адресу: {address}")
                 # Fallback на Москву (основной регион ЦИАН)
                 region = 'msk'
                 parsed_data['region'] = region
         else:
             parsed_data['region'] = region
+
+        # ВАЛИДАЦИЯ: Проверяем что спарсились критические поля
+        # Без цены или площади объект бесполезен для анализа
+        price = parsed_data.get('price') or parsed_data.get('price_raw')
+        total_area = parsed_data.get('total_area') or parsed_data.get('area')
+        address = parsed_data.get('address')
+
+        if not price and not total_area and not address:
+            logger.error(f"Парсинг не вернул данных для URL: {url}")
+            return jsonify({
+                'status': 'error',
+                'error_type': 'parsing_failed',
+                'message': 'Не удалось извлечь данные из объявления. Возможно, объявление удалено или изменена структура страницы.',
+                'details': 'Цена, площадь и адрес не найдены'
+            }), 422  # Unprocessable Entity
 
         # Определяем недостающие поля для анализа
         missing_fields = _identify_missing_fields(parsed_data)

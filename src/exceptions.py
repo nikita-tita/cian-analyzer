@@ -173,6 +173,26 @@ class RateLimitedError(ParsingError):
         super().__init__(message, url=url, details=details)
 
 
+class CaptchaError(ParsingError):
+    """Сайт показывает капчу"""
+    error_code = 'CAPTCHA_REQUIRED'
+    http_status = 503
+
+    def __init__(self, url: str):
+        message = "Сайт требует подтверждение. Попробуйте через несколько минут."
+        super().__init__(message, url=url)
+
+
+class ContentBlockedError(ParsingError):
+    """Контент заблокирован (страница без данных)"""
+    error_code = 'CONTENT_BLOCKED'
+    http_status = 503
+
+    def __init__(self, url: str, reason: str = None):
+        message = "Не удалось получить данные страницы. Попробуйте позже."
+        super().__init__(message, url=url, details={'reason': reason} if reason else {})
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ANALYSIS ERRORS (422 Unprocessable Entity)
 # ═══════════════════════════════════════════════════════════════════════════

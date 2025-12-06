@@ -172,6 +172,29 @@ const utils = {
     },
 
     /**
+     * Fetch with timeout using AbortController
+     * Prevents requests from hanging indefinitely
+     * @param {string} url - URL to fetch
+     * @param {object} options - Fetch options
+     * @param {number} timeoutMs - Timeout in ms (default: 90000)
+     * @returns {Promise<Response>}
+     */
+    async fetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            return response;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    },
+
+    /**
      * Validate and normalize CIAN URL
      * @param {string} url - URL to validate
      * @returns {object} - { valid: boolean, url: string, error: string|null }
@@ -793,11 +816,12 @@ const screen1 = {
         pixelLoader.show('parsing');
 
         try {
-            const response = await fetch('/api/parse', {
+            // 90 секунд timeout - достаточно для 3 попыток парсинга по 30 сек
+            const response = await utils.fetchWithTimeout('/api/parse', {
                 method: 'POST',
                 headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({ url })
-            });
+            }, 90000);
 
             const result = await response.json();
 
@@ -825,8 +849,9 @@ const screen1 = {
             }
         } catch (error) {
             console.error('Parse error:', error);
-            // Используем getErrorMessage для обработки любых ошибок
-            const errorData = getErrorMessage('network_error');
+            // Различаем timeout от других сетевых ошибок
+            const errorKey = error.name === 'AbortError' ? 'parsing_timeout' : 'network_error';
+            const errorData = getErrorMessage(errorKey);
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
@@ -1040,21 +1065,22 @@ const screen2 = {
         pixelLoader.show('searching');
 
         try {
-            const response = await fetch('/api/find-similar', {
+            // 120 секунд - поиск аналогов может занимать больше времени
+            const response = await utils.fetchWithTimeout('/api/find-similar', {
                 method: 'POST',
                 headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     limit: 50  // Увеличено до 50 чтобы не терять объекты
                 })
-            });
+            }, 120000);
 
             const result = await response.json();
 
             if (result.status === 'success') {
                 // Debug logging - trace object count
-                console.log('🔍 DEBUG: Received comparables from API:', result.comparables.length);
-                console.log('🔍 DEBUG: API reported count:', result.count);
+                console.log('DEBUG: Received comparables from API:', result.comparables.length);
+                console.log('DEBUG: API reported count:', result.count);
 
                 // FIX ISSUE #2: Normalize data format for frontend compatibility
                 state.comparables = result.comparables.map(comp => ({
@@ -1068,8 +1094,8 @@ const screen2 = {
                     // Ensure excluded flag exists
                     excluded: comp.excluded || false
                 }));
-                console.log('🔍 DEBUG: State comparables normalized and set to:', state.comparables.length);
-                console.log('🔍 DEBUG: Sample comparable:', state.comparables[0]);
+                console.log('DEBUG: State comparables normalized and set to:', state.comparables.length);
+                console.log('DEBUG: Sample comparable:', state.comparables[0]);
 
                 this.renderComparables();
 
@@ -1101,7 +1127,8 @@ const screen2 = {
             }
         } catch (error) {
             console.error('Find similar error:', error);
-            const errorData = getErrorMessage('network_error');
+            const errorKey = error.name === 'AbortError' ? 'parsing_timeout' : 'network_error';
+            const errorData = getErrorMessage(errorKey);
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
@@ -1128,14 +1155,15 @@ const screen2 = {
         pixelLoader.show('searching');
 
         try {
-            const response = await fetch('/api/add-comparable', {
+            // 90 секунд timeout для парсинга одного объекта
+            const response = await utils.fetchWithTimeout('/api/add-comparable', {
                 method: 'POST',
                 headers: utils.getCsrfHeaders(),
                 body: JSON.stringify({
                     session_id: state.sessionId,
                     url
                 })
-            });
+            }, 90000);
 
             const result = await response.json();
 
@@ -1167,7 +1195,8 @@ const screen2 = {
             }
         } catch (error) {
             console.error('Add comparable error:', error);
-            const errorData = getErrorMessage('network_error');
+            const errorKey = error.name === 'AbortError' ? 'parsing_timeout' : 'network_error';
+            const errorData = getErrorMessage(errorKey);
             utils.showToast(`${errorData.title}: ${errorData.message}`, 'error');
         } finally {
             pixelLoader.hide();
