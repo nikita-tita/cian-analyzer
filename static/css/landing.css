@@ -201,30 +201,39 @@ a:link {
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.2s;
+    border: 2px solid transparent;
+    cursor: pointer;
 }
 
 .btn-primary,
 a.btn-primary,
 a.btn-primary:link,
-a.btn-primary:visited {
-    background: var(--color-text);
-    color: #FFFFFF !important;
+a.btn-primary:visited,
+button.btn-primary {
+    background: var(--black);
+    color: var(--white) !important;
+    border-color: var(--black);
 }
 
 .btn-primary:hover,
-a.btn-primary:hover {
-    background: #000000;
-    color: #FFFFFF !important;
+a.btn-primary:hover,
+button.btn-primary:hover {
+    background: var(--gray-800);
+    border-color: var(--gray-800);
+    color: var(--white) !important;
 }
 
-.btn-secondary {
-    background: transparent;
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
+.btn-secondary,
+button.btn-secondary {
+    background: var(--white);
+    color: var(--black);
+    border: 2px solid var(--black);
 }
 
-.btn-secondary:hover {
-    border-color: var(--color-text);
+.btn-secondary:hover,
+button.btn-secondary:hover {
+    background: var(--black);
+    color: var(--white);
 }
 
 .btn-large {
@@ -824,7 +833,7 @@ a.btn-primary:hover {
     display: grid;
     grid-template-columns: 1fr;
     gap: 24px;
-    margin-top: var(--spacing-xl);
+    margin-top: var(--spacing-2xl);
 }
 
 @media (min-width: 640px) {
