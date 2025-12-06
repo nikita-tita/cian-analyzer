@@ -164,7 +164,7 @@ class BaseCianParser(ABC):
                         if has_street_type and has_geo_id:
                             street_url = href if href.startswith('http') else f"https://www.cian.ru{href}"
                             data['street_url'] = street_url
-                            logger.info(f"✓ Найден street_url из breadcrumbs: {street_url[:80]}...")
+                            logger.info(f"Found street_url from breadcrumbs: {street_url[:80]}...")
                             break
 
         # ЖК (Жилой комплекс)
@@ -183,13 +183,13 @@ class BaseCianParser(ABC):
                     # Например: https://zhk-moiseenko-10.cian.ru/
                     data['residential_complex'] = text.replace('ЖК ', '').replace('«', '').replace('»', '').strip()
                     data['residential_complex_url'] = href
-                    logger.info(f"✓ Найден ЖК по ссылке: {text} → {href[:50]}")
+                    logger.info(f"Found residential complex: {text} -> {href[:50]}")
                     break
                 elif '/zhiloy-kompleks-' in href or '/kupit-kvartiru-zhiloy-kompleks-' in href:
                     # Например: /kupit-kvartiru-zhiloy-kompleks-moiseenko-10-5094487/
                     data['residential_complex'] = text.replace('ЖК ', '').replace('«', '').replace('»', '').strip()
                     data['residential_complex_url'] = href if href.startswith('http') else f"https://www.cian.ru{href}"
-                    logger.info(f"✓ Найден ЖК по ссылке: {text} → {href[:50]}")
+                    logger.info(f"Found residential complex: {text} -> {href[:50]}")
                     break
 
             # Метод 2: Из breadcrumbs
@@ -673,7 +673,7 @@ class BaseCianParser(ABC):
             cached_data = self.cache.get_property(url)
             if cached_data:
                 self.stats['cache_hits'] += 1
-                logger.info(f"✅ Cache HIT: {url[:60]}...")
+                logger.info(f"Cache HIT: {url[:60]}...")
                 return cached_data
             else:
                 self.stats['cache_misses'] += 1
@@ -706,7 +706,7 @@ class BaseCianParser(ABC):
             # JSON-LD данные (приоритет)
             json_ld = self._extract_json_ld(soup)
             if json_ld:
-                logger.info("✓ Используем JSON-LD данные")
+                logger.info("Using JSON-LD data")
                 data['title'] = json_ld.get('name')
 
                 offers = json_ld.get('offers', {})
@@ -728,12 +728,19 @@ class BaseCianParser(ABC):
             # Извлекаем премиум-характеристики
             self._extract_premium_features(soup, data)
 
-            logger.info(f"✓ Успешно спарсен: {data.get('title', 'Без названия')}")
+            logger.info(f"Успешно спарсен: {data.get('title', 'Без названия')}")
 
-            # Сохраняем в кэш
+            # Сохраняем в кэш ТОЛЬКО если есть критические данные
+            # Это предотвращает кэширование пустых/неполных результатов
             if self.cache:
-                self.cache.set_property(url, data, ttl_hours=24)
-                logger.debug(f"💾 Сохранено в кэш: {url[:60]}...")
+                price = data.get('price') or data.get('price_raw')
+                area = data.get('total_area') or data.get('area')
+
+                if price or area:
+                    self.cache.set_property(url, data, ttl_hours=24)
+                    logger.debug(f"Saved to cache: {url[:60]}...")
+                else:
+                    logger.warning(f"Skip caching - no price/area: {url[:60]}...")
 
             return data
 

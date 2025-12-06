@@ -53,7 +53,7 @@ class PropertyCache:
         self._is_available = False
 
         if not enabled:
-            logger.info("🔴 Redis cache DISABLED (pass-through mode)")
+            logger.info("Redis cache DISABLED (pass-through mode)")
             return
 
         try:
@@ -71,10 +71,10 @@ class PropertyCache:
             # Проверка подключения
             self.redis_client.ping()
             self._is_available = True
-            logger.info(f"✅ Redis cache connected: {host}:{port}/{db} (namespace: {namespace})")
+            logger.info(f"Redis cache connected: {host}:{port}/{db} (namespace: {namespace})")
 
         except RedisError as e:
-            logger.warning(f"⚠️ Redis unavailable: {e}. Running without cache.")
+            logger.warning(f"Redis unavailable: {e}. Running without cache.")
             self.redis_client = None
             self._is_available = False
 
@@ -113,10 +113,10 @@ class PropertyCache:
             data = self.redis_client.get(key)
 
             if data:
-                logger.debug(f"✅ Cache HIT: {url[:50]}...")
+                logger.debug(f"Cache HIT: {url[:50]}...")
                 return json.loads(data)
 
-            logger.debug(f"❌ Cache MISS: {url[:50]}...")
+            logger.debug(f"Cache MISS: {url[:50]}...")
             return None
 
         except (RedisError, json.JSONDecodeError) as e:
@@ -148,7 +148,7 @@ class PropertyCache:
                 serialized
             )
 
-            logger.debug(f"💾 Cached property: {url[:50]}... (TTL: {ttl_hours}h)")
+            logger.debug(f"Cached property: {url[:50]}... (TTL: {ttl_hours}h)")
             return True
 
         except (RedisError, TypeError) as e:
@@ -173,10 +173,10 @@ class PropertyCache:
             data = self.redis_client.get(key)
 
             if data:
-                logger.debug(f"✅ Search cache HIT: {query_hash}")
+                logger.debug(f"Search cache HIT: {query_hash}")
                 return json.loads(data)
 
-            logger.debug(f"❌ Search cache MISS: {query_hash}")
+            logger.debug(f"Search cache MISS: {query_hash}")
             return None
 
         except (RedisError, json.JSONDecodeError) as e:
@@ -208,7 +208,7 @@ class PropertyCache:
                 serialized
             )
 
-            logger.debug(f"💾 Cached search: {query_hash} ({len(results)} results, TTL: {ttl_hours}h)")
+            logger.debug(f"Cached search: {query_hash} ({len(results)} results, TTL: {ttl_hours}h)")
             return True
 
         except (RedisError, TypeError) as e:
@@ -233,7 +233,7 @@ class PropertyCache:
             data = self.redis_client.get(key)
 
             if data:
-                logger.debug(f"✅ Complex cache HIT: {complex_name}")
+                logger.debug(f"Complex cache HIT: {complex_name}")
                 return json.loads(data)
 
             return None
@@ -272,7 +272,7 @@ class PropertyCache:
                 serialized
             )
 
-            logger.debug(f"💾 Cached complex: {complex_name} (TTL: {ttl_days}d)")
+            logger.debug(f"Cached complex: {complex_name} (TTL: {ttl_days}d)")
             return True
 
         except (RedisError, TypeError) as e:
@@ -295,7 +295,7 @@ class PropertyCache:
         try:
             key = self._make_key('property', url)
             deleted = self.redis_client.delete(key)
-            logger.debug(f"🗑️ Invalidated: {url[:50]}...")
+            logger.debug(f"Invalidated: {url[:50]}...")
             return deleted > 0
 
         except RedisError as e:
@@ -321,7 +321,7 @@ class PropertyCache:
 
             if keys:
                 deleted = self.redis_client.delete(*keys)
-                logger.warning(f"🗑️ Cleared {deleted} keys matching: {full_pattern}")
+                logger.warning(f"Cleared {deleted} keys matching: {full_pattern}")
                 return deleted
 
             return 0
@@ -413,7 +413,7 @@ def get_cache() -> PropertyCache:
     if _cache_instance is None:
         # Дефолтный инстанс без кэша (pass-through)
         _cache_instance = PropertyCache(enabled=False)
-        logger.warning("⚠️ Using default cache instance (disabled)")
+        logger.warning("Using default cache instance (disabled)")
 
     return _cache_instance
 
