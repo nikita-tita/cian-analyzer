@@ -99,10 +99,12 @@ def client_request():
         name = data.get('name', '').strip()
         phone = data.get('phone', '').strip()
         contact_method = data.get('contact_method', '').strip()
+        user_message = data.get('message', '').strip()
+        source = data.get('source', 'website').strip()
 
         # Строгая валидация enum полей
-        valid_operations = {'buy', 'sell', 'rent'}
-        valid_property_types = {'residential', 'commercial'}
+        valid_operations = {'buy', 'sell', 'rent', 'mining_inquiry'}
+        valid_property_types = {'residential', 'commercial', 'mining_equipment'}
         valid_contact_methods = {'call', 'whatsapp', 'telegram'}
 
         if operation not in valid_operations:
@@ -122,11 +124,13 @@ def client_request():
         operation_map = {
             'buy': 'Купить',
             'sell': 'Продать',
-            'rent': 'Сдать в аренду'
+            'rent': 'Сдать в аренду',
+            'mining_inquiry': 'Заявка на майнинг'
         }
         property_map = {
             'residential': 'Жилая недвижимость',
-            'commercial': 'Коммерческая недвижимость'
+            'commercial': 'Коммерческая недвижимость',
+            'mining_equipment': 'Майнинг оборудование'
         }
         contact_map = {
             'call': 'Позвонить',
@@ -141,6 +145,7 @@ def client_request():
         # Санитизация пользовательского ввода
         safe_name = TelegramNotifier.sanitize_html(name)
         safe_phone = TelegramNotifier.sanitize_html(phone)
+        safe_message = TelegramNotifier.sanitize_html(user_message) if user_message else ''
 
         # Логируем
         logger.info(f"=== НОВАЯ ЗАЯВКА ОТ КЛИЕНТА ===")
@@ -149,24 +154,40 @@ def client_request():
         logger.info(f"Имя: {name}")
         logger.info(f"Телефон: {phone}")
         logger.info(f"Способ связи: {contact_text}")
+        logger.info(f"Сообщение: {user_message if user_message else 'нет'}")
+        logger.info(f"Источник: {source}")
         logger.info(f"IP: {request.remote_addr}")
         logger.info(f"================================")
 
         # Формируем сообщение для Telegram
         timestamp = datetime.now().strftime('%d.%m.%Y %H:%M')
-        message = f"""🏠 <b>Новая заявка с сайта HOUSLER</b>
+
+        # Разный формат для mining и обычных заявок
+        if operation == 'mining_inquiry':
+            telegram_msg = f"""<b>Заявка на майнинг с сайта HOUSLER</b>
+
+<b>Контактные данные:</b>
+- Имя: {safe_name}
+- Телефон: {safe_phone}
+- Связаться через: {contact_text}
+
+<b>Сообщение:</b> {safe_message if safe_message else 'не указано'}
+
+<i>{timestamp}</i>"""
+        else:
+            telegram_msg = f"""<b>Новая заявка с сайта HOUSLER</b>
 
 <b>Операция:</b> {operation_text}
 <b>Тип недвижимости:</b> {property_text}
 
 <b>Контактные данные:</b>
-• Имя: {safe_name}
-• Телефон: {safe_phone}
-• Связаться через: {contact_text}
+- Имя: {safe_name}
+- Телефон: {safe_phone}
+- Связаться через: {contact_text}
 
-<i>📅 {timestamp}</i>"""
+<i>{timestamp}</i>"""
 
-        telegram_notifier.send(message)
+        telegram_notifier.send(telegram_msg)
 
         return jsonify({
             'success': True,
