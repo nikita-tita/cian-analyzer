@@ -1,620 +1,634 @@
 /* ============================================
    MINING PAGE STYLES
-   Version: 1.0
-   Theme: Cream & Modern
+   Based on HOUSLER Design System
    ============================================ */
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* Import design system variables */
 
-:root {
-    --color-cream: #FDF6EC;
-    --color-cream-dark: #F5EDE0;
-    --color-black: #1A1A1A;
-    --color-gray: #6B7280;
-    --color-white: #FFFFFF;
-    --color-yellow: #FBBF24;
-    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --transition: all 0.3s ease;
-}
-
-body {
-    font-family: var(--font-primary);
-    background: var(--color-cream);
-    color: var(--color-black);
+/* Page-specific styles */
+.mining-page {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--color-text, #000);
+    background: var(--color-bg, #fff);
     line-height: 1.6;
-}
-
-/* Container */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 24px;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* Navigation */
-.nav {
-    position: fixed;
+.mining-nav {
+    padding: 24px 0;
+    border-bottom: 1px solid var(--color-border, #E5E7EB);
+    background: var(--color-bg, #fff);
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
     z-index: 100;
-    background: var(--color-cream);
-    padding: 16px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
-.nav-content {
+.mining-nav .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+.mining-nav-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.logo {
+.mining-logo {
     font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: var(--color-black);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--color-text, #000) !important;
     text-decoration: none;
 }
 
-.nav-cta {
-    background: var(--color-black);
-    color: var(--color-white);
-    padding: 10px 24px;
+.mining-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+/* Language Switcher */
+.lang-switcher {
+    display: flex;
+    gap: 4px;
+    background: var(--color-bg-gray, #F9FAFB);
+    padding: 4px;
     border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 14px;
-    transition: var(--transition);
 }
 
-.nav-cta:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
+.lang-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-light, #6B7280);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.lang-btn:hover {
+    color: var(--color-text, #000);
+}
+
+.lang-btn.active {
+    background: var(--color-bg, #fff);
+    color: var(--color-text, #000);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.mining-nav-cta {
+    display: inline-block;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--black, #000);
+    color: var(--white, #fff) !important;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.mining-nav-cta:hover {
+    background: var(--gray-800, #333);
 }
 
 /* Hero Section */
-.hero {
-    padding: 140px 0 80px;
+.mining-hero {
+    padding: 80px 0;
     text-align: center;
 }
 
-.hero-badge {
+.mining-hero .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+.mining-hero-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    background: var(--color-yellow);
+    width: 56px;
+    height: 56px;
+    background: var(--black, #000);
     border-radius: 50%;
     margin-bottom: 32px;
 }
 
-.hero-badge-icon {
-    width: 32px;
-    height: 32px;
+.mining-hero-badge svg {
+    width: 28px;
+    height: 28px;
+    color: var(--white, #fff);
 }
 
-.hero-title {
-    font-size: clamp(32px, 5vw, 56px);
-    font-weight: 400;
-    line-height: 1.2;
+.mining-hero-title {
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
     margin-bottom: 48px;
-    letter-spacing: -0.02em;
 }
 
-.hero-image {
+.mining-hero-image {
     max-width: 900px;
     margin: 0 auto;
-    border-radius: 24px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    border: 1px solid var(--color-border, #E5E7EB);
 }
 
-.hero-image img {
+.mining-hero-image img {
     width: 100%;
     height: auto;
     display: block;
 }
 
 /* Sections */
-.section {
+.mining-section {
     padding: 80px 0;
 }
 
-.section-alt {
-    background: var(--color-cream-dark);
+.mining-section .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
 }
 
-.section-dark {
-    background: var(--color-black);
-    color: var(--color-white);
+.mining-section-gray {
+    background: var(--color-bg-gray, #F9FAFB);
 }
 
-.section-dark .section-title {
-    color: var(--color-white);
+.mining-section-dark {
+    background: var(--black, #000);
+    color: var(--white, #fff);
 }
 
-.section-title {
-    font-size: clamp(28px, 4vw, 48px);
-    font-weight: 400;
-    margin-bottom: 40px;
+.mining-section-title {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 600;
     letter-spacing: -0.02em;
+    margin-bottom: 48px;
 }
 
-/* Executive Summary */
-.summary-grid {
+.mining-section-dark .mining-section-title {
+    color: var(--white, #fff);
+}
+
+/* Grid Layouts */
+.mining-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: center;
+    gap: 64px;
+    align-items: start;
 }
 
-.summary-price {
+.mining-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+}
+
+/* Summary Section */
+.mining-summary-price {
     font-size: 20px;
-    font-weight: 500;
+    font-weight: 600;
     margin-bottom: 24px;
-    color: var(--color-black);
 }
 
-.summary-list {
+.mining-summary-list {
     list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
-.summary-list li {
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
-    font-size: 16px;
-    color: var(--color-gray);
+.mining-summary-list li {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--color-border, #E5E7EB);
+    font-size: 15px;
+    color: var(--color-text-light, #6B7280);
+    line-height: 1.6;
 }
 
-.summary-list li::before {
-    content: "- ";
-    color: var(--color-black);
+.mining-summary-list li::before {
+    content: "—";
+    margin-right: 12px;
+    color: var(--color-text, #000);
 }
 
-.summary-image {
-    border-radius: 16px;
+.mining-image {
+    border-radius: 12px;
     overflow: hidden;
+    border: 1px solid var(--color-border, #E5E7EB);
 }
 
-.summary-image img {
+.mining-image img {
     width: 100%;
     height: auto;
     display: block;
 }
 
-/* Problem Section */
-.problem-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: start;
-}
-
-.problem-cards {
+/* Feature Cards */
+.mining-cards {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.problem-card {
-    background: var(--color-white);
+.mining-card {
     padding: 16px 20px;
-    border-radius: 12px;
+    background: var(--color-bg, #fff);
+    border: 1px solid var(--color-border, #E5E7EB);
+    border-radius: 10px;
     font-size: 15px;
-    border: 1px solid rgba(0,0,0,0.05);
+    transition: all 0.2s;
 }
 
-.problem-images {
-    display: grid;
-    gap: 16px;
+.mining-card:hover {
+    border-color: var(--color-text, #000);
 }
 
-.problem-images img {
-    width: 100%;
-    border-radius: 16px;
+.mining-section-gray .mining-card {
+    background: var(--color-bg, #fff);
 }
 
-/* Solution Section */
-.solution-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: start;
-}
-
-.solution-images {
-    display: grid;
-    gap: 16px;
-}
-
-.solution-images img {
-    width: 100%;
-    border-radius: 16px;
-}
-
-.solution-cards {
+/* Images Grid */
+.mining-images-col {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
-.solution-card {
-    background: var(--color-cream-dark);
-    padding: 16px 20px;
+.mining-images-col img {
+    width: 100%;
     border-radius: 12px;
-    font-size: 15px;
-    border: 1px solid rgba(0,0,0,0.05);
+    border: 1px solid var(--color-border, #E5E7EB);
 }
 
 /* Equipment Section */
-.equipment-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: start;
-}
-
-.equipment-specs {
+.mining-specs {
     display: flex;
     flex-direction: column;
     gap: 24px;
 }
 
-.spec-item {
+.mining-spec-item {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.spec-value {
+.mining-spec-value {
     font-size: 32px;
     font-weight: 600;
-    color: var(--color-black);
 }
 
-.spec-label {
+.mining-spec-label {
     font-size: 14px;
-    color: var(--color-gray);
+    color: var(--color-text-light, #6B7280);
 }
 
-.equipment-note {
-    font-size: 14px;
-    color: var(--color-gray);
-    line-height: 1.7;
+.mining-spec-note {
     padding: 16px;
-    background: var(--color-white);
-    border-radius: 12px;
+    background: var(--color-bg-gray, #F9FAFB);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--color-text-light, #6B7280);
+    line-height: 1.7;
 }
 
-.equipment-features {
+.mining-section-gray .mining-spec-note {
+    background: var(--color-bg, #fff);
+    border: 1px solid var(--color-border, #E5E7EB);
+}
+
+.mining-features-list {
     list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
-.equipment-features li {
+.mining-features-list li {
     padding: 8px 0;
     font-size: 15px;
-    color: var(--color-gray);
+    color: var(--color-text-light, #6B7280);
 }
 
-.equipment-features li::before {
-    content: "- ";
-    color: var(--color-black);
+.mining-features-list li::before {
+    content: "—";
+    margin-right: 12px;
+    color: var(--color-text, #000);
 }
 
-.equipment-gallery {
+/* Equipment Gallery */
+.mining-gallery-4 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
 
-.equipment-gallery img {
+.mining-gallery-4 img {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 10px;
     aspect-ratio: 4/3;
     object-fit: cover;
+    border: 1px solid var(--color-border, #E5E7EB);
 }
 
-/* Infrastructure Section */
-.infra-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: start;
-}
-
-.infra-gallery {
+/* Infrastructure Gallery */
+.mining-infra-gallery {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
 }
 
-.infra-gallery img {
+.mining-infra-gallery img {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 10px;
     aspect-ratio: 1;
     object-fit: cover;
+    border: 1px solid var(--color-border, #E5E7EB);
 }
 
-.infra-gallery img:first-child {
+.mining-infra-gallery img:first-child {
     grid-column: span 2;
     aspect-ratio: 2/1;
 }
 
-.infra-features {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.infra-card {
-    background: var(--color-cream-dark);
-    padding: 16px 20px;
-    border-radius: 12px;
-    font-size: 15px;
-    border: 1px solid rgba(0,0,0,0.05);
-    text-align: center;
-}
-
-/* Gas Field Section */
-.gas-grid {
+/* Gas Stats */
+.mining-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 40px;
-    margin-bottom: 40px;
-}
-
-.gas-stat {
+    margin-bottom: 48px;
     text-align: center;
 }
 
-.gas-value {
-    display: block;
+.mining-stat-value {
     font-size: 48px;
     font-weight: 600;
-    color: var(--color-yellow);
     margin-bottom: 8px;
 }
 
-.gas-label {
+.mining-stat-label {
     font-size: 14px;
     color: rgba(255,255,255,0.7);
 }
 
-.gas-features {
-    list-style: none;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.gas-features li {
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    font-size: 16px;
+.mining-section-dark .mining-features-list li {
     color: rgba(255,255,255,0.8);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 12px 0;
     text-align: center;
 }
 
-/* Agreements Section */
-.agreements-grid {
+.mining-section-dark .mining-features-list li::before {
+    display: none;
+}
+
+.mining-section-dark .mining-features-list {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* Agreements Grid */
+.mining-agreements {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
 }
 
-.agreement-card {
-    background: var(--color-cream-dark);
+.mining-agreement {
     padding: 32px;
-    border-radius: 16px;
+    background: var(--color-bg-gray, #F9FAFB);
+    border-radius: 12px;
 }
 
-.agreement-card h3 {
+.mining-agreement h3 {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 16px;
 }
 
-.agreement-card p {
+.mining-agreement p {
     font-size: 14px;
-    color: var(--color-gray);
+    color: var(--color-text-light, #6B7280);
     line-height: 1.7;
 }
 
 /* Legal Section */
-.legal-content {
+.mining-legal {
     max-width: 800px;
     margin: 0 auto;
     text-align: center;
 }
 
-.legal-highlight {
+.mining-legal-highlight {
     font-size: 20px;
     font-weight: 500;
     margin-bottom: 32px;
 }
 
-.legal-points p {
+.mining-legal-text p {
     font-size: 15px;
-    color: var(--color-gray);
+    color: var(--color-text-light, #6B7280);
     line-height: 1.8;
     margin-bottom: 16px;
 }
 
-/* Contact Section */
-.contact-subtitle {
-    font-size: 18px;
-    color: rgba(255,255,255,0.7);
-    margin-bottom: 40px;
+/* CTA Section */
+.mining-cta {
+    padding: 80px 0;
+    background: var(--color-bg-gray, #F9FAFB);
     text-align: center;
 }
 
-.contact-grid {
-    display: flex;
-    justify-content: center;
-    gap: 60px;
+.mining-cta .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
 }
 
-.contact-item {
-    text-align: center;
+.mining-cta h2 {
+    font-size: 32px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
 }
 
-.contact-label {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255,255,255,0.5);
-    margin-bottom: 8px;
-}
-
-.contact-item a {
+.mining-cta p {
     font-size: 18px;
-    color: var(--color-white);
-    text-decoration: none;
-    transition: var(--transition);
+    color: var(--color-text-light, #6B7280);
+    margin-bottom: 32px;
 }
 
-.contact-item a:hover {
-    color: var(--color-yellow);
+.mining-cta-btn {
+    display: inline-block;
+    padding: 18px 40px;
+    background: var(--black, #000);
+    color: var(--white, #fff) !important;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.mining-cta-btn:hover {
+    background: var(--gray-800, #333);
+    transform: translateY(-2px);
 }
 
 /* Footer */
-.footer {
-    background: var(--color-black);
-    color: var(--color-white);
+.mining-footer {
     padding: 32px 0;
-    border-top: 1px solid rgba(255,255,255,0.1);
+    border-top: 1px solid var(--color-border, #E5E7EB);
 }
 
-.footer-content {
+.mining-footer .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+.mining-footer-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.footer-logo {
-    font-weight: 700;
-    letter-spacing: 2px;
+.mining-footer-logo {
+    font-weight: 600;
+    letter-spacing: -0.02em;
 }
 
-.footer-copy {
+.mining-footer-copy {
     font-size: 14px;
-    color: rgba(255,255,255,0.5);
+    color: var(--color-text-light, #6B7280);
 }
 
 /* Mobile Responsive */
 @media (max-width: 1024px) {
-    .summary-grid,
-    .problem-grid,
-    .solution-grid,
-    .equipment-grid,
-    .infra-grid {
+    .mining-grid-2 {
         grid-template-columns: 1fr;
         gap: 40px;
     }
 
-    .gas-grid {
+    .mining-grid-3 {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+
+    .mining-stats {
         grid-template-columns: 1fr;
         gap: 32px;
     }
 
-    .gas-value {
-        font-size: 36px;
+    .mining-agreements {
+        grid-template-columns: 1fr;
     }
 
-    .agreements-grid {
-        grid-template-columns: 1fr;
+    .mining-stat-value {
+        font-size: 36px;
     }
 }
 
 @media (max-width: 768px) {
-    .container {
-        padding: 0 16px;
+    .mining-nav .container,
+    .mining-hero .container,
+    .mining-section .container,
+    .mining-cta .container,
+    .mining-footer .container {
+        padding: 0 20px;
     }
 
-    .hero {
-        padding: 120px 0 60px;
+    .mining-hero {
+        padding: 60px 0;
     }
 
-    .hero-badge {
+    .mining-section {
+        padding: 60px 0;
+    }
+
+    .mining-hero-badge {
         width: 48px;
         height: 48px;
         margin-bottom: 24px;
     }
 
-    .hero-badge-icon {
+    .mining-hero-badge svg {
         width: 24px;
         height: 24px;
     }
 
-    .section {
-        padding: 60px 0;
-    }
-
-    .section-title {
-        margin-bottom: 32px;
-    }
-
-    .equipment-gallery {
+    .mining-gallery-4 {
         grid-template-columns: 1fr;
     }
 
-    .infra-gallery {
+    .mining-infra-gallery {
         grid-template-columns: 1fr 1fr;
     }
 
-    .infra-gallery img:first-child {
+    .mining-infra-gallery img:first-child {
         grid-column: span 2;
     }
 
-    .contact-grid {
-        flex-direction: column;
-        gap: 32px;
+    .mining-nav-cta {
+        display: none;
     }
 
-    .footer-content {
+    .mining-footer-content {
         flex-direction: column;
         gap: 16px;
         text-align: center;
     }
 
-    .problem-images,
-    .solution-images {
+    .mining-images-col {
         order: -1;
     }
 }
 
 @media (max-width: 480px) {
-    .hero-title {
+    .mining-hero-title {
         font-size: 28px;
     }
 
-    .hero-image {
-        border-radius: 16px;
-    }
-
-    .spec-value {
+    .mining-spec-value {
         font-size: 24px;
     }
 
-    .gas-value {
+    .mining-stat-value {
         font-size: 28px;
     }
 
-    .agreement-card {
+    .mining-agreement {
         padding: 24px;
     }
 
-    .infra-gallery {
+    .mining-infra-gallery {
         grid-template-columns: 1fr;
     }
 
-    .infra-gallery img:first-child {
+    .mining-infra-gallery img:first-child {
         grid-column: span 1;
         aspect-ratio: 16/9;
+    }
+
+    .lang-switcher {
+        padding: 2px;
+    }
+
+    .lang-btn {
+        padding: 6px 12px;
+        font-size: 13px;
     }
 }

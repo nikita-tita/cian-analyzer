@@ -1,107 +1,115 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gas-Powered Generation for Mining | HOUSLER</title>
-    <meta name="description" content="Own gas-powered generation for cryptocurrency mining. 44 GPU units, 14.08 MW effective capacity, $0.05/kWh electricity tariff.">
+    <title>{{ t.meta_title }} | HOUSLER</title>
+    <meta name="description" content="{{ t.meta_description }}">
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/mining.css?v=20251206">
+    <link rel="stylesheet" href="/static/css/design-system.css">
+    <link rel="stylesheet" href="/static/css/mining.css?v=20251206b">
+    <link rel="stylesheet" href="/static/css/request-form.css?v=20251126">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="mining-page">
     <!-- Navigation -->
-    <nav class="nav">
+    <nav class="mining-nav">
         <div class="container">
-            <div class="nav-content">
-                <a href="/" class="logo">HOUSLER</a>
-                <a href="#contact" class="nav-cta">Contact Us</a>
+            <div class="mining-nav-content">
+                <a href="/" class="mining-logo">HOUSLER</a>
+                <div class="mining-nav-right">
+                    <div class="lang-switcher">
+                        <a href="/mining/ru" class="lang-btn {% if lang == 'ru' %}active{% endif %}">RU</a>
+                        <a href="/mining" class="lang-btn {% if lang == 'en' %}active{% endif %}">EN</a>
+                    </div>
+                    <button class="mining-nav-cta" onclick="openMiningForm()">{{ t.cta_button }}</button>
+                </div>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="hero">
+    <section class="mining-hero">
         <div class="container">
-            <div class="hero-badge">
-                <svg class="hero-badge-icon" viewBox="0 0 24 24" fill="currentColor">
+            <div class="mining-hero-badge">
+                <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                 </svg>
             </div>
-            <h1 class="hero-title">Own gas-powered generation<br>for mining</h1>
-            <div class="hero-image">
-                <img src="/static/images/mining/page1_img1.jpeg" alt="Gas-powered generation facility">
+            <h1 class="mining-hero-title">{{ t.hero_title }}</h1>
+            <div class="mining-hero-image">
+                <img src="/static/images/mining/page1_img1.jpeg" alt="{{ t.hero_alt }}">
             </div>
         </div>
     </section>
 
     <!-- Executive Summary -->
-    <section class="section">
+    <section class="mining-section">
         <div class="container">
-            <div class="summary-grid">
-                <div class="summary-content">
-                    <h2 class="section-title">Executive Summary</h2>
-                    <p class="summary-price">Contract value: USD 5.3 million</p>
-                    <ul class="summary-list">
-                        <li>44 gas-piston units (GPU) + 44 automatic oil refill systems for USD 5.3 million</li>
-                        <li>Total effective operating capacity: 14.08 MW, with a total installed capacity of 17.6 MW</li>
-                        <li>Effective tariff for generated electricity: 0.05 USD/kWh</li>
-                        <li>Gas field resource: over 30 years</li>
-                        <li>Placement and ongoing maintenance are included in the tariff</li>
+            <div class="mining-grid-2">
+                <div>
+                    <h2 class="mining-section-title">{{ t.summary_title }}</h2>
+                    <p class="mining-summary-price">{{ t.summary_price }}</p>
+                    <ul class="mining-summary-list">
+                        <li>{{ t.summary_1 }}</li>
+                        <li>{{ t.summary_2 }}</li>
+                        <li>{{ t.summary_3 }}</li>
+                        <li>{{ t.summary_4 }}</li>
+                        <li>{{ t.summary_5 }}</li>
                     </ul>
                 </div>
-                <div class="summary-image">
-                    <img src="/static/images/mining/page2_img1.jpeg" alt="Mining facility overview">
+                <div class="mining-image">
+                    <img src="/static/images/mining/page2_img1.jpeg" alt="{{ t.summary_alt }}">
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Problem Section -->
-    <section class="section section-alt">
+    <section class="mining-section mining-section-gray">
         <div class="container">
-            <div class="problem-grid">
-                <div class="problem-content">
-                    <h2 class="section-title">Problem</h2>
-                    <div class="problem-cards">
-                        <div class="problem-card">Shortage of accessible electrical power</div>
-                        <div class="problem-card">High grid electricity tariffs</div>
-                        <div class="problem-card">Limited available capacities</div>
-                        <div class="problem-card">Hosting providers have unstable business models</div>
-                        <div class="problem-card">Energy dependence on third-party suppliers</div>
-                        <div class="problem-card">Limited opportunities for scaling</div>
-                        <div class="problem-card">Unpredictable long-term operating conditions</div>
+            <div class="mining-grid-2">
+                <div>
+                    <h2 class="mining-section-title">{{ t.problem_title }}</h2>
+                    <div class="mining-cards">
+                        <div class="mining-card">{{ t.problem_1 }}</div>
+                        <div class="mining-card">{{ t.problem_2 }}</div>
+                        <div class="mining-card">{{ t.problem_3 }}</div>
+                        <div class="mining-card">{{ t.problem_4 }}</div>
+                        <div class="mining-card">{{ t.problem_5 }}</div>
+                        <div class="mining-card">{{ t.problem_6 }}</div>
+                        <div class="mining-card">{{ t.problem_7 }}</div>
                     </div>
                 </div>
-                <div class="problem-images">
-                    <img src="/static/images/mining/page3_img1.jpeg" alt="Power lines">
-                    <img src="/static/images/mining/page3_img2.jpeg" alt="Electrical grid">
+                <div class="mining-images-col">
+                    <img src="/static/images/mining/page3_img1.jpeg" alt="">
+                    <img src="/static/images/mining/page3_img2.jpeg" alt="">
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Solution Section -->
-    <section class="section">
+    <section class="mining-section">
         <div class="container">
-            <div class="solution-grid">
-                <div class="solution-images">
-                    <img src="/static/images/mining/page4_img1.jpeg" alt="Mining facility interior">
-                    <img src="/static/images/mining/page4_img2.jpeg" alt="Cooling system">
+            <div class="mining-grid-2">
+                <div class="mining-images-col">
+                    <img src="/static/images/mining/page4_img1.jpeg" alt="">
+                    <img src="/static/images/mining/page4_img2.jpeg" alt="">
                 </div>
-                <div class="solution-content">
-                    <h2 class="section-title">Solution</h2>
-                    <div class="solution-cards">
-                        <div class="solution-card">Full autonomy from the power grid</div>
-                        <div class="solution-card">Minimal electricity production cost</div>
-                        <div class="solution-card">Direct access to natural gas</div>
-                        <div class="solution-card">Predictable and controlled operating expenses</div>
-                        <div class="solution-card">Scalable infrastructure</div>
-                        <div class="solution-card">High level of control over all critical systems</div>
-                        <div class="solution-card">Maximized mining profitability</div>
+                <div>
+                    <h2 class="mining-section-title">{{ t.solution_title }}</h2>
+                    <div class="mining-cards">
+                        <div class="mining-card">{{ t.solution_1 }}</div>
+                        <div class="mining-card">{{ t.solution_2 }}</div>
+                        <div class="mining-card">{{ t.solution_3 }}</div>
+                        <div class="mining-card">{{ t.solution_4 }}</div>
+                        <div class="mining-card">{{ t.solution_5 }}</div>
+                        <div class="mining-card">{{ t.solution_6 }}</div>
+                        <div class="mining-card">{{ t.solution_7 }}</div>
                     </div>
                 </div>
             </div>
@@ -109,161 +117,336 @@
     </section>
 
     <!-- Equipment Section -->
-    <section class="section section-alt">
+    <section class="mining-section mining-section-gray">
         <div class="container">
-            <h2 class="section-title">Equipment (GPU - Gas Piston Unit)</h2>
-            <div class="equipment-grid">
-                <div class="equipment-specs">
-                    <div class="spec-item">
-                        <span class="spec-value">400 kW</span>
-                        <span class="spec-label">nominal (nameplate) capacity</span>
+            <h2 class="mining-section-title">{{ t.equipment_title }}</h2>
+            <div class="mining-grid-2">
+                <div class="mining-specs">
+                    <div class="mining-spec-item">
+                        <span class="mining-spec-value">400 {{ t.kw }}</span>
+                        <span class="mining-spec-label">{{ t.equipment_nominal }}</span>
                     </div>
-                    <div class="spec-item">
-                        <span class="spec-value">320 kW</span>
-                        <span class="spec-label">effective operating capacity</span>
+                    <div class="mining-spec-item">
+                        <span class="mining-spec-value">320 {{ t.kw }}</span>
+                        <span class="mining-spec-label">{{ t.equipment_effective }}</span>
                     </div>
-                    <div class="spec-item">
-                        <span class="spec-value">~90 units</span>
-                        <span class="spec-label">Antminer Bitmain L7 9500Mh support</span>
+                    <div class="mining-spec-item">
+                        <span class="mining-spec-value">~90 {{ t.units }}</span>
+                        <span class="mining-spec-label">Antminer Bitmain L7 9500Mh</span>
                     </div>
-                    <p class="equipment-note">
-                        The GPU operates at 320 kW (80% of its nominal capacity) because, just like an automobile engine,
-                        it cannot run at peak power continuously without accelerated wear. Operating in an optimal load range
-                        ensures stability, efficiency, and long-term durability.
-                    </p>
-                    <ul class="equipment-features">
-                        <li>Low fuel consumption (from 0.27 m3/kWh)</li>
-                        <li>Factory-rated operational resource before major overhaul: 5 years</li>
-                        <li>Maintenance interval: up to 2,000 operating hours</li>
+                    <p class="mining-spec-note">{{ t.equipment_note }}</p>
+                    <ul class="mining-features-list">
+                        <li>{{ t.equipment_fuel }}</li>
+                        <li>{{ t.equipment_resource }}</li>
+                        <li>{{ t.equipment_maintenance }}</li>
                     </ul>
                 </div>
-                <div class="equipment-gallery">
-                    <img src="/static/images/mining/page5_img1.jpeg" alt="Gas piston unit">
-                    <img src="/static/images/mining/page5_img2.jpeg" alt="GPU installation">
-                    <img src="/static/images/mining/page5_img3.jpeg" alt="Generator equipment">
-                    <img src="/static/images/mining/page5_img4.jpeg" alt="Engine detail">
+                <div class="mining-gallery-4">
+                    <img src="/static/images/mining/page5_img1.jpeg" alt="">
+                    <img src="/static/images/mining/page5_img2.jpeg" alt="">
+                    <img src="/static/images/mining/page5_img3.jpeg" alt="">
+                    <img src="/static/images/mining/page5_img4.jpeg" alt="">
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Infrastructure Section -->
-    <section class="section">
+    <section class="mining-section">
         <div class="container">
-            <h2 class="section-title">Project Infrastructure</h2>
-            <div class="infra-grid">
-                <div class="infra-gallery">
-                    <img src="/static/images/mining/page6_img1.jpeg" alt="Container infrastructure">
-                    <img src="/static/images/mining/page6_img2.jpeg" alt="Mining containers">
-                    <img src="/static/images/mining/page6_img3.jpeg" alt="Wind turbine">
-                    <img src="/static/images/mining/page6_img4.jpeg" alt="Mining racks">
-                    <img src="/static/images/mining/page6_img5.jpeg" alt="GPU engine">
+            <h2 class="mining-section-title">{{ t.infra_title }}</h2>
+            <div class="mining-grid-2">
+                <div class="mining-infra-gallery">
+                    <img src="/static/images/mining/page6_img1.jpeg" alt="">
+                    <img src="/static/images/mining/page6_img2.jpeg" alt="">
+                    <img src="/static/images/mining/page6_img3.jpeg" alt="">
+                    <img src="/static/images/mining/page6_img4.jpeg" alt="">
+                    <img src="/static/images/mining/page6_img5.jpeg" alt="">
                 </div>
-                <div class="infra-features">
-                    <div class="infra-card">Operator-provided containers</div>
-                    <div class="infra-card">Client-owned ASIC equipment</div>
-                    <div class="infra-card">Equipment maintenance and monitoring</div>
-                    <div class="infra-card">24/7 technical support</div>
-                    <div class="infra-card">Stable internet connectivity</div>
-                    <div class="infra-card">Guarded facility</div>
-                    <div class="infra-card">Land plot for equipment placement owned by the operator</div>
-                    <div class="infra-card">Secure and protected infrastructure</div>
+                <div class="mining-cards">
+                    <div class="mining-card">{{ t.infra_1 }}</div>
+                    <div class="mining-card">{{ t.infra_2 }}</div>
+                    <div class="mining-card">{{ t.infra_3 }}</div>
+                    <div class="mining-card">{{ t.infra_4 }}</div>
+                    <div class="mining-card">{{ t.infra_5 }}</div>
+                    <div class="mining-card">{{ t.infra_6 }}</div>
+                    <div class="mining-card">{{ t.infra_7 }}</div>
+                    <div class="mining-card">{{ t.infra_8 }}</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Gas Field Section -->
-    <section class="section section-dark">
+    <section class="mining-section mining-section-dark">
         <div class="container">
-            <h2 class="section-title">Gas Field and Fuel Supply</h2>
-            <div class="gas-grid">
-                <div class="gas-stat">
-                    <span class="gas-value">24</span>
-                    <span class="gas-label">gas wells owned by the operator</span>
+            <h2 class="mining-section-title">{{ t.gas_title }}</h2>
+            <div class="mining-stats">
+                <div>
+                    <div class="mining-stat-value">24</div>
+                    <div class="mining-stat-label">{{ t.gas_wells }}</div>
                 </div>
-                <div class="gas-stat">
-                    <span class="gas-value">$0.09/m3</span>
-                    <span class="gas-label">cost of purified and conditioned gas</span>
+                <div>
+                    <div class="mining-stat-value">$0.09/m3</div>
+                    <div class="mining-stat-label">{{ t.gas_cost }}</div>
                 </div>
-                <div class="gas-stat">
-                    <span class="gas-value">30+ years</span>
-                    <span class="gas-label">gas field reserves</span>
+                <div>
+                    <div class="mining-stat-value">30+</div>
+                    <div class="mining-stat-label">{{ t.gas_years }}</div>
                 </div>
             </div>
-            <ul class="gas-features">
-                <li>Gas price indexation regulated by the Federal Antimonopoly Service (FAS)</li>
-                <li>Official production with full documentation: certificates for the field and gas quality are provided</li>
+            <ul class="mining-features-list">
+                <li>{{ t.gas_1 }}</li>
+                <li>{{ t.gas_2 }}</li>
             </ul>
         </div>
     </section>
 
     <!-- Agreements Section -->
-    <section class="section">
+    <section class="mining-section">
         <div class="container">
-            <h2 class="section-title">Required Agreements</h2>
-            <div class="agreements-grid">
-                <div class="agreement-card">
-                    <h3>GPU Supply Agreement</h3>
-                    <p>This agreement defines all terms, timelines, and procedures related to the purchase, production, delivery, and commissioning of the gas-piston units (GPUs). It regulates manufacturing deadlines, payment schedules, logistics, and acceptance procedures.</p>
+            <h2 class="mining-section-title">{{ t.agreements_title }}</h2>
+            <div class="mining-agreements">
+                <div class="mining-agreement">
+                    <h3>{{ t.agreement_1_title }}</h3>
+                    <p>{{ t.agreement_1_text }}</p>
                 </div>
-                <div class="agreement-card">
-                    <h3>GPU Lease Agreement (Buyer as Lessor)</h3>
-                    <p>After purchasing the GPUs, the buyer leases the equipment to the operator. This agreement regulates responsibility for operation, maintenance, performance, and preservation of the equipment. The operator assumes full operational and physical responsibility for the leased GPUs.</p>
+                <div class="mining-agreement">
+                    <h3>{{ t.agreement_2_title }}</h3>
+                    <p>{{ t.agreement_2_text }}</p>
                 </div>
-                <div class="agreement-card">
-                    <h3>Power Supply Agreement</h3>
-                    <p>This document specifies the terms under which the operator supplies electricity generated by the leased GPUs to the client's mining equipment. It defines the effective electricity tariff, billing procedures, consumption reporting, and operational obligations.</p>
+                <div class="mining-agreement">
+                    <h3>{{ t.agreement_3_title }}</h3>
+                    <p>{{ t.agreement_3_text }}</p>
                 </div>
-                <div class="agreement-card">
-                    <h3>Mining Equipment Hosting Agreement</h3>
-                    <p>This agreement covers the placement of the client's ASIC miners at the operator's facility. It regulates hosting conditions, infrastructure access, uptime standards, security measures, internet connectivity, monitoring, and technical support.</p>
+                <div class="mining-agreement">
+                    <h3>{{ t.agreement_4_title }}</h3>
+                    <p>{{ t.agreement_4_text }}</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Legal Section -->
-    <section class="section section-alt">
+    <section class="mining-section mining-section-gray">
         <div class="container">
-            <div class="legal-content">
-                <h2 class="section-title">Legal Compliance</h2>
-                <p class="legal-highlight">The GPUs become the property of the buyer and are used to generate electricity.</p>
-                <div class="legal-points">
-                    <p>Our company operates fully in compliance with the law. We possess all required permits, licenses, contracts, invoices, and supporting documentation.</p>
-                    <p>All equipment has been legally imported, customs-cleared in the Russian Federation, and holds a fully valid legal status in Russia.</p>
-                    <p>We maintain full legal transparency in all operational and financial processes. Our company strictly follows Russian regulatory requirements and provides complete documentation for every stage of cooperation, including equipment ownership, hosting, power supply, and financial transactions.</p>
+            <div class="mining-legal">
+                <h2 class="mining-section-title">{{ t.legal_title }}</h2>
+                <p class="mining-legal-highlight">{{ t.legal_highlight }}</p>
+                <div class="mining-legal-text">
+                    <p>{{ t.legal_1 }}</p>
+                    <p>{{ t.legal_2 }}</p>
+                    <p>{{ t.legal_3 }}</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Contact Section -->
-    <section class="section section-dark" id="contact">
+    <!-- CTA Section -->
+    <section class="mining-cta">
         <div class="container">
-            <h2 class="section-title">Get in Touch</h2>
-            <p class="contact-subtitle">Interested in this opportunity? Contact us to discuss the details.</p>
-            <div class="contact-grid">
-                <div class="contact-item">
-                    <div class="contact-label">Email</div>
-                    <a href="mailto:hello@housler.ru">hello@housler.ru</a>
-                </div>
-                <div class="contact-item">
-                    <div class="contact-label">Telegram</div>
-                    <a href="https://t.me/housler_spb" target="_blank">@housler_spb</a>
-                </div>
-            </div>
+            <h2>{{ t.cta_title }}</h2>
+            <p>{{ t.cta_subtitle }}</p>
+            <button class="mining-cta-btn" onclick="openMiningForm()">{{ t.cta_button }}</button>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="mining-footer">
         <div class="container">
-            <div class="footer-content">
-                <span class="footer-logo">HOUSLER</span>
-                <span class="footer-copy">2025. All rights reserved.</span>
+            <div class="mining-footer-content">
+                <span class="mining-footer-logo">HOUSLER</span>
+                <span class="mining-footer-copy">2025. {{ t.footer_rights }}</span>
             </div>
         </div>
     </footer>
+
+    <!-- Request Form Popup -->
+    <div class="request-popup-overlay" id="miningRequestPopup">
+        <div class="request-popup">
+            <div class="request-popup-header">
+                <h2>{{ t.form_title }}</h2>
+                <button class="request-popup-close" onclick="closeMiningForm()">&times;</button>
+            </div>
+            <div class="request-popup-body">
+                <!-- Error Message -->
+                <div class="request-error" id="miningRequestError"></div>
+
+                <!-- Form -->
+                <div id="miningFormContent">
+                    <div class="request-input-group">
+                        <label for="miningName">{{ t.form_name }}</label>
+                        <input type="text" id="miningName" name="name" placeholder="{{ t.form_name_placeholder }}" autocomplete="name">
+                    </div>
+                    <div class="request-input-group">
+                        <label for="miningPhone">{{ t.form_phone }}</label>
+                        <input type="tel" id="miningPhone" name="phone" placeholder="+7 (999) 123-45-67" autocomplete="tel">
+                    </div>
+                    <div class="request-input-group">
+                        <label for="miningMessage">{{ t.form_message }}</label>
+                        <textarea id="miningMessage" name="message" rows="3" placeholder="{{ t.form_message_placeholder }}" style="width:100%;padding:14px 16px;border:1px solid var(--color-border,#E5E7EB);border-radius:12px;font-size:16px;font-family:inherit;resize:vertical;"></textarea>
+                    </div>
+                    <div class="request-step-title" style="margin-top: 24px;">{{ t.form_contact_method }}</div>
+                    <div class="request-contact-options">
+                        <label class="request-contact-option">
+                            <input type="radio" name="mining_contact_method" value="call">
+                            <div class="request-contact-label">{{ t.form_call }}</div>
+                        </label>
+                        <label class="request-contact-option">
+                            <input type="radio" name="mining_contact_method" value="whatsapp">
+                            <div class="request-contact-label">WhatsApp</div>
+                        </label>
+                        <label class="request-contact-option">
+                            <input type="radio" name="mining_contact_method" value="telegram">
+                            <div class="request-contact-label">Telegram</div>
+                        </label>
+                    </div>
+                    <div class="request-nav">
+                        <button class="request-btn request-btn-next" id="submitMiningRequest" disabled>{{ t.form_submit }}</button>
+                    </div>
+                </div>
+
+                <!-- Success State -->
+                <div class="request-success" id="miningRequestSuccess">
+                    <div class="request-success-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h3>{{ t.form_success_title }}</h3>
+                    <p>{{ t.form_success_text }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Form Logic
+        const miningFormData = {
+            name: '',
+            phone: '',
+            message: '',
+            contact_method: null,
+            source: 'mining_page'
+        };
+
+        function openMiningForm() {
+            document.getElementById('miningRequestPopup').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMiningForm() {
+            document.getElementById('miningRequestPopup').classList.remove('active');
+            document.body.style.overflow = '';
+            // Reset form after close
+            setTimeout(resetMiningForm, 300);
+        }
+
+        function resetMiningForm() {
+            miningFormData.name = '';
+            miningFormData.phone = '';
+            miningFormData.message = '';
+            miningFormData.contact_method = null;
+
+            document.getElementById('miningName').value = '';
+            document.getElementById('miningPhone').value = '';
+            document.getElementById('miningMessage').value = '';
+            document.querySelectorAll('.request-contact-option').forEach(o => o.classList.remove('selected'));
+            document.querySelectorAll('input[name="mining_contact_method"]').forEach(r => r.checked = false);
+
+            document.getElementById('miningFormContent').style.display = '';
+            document.getElementById('miningRequestSuccess').classList.remove('active');
+            document.getElementById('miningRequestError').classList.remove('active');
+            updateMiningSubmitBtn();
+        }
+
+        function updateMiningSubmitBtn() {
+            const canSubmit = miningFormData.name.trim() &&
+                              miningFormData.phone.trim() &&
+                              miningFormData.contact_method;
+            document.getElementById('submitMiningRequest').disabled = !canSubmit;
+        }
+
+        // Input handlers
+        document.getElementById('miningName').addEventListener('input', e => {
+            miningFormData.name = e.target.value;
+            updateMiningSubmitBtn();
+        });
+
+        document.getElementById('miningPhone').addEventListener('input', e => {
+            miningFormData.phone = e.target.value;
+            updateMiningSubmitBtn();
+        });
+
+        document.getElementById('miningMessage').addEventListener('input', e => {
+            miningFormData.message = e.target.value;
+        });
+
+        // Contact method selection
+        document.querySelectorAll('.request-contact-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const input = option.querySelector('input');
+                document.querySelectorAll('.request-contact-option').forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                input.checked = true;
+                miningFormData.contact_method = input.value;
+                updateMiningSubmitBtn();
+            });
+        });
+
+        // Submit
+        document.getElementById('submitMiningRequest').addEventListener('click', async () => {
+            const btn = document.getElementById('submitMiningRequest');
+            const errorEl = document.getElementById('miningRequestError');
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+            errorEl.classList.remove('active');
+
+            try {
+                const response = await fetch('/api/client-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'mining_inquiry',
+                        property_type: 'mining_equipment',
+                        name: miningFormData.name,
+                        phone: miningFormData.phone,
+                        message: miningFormData.message,
+                        contact_method: miningFormData.contact_method,
+                        source: 'mining_page'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    document.getElementById('miningFormContent').style.display = 'none';
+                    document.getElementById('miningRequestSuccess').classList.add('active');
+                    setTimeout(closeMiningForm, 3000);
+                } else {
+                    throw new Error(result.error || '{{ t.form_error }}');
+                }
+            } catch (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.add('active');
+            } finally {
+                btn.classList.remove('loading');
+                updateMiningSubmitBtn();
+            }
+        });
+
+        // Close on overlay click
+        document.getElementById('miningRequestPopup').addEventListener('click', e => {
+            if (e.target.id === 'miningRequestPopup') closeMiningForm();
+        });
+
+        // Escape key
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && document.getElementById('miningRequestPopup').classList.contains('active')) {
+                closeMiningForm();
+            }
+        });
+    </script>
 </body>
 </html>
