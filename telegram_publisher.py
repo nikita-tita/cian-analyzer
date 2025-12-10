@@ -6,7 +6,6 @@ Publishes new articles to Telegram channel
 import os
 import requests
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +27,15 @@ class TelegramPublisher:
         self,
         title: str,
         content: str,
-        slug: str,
-        excerpt: Optional[str] = None
+        slug: str
     ) -> bool:
         """
         Publish blog post to Telegram channel
 
         Args:
             title: Article title
-            content: Full article content
+            content: Full article content (will extract 60-70% for preview)
             slug: URL slug for the article
-            excerpt: Optional custom excerpt (if not provided, will generate from content)
 
         Returns:
             True if published successfully, False otherwise
@@ -51,10 +48,7 @@ class TelegramPublisher:
             article_url = f"{self.site_url}/blog/{slug}"
 
             # Generate preview (60-70% of content)
-            if excerpt:
-                preview_text = excerpt
-            else:
-                preview_text = self._generate_preview(content)
+            preview_text = self._generate_preview(content)
 
             # Format message with HTML
             message = f"<b>{title}</b>\n\n"

@@ -56,8 +56,7 @@ def publish_one_post():
         success = tg.publish_post(
             title=post['title'],
             content=post['content'],
-            slug=post['slug'],
-            excerpt=post.get('excerpt')
+            slug=post['slug']
         )
 
         if success:

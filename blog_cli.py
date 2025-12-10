@@ -87,8 +87,7 @@ def parse_and_publish(limit: int = 5, force: bool = False):
             telegram.publish_post(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug,
-                excerpt=rewritten['excerpt']
+                slug=slug
             )
 
             published_count += 1
@@ -164,8 +163,7 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
             telegram.publish_post(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug,
-                excerpt=rewritten['excerpt']
+                slug=slug
             )
 
             published_count += 1
@@ -241,8 +239,7 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
             telegram.publish_post(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug,
-                excerpt=rewritten['excerpt']
+                slug=slug
             )
 
             published_count += 1
@@ -318,8 +315,7 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
             telegram.publish_post(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug,
-                excerpt=rewritten['excerpt']
+                slug=slug
             )
 
             published_count += 1
