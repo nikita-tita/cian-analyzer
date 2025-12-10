@@ -45,6 +45,8 @@ services:
       # Flask
       FLASK_ENV: production
       FLASK_DEBUG: "false"
+      # Blog database path (inside container)
+      BLOG_DB_PATH: /app/blog.db
       # Parser (BrowserPool enabled for better performance)
       USE_BROWSER_POOL: "true"
       MAX_BROWSERS: 3
