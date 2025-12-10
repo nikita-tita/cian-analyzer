@@ -1,0 +1,14 @@
+[Unit]
+Description=Housler RSS News Parser
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/var/www/housler/scripts/parse-rss-docker.sh
+WorkingDirectory=/var/www/housler
+StandardOutput=append:/var/log/housler/rss-parser.log
+StandardError=append:/var/log/housler/rss-parser.log
+
+[Install]
+WantedBy=multi-user.target

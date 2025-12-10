@@ -17,6 +17,10 @@ class TelegramPublisher:
         self.channel_id = os.getenv('TELEGRAM_CHANNEL_ID', '@housler_ae')
         self.site_url = os.getenv('SITE_URL', 'https://housler.ru')
 
+        # Content configuration: 60-70% of article, max 4096 symbols (Telegram limit)
+        self.content_ratio = float(os.getenv('TELEGRAM_CONTENT_RATIO', '0.65'))
+        self.max_symbols = int(os.getenv('TELEGRAM_MAX_SYMBOLS', '4000'))
+
         if not self.bot_token:
             logger.warning("TELEGRAM_BOT_TOKEN not set, Telegram publishing disabled")
 
@@ -34,7 +38,7 @@ class TelegramPublisher:
             title: Article title
             content: Full article content
             slug: URL slug for the article
-            excerpt: Optional excerpt (if not provided, will use 1/3 of content)
+            excerpt: Optional custom excerpt (if not provided, will generate from content)
 
         Returns:
             True if published successfully, False otherwise
@@ -44,38 +48,18 @@ class TelegramPublisher:
             return False
 
         try:
-            # Build article URL
             article_url = f"{self.site_url}/blog/{slug}"
 
-            # Prepare post text: title + 1/3 of content
+            # Generate preview (60-70% of content)
             if excerpt:
                 preview_text = excerpt
             else:
-                # Take approximately 1/3 of content
-                content_length = len(content)
-                preview_length = content_length // 3
-                preview_text = content[:preview_length]
-
-                # Cut at last complete sentence or paragraph
-                last_period = preview_text.rfind('.')
-                last_newline = preview_text.rfind('\n')
-                cut_point = max(last_period, last_newline)
-
-                if cut_point > 100:
-                    preview_text = preview_text[:cut_point + 1]
-
-            # Clean up the preview text
-            preview_text = preview_text.strip()
-            if len(preview_text) > 800:
-                preview_text = preview_text[:800]
-                last_period = preview_text.rfind('.')
-                if last_period > 400:
-                    preview_text = preview_text[:last_period + 1]
+                preview_text = self._generate_preview(content)
 
             # Format message with HTML
             message = f"<b>{title}</b>\n\n"
             message += f"{preview_text}\n\n"
-            message += f'<a href="{article_url}">Продолжить на сайте</a>'
+            message += f'<a href="{article_url}">Читать полностью на сайте</a>'
 
             # Send to Telegram
             api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
@@ -112,7 +96,6 @@ class TelegramPublisher:
             return False
 
         try:
-            # Test bot
             api_url = f"https://api.telegram.org/bot{self.bot_token}/getMe"
             response = requests.get(api_url, timeout=10)
 
@@ -128,3 +111,114 @@ class TelegramPublisher:
         except Exception as e:
             logger.error(f"Failed to test Telegram connection: {e}")
             return False
+
+    def _generate_preview(self, content: str) -> str:
+        """
+        Generate preview with 60-70% of article content
+
+        Args:
+            content: Full article content
+
+        Returns:
+            Preview text for Telegram
+        """
+        # Split into paragraphs and filter promotional content
+        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+
+        if not paragraphs:
+            return content[:self.max_symbols]
+
+        # Remove promotional/CTA paragraphs
+        content_paragraphs = []
+        skip_words = [
+            'housler', 'оставьте заявку', 'свяжется с вами',
+            'агентство', '[оставьте заявку]', 'эксперт свяжется'
+        ]
+        for paragraph in paragraphs:
+            if any(word in paragraph.lower() for word in skip_words):
+                continue
+            content_paragraphs.append(paragraph)
+
+        if not content_paragraphs:
+            return content[:self.max_symbols]
+
+        # Calculate target length
+        full_text = '\n\n'.join(content_paragraphs)
+        target_length = self._calculate_target_length(len(full_text))
+
+        # Take sequential paragraphs up to target length
+        result = ''
+        current_length = 0
+
+        for paragraph in content_paragraphs:
+            paragraph_text = paragraph + '\n\n' if result else paragraph
+            new_length = current_length + len(paragraph_text)
+
+            if new_length > target_length:
+                # Try to fit partial paragraph
+                remaining = target_length - current_length
+                if remaining > 100:
+                    partial = paragraph[:remaining]
+                    # Cut at sentence boundary
+                    for char in '.!?':
+                        pos = partial.rfind(char)
+                        if pos > remaining * 0.6:
+                            result += ('\n\n' if result else '') + partial[:pos + 1]
+                            break
+                break
+            else:
+                result += paragraph_text
+                current_length = new_length
+
+        result = result.strip()
+
+        # Ensure we don't exceed Telegram limit
+        if len(result) > self.max_symbols:
+            result = self._truncate_at_sentence(result, self.max_symbols)
+
+        return result
+
+    def _calculate_target_length(self, content_length: int) -> int:
+        """
+        Calculate target length for preview (60-70% of content)
+        Aims for 3400-3900 symbols for optimal Telegram display
+        """
+        target_min, target_max = 3400, 3900
+        target_avg = (target_min + target_max) / 2
+
+        if content_length <= target_avg:
+            # Short articles: take up to 95%
+            ratio = 0.95
+        else:
+            # Long articles: calculate ratio to reach target_avg
+            ratio = target_avg / content_length
+
+        # Keep ratio between content_ratio and 95%
+        ratio = min(0.95, max(self.content_ratio, ratio))
+
+        result = int(content_length * ratio)
+
+        # Ensure minimum length for long articles
+        if content_length > target_max and result < target_min:
+            result = target_min
+
+        return min(result, self.max_symbols)
+
+    def _truncate_at_sentence(self, text: str, max_length: int) -> str:
+        """Truncate text at sentence boundary"""
+        if len(text) <= max_length:
+            return text
+
+        truncated = text[:max_length]
+
+        # Find last sentence ending
+        cut_point = -1
+        for char in '.!?':
+            pos = truncated.rfind(char)
+            if pos > cut_point:
+                cut_point = pos
+
+        if cut_point > max_length * 0.7:
+            return truncated[:cut_point + 1]
+
+        return truncated.rstrip() + '...'

@@ -8,6 +8,7 @@ Telegram Post Scheduler
 import os
 import sys
 import logging
+import fcntl
 from pathlib import Path
 
 # Загружаем переменные окружения из .env
@@ -73,5 +74,23 @@ def publish_one_post():
         return False
 
 
+def run_with_lock():
+    """Запустить scheduler с file locking для предотвращения concurrent execution"""
+    lock_file = '/tmp/telegram_scheduler.lock'
+    
+    try:
+        with open(lock_file, 'w') as f:
+            # Пытаемся получить exclusive lock
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            logger.info("Acquired lock, starting telegram scheduler")
+            return publish_one_post()
+    except IOError:
+        logger.info("Another scheduler instance is running, skipping")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to acquire lock: {e}")
+        return False
+
+
 if __name__ == '__main__':
-    publish_one_post()
+    run_with_lock()
