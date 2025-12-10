@@ -5,9 +5,21 @@ Yandex GPT Integration for Article Rewriting
 import requests
 import os
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TokenUsage:
+    """Статистика использования токенов"""
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.input_tokens + self.output_tokens
 
 
 class YandexGPT:
@@ -115,8 +127,18 @@ CONTENT:
             # Извлекаем текст ответа
             result_text = data['result']['alternatives'][0]['message']['text']
 
+            # Извлекаем статистику токенов
+            usage_data = data['result'].get('usage', {})
+            usage = TokenUsage(
+                input_tokens=int(usage_data.get('inputTextTokens', 0)),
+                output_tokens=int(usage_data.get('completionTokens', 0))
+            )
+            logger.info(f"Yandex GPT tokens - input: {usage.input_tokens}, output: {usage.output_tokens}, total: {usage.total}")
+
             # Парсим ответ
-            return self._parse_gpt_response(result_text, original_title, original_excerpt)
+            parsed = self._parse_gpt_response(result_text, original_title, original_excerpt)
+            parsed['usage'] = usage
+            return parsed
 
         except Exception as e:
             logger.error(f"Failed to rewrite article: {e}")
@@ -124,7 +146,8 @@ CONTENT:
             return {
                 'title': original_title,
                 'excerpt': original_excerpt or original_content[:200] + '...',
-                'content': original_content
+                'content': original_content,
+                'usage': TokenUsage()
             }
 
     def _parse_gpt_response(

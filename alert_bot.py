@@ -32,6 +32,13 @@ class ParseResult:
     pending_telegram: int = 0  # Статьи в очереди на публикацию в ТГ
     published_titles: List[str] = field(default_factory=list)  # Названия опубликованных статей
     errors: List[str] = field(default_factory=list)
+    # Статистика токенов Yandex GPT
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
 
     @property
     def is_success(self) -> bool:
@@ -160,6 +167,11 @@ class AlertBot:
             for i, title in enumerate(result.published_titles, 1):
                 published_list += f"{i}. {title}\n"
 
+        # Формируем строку с токенами
+        tokens_line = ""
+        if result.total_tokens > 0:
+            tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
+
         message = f"""✅ <b>Парсинг {result.source} завершён успешно</b>
 
 📅 {now}
@@ -169,7 +181,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}{published_list}
+• В очереди на ТГ: {result.pending_telegram}{tokens_line}{published_list}
 
 🎉 Всё работает штатно!"""
 
@@ -190,6 +202,11 @@ class AlertBot:
             for i, title in enumerate(result.published_titles, 1):
                 published_list += f"{i}. {title}\n"
 
+        # Формируем строку с токенами
+        tokens_line = ""
+        if result.total_tokens > 0:
+            tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
+
         message = f"""⚠️ <b>Парсинг {result.source} завершён с ошибками</b>
 
 📅 {now}
@@ -199,7 +216,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}{published_list}
+• В очереди на ТГ: {result.pending_telegram}{tokens_line}{published_list}
 
 ❌ <b>Ошибки:</b>
 {errors_text}"""
@@ -214,6 +231,11 @@ class AlertBot:
         if len(result.errors) > 5:
             errors_text += f"\n• ...и ещё {len(result.errors) - 5} ошибок"
 
+        # Формируем строку с токенами
+        tokens_line = ""
+        if result.total_tokens > 0:
+            tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
+
         message = f"""🚨 <b>Парсинг {result.source} ПРОВАЛЕН</b>
 
 📅 {now}
@@ -222,7 +244,7 @@ class AlertBot:
 • Найдено статей: {result.articles_found}
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
-• Опубликовано на сайте: {result.articles_published_site}
+• Опубликовано на сайте: {result.articles_published_site}{tokens_line}
 
 ❌ <b>Ошибки:</b>
 {errors_text}

@@ -126,6 +126,11 @@ def main(source: str = 'cian'):
                         original_excerpt=full_article.get('excerpt')
                     )
                     result.articles_rewritten += 1
+                    # Накапливаем статистику токенов
+                    usage = rewritten.get('usage')
+                    if usage:
+                        result.input_tokens += usage.input_tokens
+                        result.output_tokens += usage.output_tokens
                 except Exception as e:
                     result.errors.append(f"Ошибка GPT: {str(e)[:50]}")
                     logger.error(f"GPT rewrite failed: {e}")
