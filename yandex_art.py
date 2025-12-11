@@ -28,7 +28,9 @@ class YandexART:
     - YANDEX_FOLDER_ID
     """
 
-    PROMPT_TEMPLATE = '''"{title}" Create an illustration in a mixed style: hand-drawn pencil sketch + Pixar-like 3D object but entirely in black and white, in a 16:9 aspect ratio. All elements must be grayscale only — no color, no tint, no warm tones. Represent modern apartment buildings as stylized 3D objects with soft Pixar-like volume, but rendered strictly in monochrome with realistic pencil shading. Surround them with hand-drawn pencil sketch lines showing market dynamics, arrows, rising graphs. The pencil part should look natural, imperfect, textured. The 3D part should look smooth, volumetric, slightly stylized, but strictly grayscale. No text, no captions, no symbols resembling letters. Soft clean background, balanced wide composition suited for 16:9, high detail, high resolution.'''
+    # Prompt must be under 500 chars total (including title)
+    # Template ~220 chars + title ~150 chars max = ~370 chars
+    PROMPT_TEMPLATE = '''"{title}" Black and white pencil sketch + Pixar 3D illustration. Modern buildings with soft volume, grayscale pencil shading, market trend arrows. 16:9 wide format. No text or letters. Clean background, high detail.'''
 
     def __init__(self, covers_dir: str = "static/blog/covers"):
         """
