@@ -38,6 +38,14 @@ RSS_SOURCES = [
         full_text_field='yandex_full-text',
         category='general'
     ),
+    RSSSource(
+        name='RBC Realty',
+        url='https://rssexport.rbc.ru/realty/news/30/full.rss',
+        language='ru',
+        has_full_text=True,
+        full_text_field='rbc_news_full-text',
+        category='analytics'
+    ),
 
     # Russian sources (headlines only - need web scraping for full text)
     RSSSource(
