@@ -58,6 +58,8 @@ services:
       - ./logs:/app/logs
       # ВАЖНО: blog.db должен сохраняться между деплоями
       - /var/www/housler_data/blog.db:/app/blog.db
+      # Обложки блога - должны быть доступны nginx на хосте
+      - ./static/blog/covers:/app/static/blog/covers
     networks:
       - housler-network
     healthcheck:
