@@ -98,11 +98,12 @@ class TelegramPublisher:
         """
         Publish blog post to Telegram channel with cover image
 
-        Telegram sendPhoto caption limit: 1024 characters
-        We use 1020 as safe limit.
+        Now uses two-message approach:
+        1. Long text message (3/4 of content)
+        2. Photo without caption
 
         If cover_image is not provided or file not found,
-        falls back to text-only publish_post() with full 3400 chars.
+        falls back to text-only publish_post().
 
         Args:
             title: Article title
@@ -118,7 +119,7 @@ class TelegramPublisher:
             logger.warning("Telegram publishing skipped - no bot token")
             return False
 
-        # If no cover - use text-only method (3400 chars)
+        # If no cover - use text-only method
         if not cover_image:
             return self.publish_post(title, content, slug)
 
@@ -128,46 +129,16 @@ class TelegramPublisher:
             logger.warning(f"Cover image not found: {image_path}, falling back to text")
             return self.publish_post(title, content, slug)
 
-        try:
-            article_url = f"{self.site_url}/blog/{slug}"
+        # Delegate to the two-message method
+        return self.publish_post_with_text_and_photos(
+            title=title,
+            content=content,
+            slug=slug,
+            images=[cover_image],
+            excerpt=excerpt
+        )
 
-            # Build caption with 1020 char limit
-            caption = self._build_photo_caption(title, content, excerpt, article_url)
-
-            # Send photo
-            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
-
-            with open(image_path, 'rb') as photo:
-                response = requests.post(
-                    api_url,
-                    data={
-                        "chat_id": self.channel_id,
-                        "caption": caption,
-                        "parse_mode": "HTML"
-                    },
-                    files={
-                        "photo": photo
-                    },
-                    timeout=60  # larger timeout for file upload
-                )
-
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ok'):
-                    logger.info(f"Published to Telegram with image: {title[:50]}...")
-                    return True
-                else:
-                    logger.error(f"Telegram API error: {result.get('description')}")
-                    return self.publish_post(title, content, slug)
-            else:
-                logger.error(f"Telegram API HTTP error: {response.status_code}")
-                return self.publish_post(title, content, slug)
-
-        except Exception as e:
-            logger.error(f"Failed to publish with image: {e}")
-            return self.publish_post(title, content, slug)
-
-    def publish_post_with_gallery(
+    def publish_post_with_text_and_photos(
         self,
         title: str,
         content: str,
@@ -176,18 +147,17 @@ class TelegramPublisher:
         excerpt: Optional[str] = None
     ) -> bool:
         """
-        Publish blog post with multiple images as Telegram media group
+        Publish blog post as TWO messages: long text first, then photos
 
-        Telegram sendMediaGroup:
-        - Max 10 media items
-        - Only first item can have caption (1024 chars)
-        - All media must be same type (photos)
+        This approach allows:
+        - Text message: up to 4096 chars (we use 3/4 of content = ~1500+ chars)
+        - Photos: sent separately without caption limit
 
         Args:
             title: Article title
             content: Full article content
             slug: URL slug for the article
-            images: List of image paths (e.g., ["/static/blog/covers/slug.jpg", ...])
+            images: List of image paths
             excerpt: Optional custom excerpt
 
         Returns:
@@ -206,80 +176,142 @@ class TelegramPublisher:
             else:
                 logger.warning(f"Image not found: {img_path}")
 
+        # If no valid images, fall back to text-only
         if not valid_images:
-            logger.warning("No valid images for gallery, falling back to text")
+            logger.warning("No valid images, using text-only publish")
             return self.publish_post(title, content, slug)
-
-        if len(valid_images) == 1:
-            # Single image - use regular method
-            return self.publish_post_with_image(title, content, slug, images[0], excerpt)
-
-        # Limit to 10 images (Telegram limit)
-        if len(valid_images) > 10:
-            valid_images = valid_images[:10]
-            logger.info(f"Trimmed gallery to 10 images")
 
         try:
             article_url = f"{self.site_url}/blog/{slug}"
 
-            # Build caption for first photo (1020 char limit)
-            caption = self._build_photo_caption(title, content, excerpt, article_url)
+            # Step 1: Send long text message (3/4 of content)
+            preview_text = self._generate_preview(content)
 
-            # Build media array for sendMediaGroup
-            media = []
-            files = {}
+            message = f"<b>{title}</b>\n\n"
+            message += f"{preview_text}\n\n"
+            message += f'<a href="{article_url}">Читать полностью на сайте</a>'
 
-            for i, img_path in enumerate(valid_images):
-                file_key = f"photo{i}"
-                media_item = {
-                    "type": "photo",
-                    "media": f"attach://{file_key}"
-                }
-
-                # Only first item gets caption
-                if i == 0:
-                    media_item["caption"] = caption
-                    media_item["parse_mode"] = "HTML"
-
-                media.append(media_item)
-                files[file_key] = open(img_path, 'rb')
-
-            # Send media group
-            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMediaGroup"
-
-            response = requests.post(
+            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            text_response = requests.post(
                 api_url,
-                data={
+                json={
                     "chat_id": self.channel_id,
-                    "media": json.dumps(media)
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True  # Disable preview since we send photos
                 },
-                files=files,
-                timeout=120  # Longer timeout for multiple files
+                timeout=30
             )
 
-            # Close all file handles
-            for f in files.values():
-                f.close()
+            if text_response.status_code != 200:
+                logger.error(f"Failed to send text: {text_response.status_code}")
+                return False
 
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ok'):
-                    logger.info(f"Published gallery ({len(valid_images)} photos) to Telegram: {title[:50]}...")
+            text_result = text_response.json()
+            if not text_result.get('ok'):
+                logger.error(f"Telegram API error: {text_result.get('description')}")
+                return False
+
+            logger.info(f"Sent text message for: {title[:50]}... ({len(preview_text)} chars)")
+
+            # Step 2: Send photos (single or media group)
+            # Limit to 10 images (Telegram limit)
+            if len(valid_images) > 10:
+                valid_images = valid_images[:10]
+
+            if len(valid_images) == 1:
+                # Single photo - use sendPhoto without caption
+                photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+                with open(valid_images[0], 'rb') as photo:
+                    photo_response = requests.post(
+                        photo_url,
+                        data={"chat_id": self.channel_id},
+                        files={"photo": photo},
+                        timeout=60
+                    )
+            else:
+                # Multiple photos - use sendMediaGroup without captions
+                media = []
+                files = {}
+
+                for i, img_path in enumerate(valid_images):
+                    file_key = f"photo{i}"
+                    media.append({
+                        "type": "photo",
+                        "media": f"attach://{file_key}"
+                    })
+                    files[file_key] = open(img_path, 'rb')
+
+                photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendMediaGroup"
+                photo_response = requests.post(
+                    photo_url,
+                    data={
+                        "chat_id": self.channel_id,
+                        "media": json.dumps(media)
+                    },
+                    files=files,
+                    timeout=120
+                )
+
+                # Close all file handles
+                for f in files.values():
+                    f.close()
+
+            if photo_response.status_code == 200:
+                photo_result = photo_response.json()
+                if photo_result.get('ok'):
+                    logger.info(f"Published {len(valid_images)} photo(s) to Telegram: {title[:50]}...")
                     return True
                 else:
-                    logger.error(f"Telegram API error: {result.get('description')}")
-                    # Fallback to single image
-                    return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+                    logger.error(f"Photo upload error: {photo_result.get('description')}")
+                    # Text was sent, photos failed - still partial success
+                    return True
             else:
-                logger.error(f"Telegram API HTTP error: {response.status_code}")
-                return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+                logger.error(f"Photo upload HTTP error: {photo_response.status_code}")
+                return True  # Text was sent successfully
 
         except Exception as e:
-            logger.error(f"Failed to publish gallery: {e}")
-            # Fallback to single image
-            if valid_images:
-                return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+            logger.error(f"Failed to publish with text and photos: {e}")
             return self.publish_post(title, content, slug)
+
+    def publish_post_with_gallery(
+        self,
+        title: str,
+        content: str,
+        slug: str,
+        images: List[str],
+        excerpt: Optional[str] = None
+    ) -> bool:
+        """
+        Publish blog post with multiple images as Telegram media group
+
+        DEPRECATED: Use publish_post_with_text_and_photos() for longer text.
+        This method is kept for backward compatibility but now delegates
+        to the new two-message approach.
+
+        Telegram sendMediaGroup:
+        - Max 10 media items
+        - Only first item can have caption (1024 chars)
+        - All media must be same type (photos)
+
+        Args:
+            title: Article title
+            content: Full article content
+            slug: URL slug for the article
+            images: List of image paths (e.g., ["/static/blog/covers/slug.jpg", ...])
+            excerpt: Optional custom excerpt
+
+        Returns:
+            True if published successfully, False otherwise
+        """
+        # Delegate to new two-message method for longer text support
+        return self.publish_post_with_text_and_photos(
+            title=title,
+            content=content,
+            slug=slug,
+            images=images,
+            excerpt=excerpt
+        )
 
     def _build_photo_caption(
         self,
