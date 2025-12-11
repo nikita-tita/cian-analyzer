@@ -47,7 +47,7 @@ def main(source: str = 'cian'):
     from yandex_gpt import YandexGPT
     from yandex_art import YandexART
     from blog_database import BlogDatabase
-    from alert_bot import ParseResult, send_parse_report
+    from alert_bot import ParseResult, send_parse_report, send_cover_alert
 
     # Результат для отчёта
     result = ParseResult(source=source.upper())
@@ -138,7 +138,7 @@ def main(source: str = 'cian'):
                     logger.error(f"GPT rewrite failed: {e}")
                     continue
 
-                # Генерируем обложку (не блокирует публикацию при ошибке)
+                # Генерируем обложку (обязательна для публикации в Telegram)
                 cover_image = None
                 try:
                     cover_image = art.generate_cover(
@@ -147,8 +147,16 @@ def main(source: str = 'cian'):
                     )
                     if cover_image:
                         logger.info(f"Cover generated: {cover_image}")
+                    else:
+                        # YandexART вернул None (disabled или ошибка)
+                        error_msg = "YandexART returned None (disabled or API error)"
+                        logger.warning(f"Cover generation failed: {error_msg}")
+                        send_cover_alert(rewritten['title'], slug, error_msg)
+                        result.errors.append(f"Нет обложки: {slug}")
                 except Exception as e:
-                    logger.warning(f"Cover generation failed, continuing without cover: {e}")
+                    logger.warning(f"Cover generation failed: {e}")
+                    send_cover_alert(rewritten['title'], slug, str(e))
+                    result.errors.append(f"Нет обложки: {slug}")
 
                 # Сохраняем в БД
                 post_id = db.create_post(
@@ -175,8 +183,10 @@ def main(source: str = 'cian'):
         # Итоговая статистика
         final_posts = db.get_all_posts()
         result.pending_telegram = db.count_unpublished_telegram()
+        result.pending_without_cover = db.count_posts_without_cover()
         logger.info(f"Published {result.articles_published_site} new articles to site")
         logger.info(f"Pending Telegram posts: {result.pending_telegram}")
+        logger.info(f"Posts without cover: {result.pending_without_cover}")
         logger.info(f"Total posts in database: {len(final_posts)}")
         logger.info("Automated blog parsing completed")
         logger.info("=" * 60)

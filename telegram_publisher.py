@@ -113,14 +113,13 @@ class TelegramPublisher:
         Publish blog post to Telegram channel with cover image as SINGLE message
 
         Uses sendPhoto with caption (limit 1024 chars).
-        If cover_image is not provided or file not found,
-        falls back to text-only publish_post() with full telegram_content.
+        All posts MUST have a cover image - without it, publishing is skipped.
 
         Args:
             title: Article title
-            content: Full article content (fallback)
+            content: Full article content (fallback for caption)
             slug: URL slug for the article
-            cover_image: Path to cover image (e.g., "/static/blog/covers/slug.png")
+            cover_image: Path to cover image (REQUIRED)
             excerpt: Optional custom excerpt
             telegram_content: Pre-generated shortened content for Telegram
 
@@ -131,15 +130,16 @@ class TelegramPublisher:
             logger.warning("Telegram publishing skipped - no bot token")
             return False
 
-        # If no cover - use text-only method (full telegram_content up to 4096)
+        # No cover = no publish
         if not cover_image:
-            return self.publish_post(title, content, slug, telegram_content=telegram_content)
+            logger.error(f"Cannot publish to Telegram without cover image: {slug}")
+            return False
 
         # Check file exists
         image_path = cover_image.lstrip('/')  # "/static/..." -> "static/..."
         if not os.path.exists(image_path):
-            logger.warning(f"Cover image not found: {image_path}, falling back to text")
-            return self.publish_post(title, content, slug, telegram_content=telegram_content)
+            logger.error(f"Cover image not found, cannot publish: {image_path}")
+            return False
 
         try:
             article_url = f"{self.site_url}/blog/{slug}"
@@ -169,7 +169,7 @@ class TelegramPublisher:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('ok'):
-                    logger.info(f"Published photo with caption to Telegram: {title[:50]}... ({len(caption)} chars)")
+                    logger.info(f"Published to Telegram: {title[:50]}... ({len(caption)} chars)")
                     return True
                 else:
                     logger.error(f"Telegram API error: {result.get('description')}")
@@ -179,9 +179,8 @@ class TelegramPublisher:
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to publish with image: {e}")
-            # Fallback to text-only
-            return self.publish_post(title, content, slug, telegram_content=telegram_content)
+            logger.error(f"Failed to publish to Telegram: {e}")
+            return False
 
     def publish_post_with_text_and_photos(
         self,
@@ -222,10 +221,10 @@ class TelegramPublisher:
             else:
                 logger.warning(f"Image not found: {img_path}")
 
-        # If no valid images, fall back to text-only
+        # No valid images = no publish
         if not valid_images:
-            logger.warning("No valid images, using text-only publish")
-            return self.publish_post(title, content, slug, telegram_content=telegram_content)
+            logger.error(f"Cannot publish to Telegram without images: {slug}")
+            return False
 
         # Single image - use simpler method
         if len(valid_images) == 1:

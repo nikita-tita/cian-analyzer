@@ -254,14 +254,17 @@ class BlogDatabase:
         }
 
     def get_unpublished_telegram(self, limit: int = 1) -> List[Dict]:
-        """Get posts not yet published to Telegram"""
+        """Get posts not yet published to Telegram (only with cover image)"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
 
         c.execute('''
             SELECT * FROM blog_posts
-            WHERE is_published = 1 AND telegram_published = 0
+            WHERE is_published = 1
+              AND telegram_published = 0
+              AND cover_image IS NOT NULL
+              AND cover_image != ''
             ORDER BY created_at ASC
             LIMIT ?
         ''', (limit,))
@@ -286,11 +289,32 @@ class BlogDatabase:
         conn.close()
 
     def count_unpublished_telegram(self) -> int:
-        """Count posts not yet published to Telegram"""
+        """Count posts not yet published to Telegram (only with cover image)"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
-        c.execute('SELECT COUNT(*) FROM blog_posts WHERE is_published = 1 AND telegram_published = 0')
+        c.execute('''
+            SELECT COUNT(*) FROM blog_posts
+            WHERE is_published = 1
+              AND telegram_published = 0
+              AND cover_image IS NOT NULL
+              AND cover_image != ''
+        ''')
+        count = c.fetchone()[0]
+        conn.close()
+
+        return count
+
+    def count_posts_without_cover(self) -> int:
+        """Count posts without cover image (waiting for YandexART)"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('''
+            SELECT COUNT(*) FROM blog_posts
+            WHERE is_published = 1
+              AND (cover_image IS NULL OR cover_image = '')
+        ''')
         count = c.fetchone()[0]
         conn.close()
 

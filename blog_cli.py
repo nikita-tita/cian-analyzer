@@ -16,6 +16,7 @@ from yandex_gpt import YandexGPT
 from yandex_art import YandexART
 from blog_database import BlogDatabase
 from telegram_publisher import TelegramPublisher
+from alert_bot import send_cover_alert
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,15 +73,19 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 original_excerpt=article_preview.get('excerpt')
             )
 
-            # Генерируем обложку (не блокирует публикацию при ошибке)
+            # Генерируем обложку (обязательна для публикации в Telegram)
             cover_image = None
             try:
                 cover_image = art.generate_cover(
                     title=rewritten['title'],
                     slug=slug
                 )
+                if not cover_image:
+                    logger.warning(f"Cover generation returned None for {slug}")
+                    send_cover_alert(rewritten['title'], slug, "YandexART returned None")
             except Exception as e:
-                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+                logger.warning(f"Cover generation failed: {e}")
+                send_cover_alert(rewritten['title'], slug, str(e))
 
             # Сохраняем в БД
             post_id = db.create_post(
@@ -179,15 +184,19 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                     result.input_tokens += usage.input_tokens
                     result.output_tokens += usage.output_tokens
 
-                # Generate cover (doesn't block publishing on error)
+                # Generate cover (required for Telegram publishing)
                 cover_image = None
                 try:
                     cover_image = art.generate_cover(
                         title=rewritten['title'],
                         slug=slug
                     )
+                    if not cover_image:
+                        logger.warning(f"Cover generation returned None for {slug}")
+                        send_cover_alert(rewritten['title'], slug, "YandexART returned None")
                 except Exception as e:
-                    logger.warning(f"Cover generation failed, continuing without cover: {e}")
+                    logger.warning(f"Cover generation failed: {e}")
+                    send_cover_alert(rewritten['title'], slug, str(e))
 
                 # Save to DB
                 post_id = db.create_post(
@@ -281,15 +290,19 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 original_excerpt=article_preview.get('excerpt')
             )
 
-            # Generate cover (doesn't block publishing on error)
+            # Generate cover (required for Telegram publishing)
             cover_image = None
             try:
                 cover_image = art.generate_cover(
                     title=rewritten['title'],
                     slug=slug
                 )
+                if not cover_image:
+                    logger.warning(f"Cover generation returned None for {slug}")
+                    send_cover_alert(rewritten['title'], slug, "YandexART returned None")
             except Exception as e:
-                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+                logger.warning(f"Cover generation failed: {e}")
+                send_cover_alert(rewritten['title'], slug, str(e))
 
             # Save to DB
             post_id = db.create_post(
@@ -387,15 +400,19 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                     result.input_tokens += usage.input_tokens
                     result.output_tokens += usage.output_tokens
 
-                # Generate cover (doesn't block publishing on error)
+                # Generate cover (required for Telegram publishing)
                 cover_image = None
                 try:
                     cover_image = art.generate_cover(
                         title=rewritten['title'],
                         slug=slug
                     )
+                    if not cover_image:
+                        logger.warning(f"Cover generation returned None for {slug}")
+                        send_cover_alert(rewritten['title'], slug, "YandexART returned None")
                 except Exception as e:
-                    logger.warning(f"Cover generation failed, continuing without cover: {e}")
+                    logger.warning(f"Cover generation failed: {e}")
+                    send_cover_alert(rewritten['title'], slug, str(e))
 
                 # Save to DB
                 post_id = db.create_post(

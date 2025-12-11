@@ -47,6 +47,9 @@ if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN не найден в .env файле")
 
 
+# Импорт алертов
+from alert_bot import send_cover_alert
+
 # === Утилиты для блога ===
 
 def create_slug(title: str) -> str:
@@ -287,8 +290,16 @@ async def process_blog_post(
         )
         try:
             cover_image = art.generate_cover(title=new_title, slug=slug)
+            if cover_image:
+                logger.info(f"Cover generated: {cover_image}")
+            else:
+                # YandexART вернул None (disabled или ошибка API)
+                error_msg = "YandexART returned None (disabled or API error)"
+                logger.warning(f"Cover generation failed: {error_msg}")
+                send_cover_alert(new_title, slug, error_msg)
         except Exception as e:
             logger.warning(f"Cover generation failed: {e}")
+            send_cover_alert(new_title, slug, str(e))
 
     # 3. Save to DB
     await status_msg.edit_text(
@@ -311,45 +322,58 @@ async def process_blog_post(
 
     logger.info(f"Created blog post: {new_title} (ID: {post_id})")
 
-    # 4. Publish to Telegram channel
-    await status_msg.edit_text(
-        f"Обрабатываю статью: {new_title[:50]}...\n"
-        "Публикую в канал..."
-    )
+    # 4. Publish to Telegram channel (only if cover exists)
+    article_url = f"{SITE_URL}/blog/{slug}"
+    telegram_published = False
 
-    # Use gallery method if multiple photos
+    # Build images list for gallery
     all_images = [cover_image] + gallery_images[1:] if gallery_images else ([cover_image] if cover_image else [])
 
-    if len(all_images) > 1:
-        telegram_pub.publish_post_with_gallery(
-            title=new_title,
-            content=new_content,
-            slug=slug,
-            images=all_images,
-            excerpt=excerpt,
-            telegram_content=telegram_content
-        )
-    else:
-        telegram_pub.publish_post_with_image(
-            title=new_title,
-            content=new_content,
-            slug=slug,
-            cover_image=cover_image,
-            excerpt=excerpt,
-            telegram_content=telegram_content
+    if cover_image:
+        await status_msg.edit_text(
+            f"Обрабатываю статью: {new_title[:50]}...\n"
+            "Публикую в канал..."
         )
 
-    # Mark as published
-    db.mark_telegram_published(post_id)
+        if len(all_images) > 1:
+            telegram_published = telegram_pub.publish_post_with_gallery(
+                title=new_title,
+                content=new_content,
+                slug=slug,
+                images=all_images,
+                excerpt=excerpt,
+                telegram_content=telegram_content
+            )
+        else:
+            telegram_published = telegram_pub.publish_post_with_image(
+                title=new_title,
+                content=new_content,
+                slug=slug,
+                cover_image=cover_image,
+                excerpt=excerpt,
+                telegram_content=telegram_content
+            )
+
+        if telegram_published:
+            db.mark_telegram_published(post_id)
+    else:
+        logger.warning(f"No cover image - Telegram publish skipped, will be queued: {slug}")
 
     # 5. Reply to user
-    article_url = f"{SITE_URL}/blog/{slug}"
     photos_info = f"\nФото: {len(gallery_images)}" if gallery_images else ""
-    await status_msg.edit_text(
-        f"Статья опубликована!\n\n"
-        f"Заголовок: {new_title}{photos_info}\n"
-        f"Ссылка: {article_url}"
-    )
+    if telegram_published:
+        await status_msg.edit_text(
+            f"Статья опубликована!\n\n"
+            f"Заголовок: {new_title}{photos_info}\n"
+            f"Ссылка: {article_url}"
+        )
+    else:
+        await status_msg.edit_text(
+            f"Статья сохранена на сайте!\n\n"
+            f"Заголовок: {new_title}{photos_info}\n"
+            f"Ссылка: {article_url}\n\n"
+            f"В Telegram будет опубликована автоматически после генерации обложки."
+        )
 
     logger.info(f"Blog post published successfully: {article_url}")
     return True

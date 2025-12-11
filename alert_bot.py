@@ -29,7 +29,8 @@ class ParseResult:
     articles_parsed: int = 0
     articles_rewritten: int = 0
     articles_published_site: int = 0
-    pending_telegram: int = 0  # Статьи в очереди на публикацию в ТГ
+    pending_telegram: int = 0  # Статьи в очереди на публикацию в ТГ (с обложкой)
+    pending_without_cover: int = 0  # Статьи без обложки (ждут YandexART)
     published_titles: List[str] = field(default_factory=list)  # Названия опубликованных статей
     errors: List[str] = field(default_factory=list)
     # Статистика токенов Yandex GPT
@@ -172,6 +173,11 @@ class AlertBot:
         if result.total_tokens > 0:
             tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
 
+        # Формируем строку о постах без обложки (если есть)
+        no_cover_line = ""
+        if result.pending_without_cover > 0:
+            no_cover_line = f"\n• Без обложки: {result.pending_without_cover}"
+
         message = f"""✅ <b>Парсинг {result.source} завершён успешно</b>
 
 📅 {now}
@@ -181,7 +187,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}{tokens_line}{published_list}
+• В очереди на ТГ: {result.pending_telegram}{no_cover_line}{tokens_line}{published_list}
 
 🎉 Всё работает штатно!"""
 
@@ -207,6 +213,11 @@ class AlertBot:
         if result.total_tokens > 0:
             tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
 
+        # Формируем строку о постах без обложки (если есть)
+        no_cover_line = ""
+        if result.pending_without_cover > 0:
+            no_cover_line = f"\n• Без обложки: {result.pending_without_cover}"
+
         message = f"""⚠️ <b>Парсинг {result.source} завершён с ошибками</b>
 
 📅 {now}
@@ -216,7 +227,7 @@ class AlertBot:
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
 • Опубликовано на сайте: {result.articles_published_site}
-• В очереди на ТГ: {result.pending_telegram}{tokens_line}{published_list}
+• В очереди на ТГ: {result.pending_telegram}{no_cover_line}{tokens_line}{published_list}
 
 ❌ <b>Ошибки:</b>
 {errors_text}"""
@@ -236,6 +247,11 @@ class AlertBot:
         if result.total_tokens > 0:
             tokens_line = f"\n• Токены GPT: {result.input_tokens:,} вх / {result.output_tokens:,} вых"
 
+        # Формируем строку о постах без обложки (если есть)
+        no_cover_line = ""
+        if result.pending_without_cover > 0:
+            no_cover_line = f"\n• Без обложки: {result.pending_without_cover}"
+
         message = f"""🚨 <b>Парсинг {result.source} ПРОВАЛЕН</b>
 
 📅 {now}
@@ -244,7 +260,7 @@ class AlertBot:
 • Найдено статей: {result.articles_found}
 • Спаршено: {result.articles_parsed}
 • Переписано ИИ: {result.articles_rewritten}
-• Опубликовано на сайте: {result.articles_published_site}{tokens_line}
+• Опубликовано на сайте: {result.articles_published_site}{no_cover_line}{tokens_line}
 
 ❌ <b>Ошибки:</b>
 {errors_text}
@@ -275,3 +291,27 @@ def send_alert(message: str) -> bool:
 def send_parse_report(result: ParseResult) -> bool:
     """Быстрая функция для отправки отчёта"""
     return alert_bot.send_report(result)
+
+
+def send_cover_alert(title: str, slug: str, error: str) -> bool:
+    """
+    Отправить алерт о неудачной генерации обложки
+
+    Пост сохранён в БД, но без обложки.
+    Публикация в Telegram отложена до появления обложки.
+    """
+    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    message = f"""🎨 <b>YandexART: ошибка генерации обложки</b>
+
+📅 {now}
+
+📝 <b>Статья:</b> {title[:80]}{'...' if len(title) > 80 else ''}
+🔗 <b>Slug:</b> {slug}
+
+❌ <b>Ошибка:</b>
+{error[:200]}{'...' if len(str(error)) > 200 else ''}
+
+⚠️ Пост сохранён на сайте, но НЕ будет опубликован в Telegram пока нет обложки."""
+
+    return alert_bot.send_alert(message)
