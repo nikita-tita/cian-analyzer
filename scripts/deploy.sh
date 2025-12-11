@@ -116,14 +116,24 @@ else
     ERRORS=$((ERRORS+1))
 fi
 
-# Тест 4: Обложки примонтированы
+# Тест 4: Обложки примонтированы и все файлы существуют
 COVERS_HOST=$(ssh -i "$SSH_KEY" "$SERVER" "ls /var/www/housler/static/blog/covers/*.png 2>/dev/null | wc -l")
-COVERS_CONTAINER=$(ssh -i "$SSH_KEY" "$SERVER" "docker exec housler-app ls /app/static/blog/covers/*.png 2>/dev/null | wc -l")
-if [ "$COVERS_HOST" = "$COVERS_CONTAINER" ] && [ "$COVERS_HOST" -gt "0" ]; then
-    echo -e "${GREEN}✓ Обложки синхронизированы ($COVERS_HOST файлов)${NC}"
+COVERS_DB=$(ssh -i "$SSH_KEY" "$SERVER" "sqlite3 /var/www/housler_data/blog.db 'SELECT COUNT(*) FROM blog_posts WHERE cover_image IS NOT NULL'")
+MISSING_COVERS=$(ssh -i "$SSH_KEY" "$SERVER" "sqlite3 /var/www/housler_data/blog.db \"SELECT cover_image FROM blog_posts WHERE cover_image IS NOT NULL\" | while read path; do filename=\$(basename \"\$path\"); [ ! -f \"/var/www/housler/static/blog/covers/\$filename\" ] && echo \"\$filename\"; done | wc -l")
+
+if [ "$MISSING_COVERS" -eq "0" ] && [ "$COVERS_HOST" -gt "0" ]; then
+    echo -e "${GREEN}✓ Обложки: $COVERS_HOST файлов, все синхронизированы${NC}"
 else
-    echo -e "${RED}✗ Обложки не синхронизированы (host: $COVERS_HOST, container: $COVERS_CONTAINER)${NC}"
+    echo -e "${RED}✗ Обложки: DB=$COVERS_DB, файлов=$COVERS_HOST, отсутствует=$MISSING_COVERS${NC}"
     ERRORS=$((ERRORS+1))
+fi
+
+# Тест 5: Права на папку covers
+COVERS_PERMS=$(ssh -i "$SSH_KEY" "$SERVER" "stat -c '%a' /var/www/housler/static/blog/covers")
+if [ "$COVERS_PERMS" = "777" ]; then
+    echo -e "${GREEN}✓ Права на папку covers корректны (777)${NC}"
+else
+    echo -e "${YELLOW}⚠ Права на папку covers: $COVERS_PERMS (рекомендуется 777)${NC}"
 fi
 
 if [ $ERRORS -gt 0 ]; then
