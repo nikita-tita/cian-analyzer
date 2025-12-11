@@ -289,7 +289,10 @@ async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Парсим сообщение
     text = message.text or message.caption or ''
+    logger.info(f"Raw message text ({len(text)} chars): {text[:200]}...")
+
     title, content = parse_blog_message(text)
+    logger.info(f"Parsed: title={title[:50] if title else None}..., content_len={len(content) if content else 0}")
 
     if not title or not content:
         await message.reply_text(
