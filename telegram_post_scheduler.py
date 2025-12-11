@@ -59,7 +59,8 @@ def publish_one_post():
             content=post['content'],
             slug=post['slug'],
             cover_image=post.get('cover_image'),
-            excerpt=post.get('excerpt')
+            excerpt=post.get('excerpt'),
+            telegram_content=post.get('telegram_content', '')
         )
 
         if success:

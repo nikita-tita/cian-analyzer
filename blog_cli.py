@@ -91,7 +91,8 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 original_url=url,
                 original_title=full_article['title'],
                 published_at=full_article['published_at'],
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
 
             logger.info(f"✓ Published: {rewritten['title']} (ID: {post_id})")
@@ -101,7 +102,8 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 title=rewritten['title'],
                 content=rewritten['content'],
                 slug=slug,
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
             # Mark as published to avoid duplicate from scheduler
             db.mark_telegram_published(post_id)
@@ -182,7 +184,8 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 original_url=url,
                 original_title=full_article['title'],
                 published_at=full_article['published_at'],
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
 
             logger.info(f"✓ Published: {rewritten['title']} (ID: {post_id})")
@@ -192,7 +195,8 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 title=rewritten['title'],
                 content=rewritten['content'],
                 slug=slug,
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
             # Mark as published to avoid duplicate from scheduler
             db.mark_telegram_published(post_id)
@@ -273,7 +277,8 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 original_url=url,
                 original_title=full_article['title'],
                 published_at=full_article['published_at'],
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
 
             logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
@@ -283,7 +288,8 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 title=rewritten['title'],
                 content=rewritten['content'],
                 slug=slug,
-                cover_image=cover_image
+                cover_image=cover_image,
+                telegram_content=rewritten.get('telegram_content', '')
             )
             # Mark as published to avoid duplicate from scheduler
             db.mark_telegram_published(post_id)
@@ -377,7 +383,8 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                     original_url=article['url'],
                     original_title=article['title'],
                     published_at=article.get('published_date') or datetime.now().isoformat(),
-                    cover_image=cover_image
+                    cover_image=cover_image,
+                    telegram_content=rewritten.get('telegram_content', '')
                 )
 
                 result.articles_published_site += 1
@@ -389,7 +396,8 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                     title=rewritten['title'],
                     content=rewritten['content'],
                     slug=slug,
-                    cover_image=cover_image
+                    cover_image=cover_image,
+                    telegram_content=rewritten.get('telegram_content', '')
                 )
                 # Mark as published to avoid duplicate from scheduler
                 db.mark_telegram_published(post_id)

@@ -159,7 +159,8 @@ def main(source: str = 'cian'):
                     original_url=url,
                     original_title=full_article['title'],
                     published_at=full_article['published_at'],
-                    cover_image=cover_image
+                    cover_image=cover_image,
+                    telegram_content=rewritten.get('telegram_content', '')
                 )
 
                 result.articles_published_site += 1

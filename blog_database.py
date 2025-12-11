@@ -76,6 +76,13 @@ class BlogDatabase:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Add telegram_content column if it doesn't exist (migration)
+        # Stores pre-generated shortened content for Telegram (1200-1500 chars)
+        try:
+            c.execute('ALTER TABLE blog_posts ADD COLUMN telegram_content TEXT DEFAULT NULL')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -90,7 +97,8 @@ class BlogDatabase:
         published_at: Optional[str] = None,
         telegram_post_type: Optional[str] = None,
         cover_image: Optional[str] = None,
-        gallery_images: Optional[List[str]] = None
+        gallery_images: Optional[List[str]] = None,
+        telegram_content: Optional[str] = None
     ) -> int:
         """Create new blog post"""
         conn = sqlite3.connect(self.db_path)
@@ -110,10 +118,10 @@ class BlogDatabase:
         c.execute('''
             INSERT INTO blog_posts
             (slug, title, excerpt, content, original_url, original_title,
-             published_at, created_at, updated_at, telegram_post_type, cover_image, gallery_images)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             published_at, created_at, updated_at, telegram_post_type, cover_image, gallery_images, telegram_content)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (slug, title, excerpt, content, original_url, original_title,
-              published_at, now, now, telegram_post_type, cover_image, gallery_json))
+              published_at, now, now, telegram_post_type, cover_image, gallery_json, telegram_content))
 
         post_id = c.lastrowid
         conn.commit()

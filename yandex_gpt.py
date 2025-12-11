@@ -104,7 +104,15 @@ EXCERPT: [краткое описание в 1-2 предложениях]
 CONTENT:
 [Полный переписанный текст статьи — МИНИМУМ 2000 символов]
 
-[В конце обязательно блок с CTA]"""
+[В конце обязательно блок с CTA]
+
+TELEGRAM_CONTENT:
+[Сокращённая версия статьи для Telegram — 1200-1500 символов]
+- Это полноценный рерайт в сжатом формате, НЕ обрезка
+- Сохрани ключевые мысли, факты и выводы
+- Убери лишние детали, оставь суть
+- БЕЗ блока CTA (он будет в ссылке)
+- Текст должен быть законченным и читабельным"""
 
         try:
             response = requests.post(
@@ -156,6 +164,7 @@ CONTENT:
                 'title': original_title,
                 'excerpt': original_excerpt or original_content[:200] + '...',
                 'content': original_content,
+                'telegram_content': '',  # Пустой — будет fallback на обрезку
                 'usage': TokenUsage()
             }
 
@@ -165,36 +174,51 @@ CONTENT:
         fallback_title: str,
         fallback_excerpt: Optional[str]
     ) -> Dict[str, str]:
-        """Parse GPT response into title, excerpt, content"""
+        """Parse GPT response into title, excerpt, content, telegram_content"""
 
         title = fallback_title
         excerpt = fallback_excerpt or ""
         content = response_text
+        telegram_content = ""
 
         try:
             lines = response_text.strip().split('\n')
             current_section = None
             content_lines = []
+            telegram_lines = []
 
             for line in lines:
-                line = line.strip()
+                line_stripped = line.strip()
 
-                if line.startswith('TITLE:'):
-                    title = line.replace('TITLE:', '').strip()
+                if line_stripped.startswith('TITLE:'):
+                    title = line_stripped.replace('TITLE:', '').strip()
                     current_section = 'title'
-                elif line.startswith('EXCERPT:'):
-                    excerpt = line.replace('EXCERPT:', '').strip()
+                elif line_stripped.startswith('EXCERPT:'):
+                    excerpt = line_stripped.replace('EXCERPT:', '').strip()
                     current_section = 'excerpt'
-                elif line.startswith('CONTENT:'):
+                elif line_stripped.startswith('CONTENT:'):
                     current_section = 'content'
                     continue
-                elif current_section == 'content' and line:
-                    content_lines.append(line)
-                elif current_section == 'excerpt' and line and not line.startswith('CONTENT:'):
-                    excerpt += ' ' + line
+                elif line_stripped.startswith('TELEGRAM_CONTENT:'):
+                    current_section = 'telegram'
+                    continue
+                elif current_section == 'content' and line_stripped:
+                    # Stop content when TELEGRAM_CONTENT starts
+                    if not line_stripped.startswith('TELEGRAM_CONTENT'):
+                        content_lines.append(line_stripped)
+                elif current_section == 'telegram' and line_stripped:
+                    # Skip instruction lines starting with "-"
+                    if not line_stripped.startswith('-'):
+                        telegram_lines.append(line_stripped)
+                elif current_section == 'excerpt' and line_stripped:
+                    if not line_stripped.startswith('CONTENT:'):
+                        excerpt += ' ' + line_stripped
 
             if content_lines:
                 content = '\n\n'.join(content_lines)
+
+            if telegram_lines:
+                telegram_content = '\n\n'.join(telegram_lines)
 
         except Exception as e:
             logger.warning(f"Failed to parse GPT response: {e}")
@@ -202,5 +226,6 @@ CONTENT:
         return {
             'title': title,
             'excerpt': excerpt[:300] if len(excerpt) > 300 else excerpt,
-            'content': content
+            'content': content,
+            'telegram_content': telegram_content
         }

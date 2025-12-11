@@ -30,15 +30,17 @@ class TelegramPublisher:
         self,
         title: str,
         content: str,
-        slug: str
+        slug: str,
+        telegram_content: Optional[str] = None
     ) -> bool:
         """
         Publish blog post to Telegram channel
 
         Args:
             title: Article title
-            content: Full article content (will extract 60-70% for preview)
+            content: Full article content (fallback if telegram_content not provided)
             slug: URL slug for the article
+            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
 
         Returns:
             True if published successfully, False otherwise
@@ -50,8 +52,19 @@ class TelegramPublisher:
         try:
             article_url = f"{self.site_url}/blog/{slug}"
 
-            # Generate preview (60-70% of content)
-            preview_text = self._generate_preview(content)
+            # Use telegram_content if available, otherwise truncate content as fallback
+            if telegram_content:
+                preview_text = telegram_content
+            else:
+                # Fallback: simple truncation (legacy behavior)
+                preview_text = content[:self.max_symbols]
+                if len(content) > self.max_symbols:
+                    # Cut at sentence boundary
+                    for char in '.!?':
+                        pos = preview_text.rfind(char)
+                        if pos > self.max_symbols * 0.7:
+                            preview_text = preview_text[:pos + 1]
+                            break
 
             # Format message with HTML
             message = f"<b>{title}</b>\n\n"
@@ -93,13 +106,14 @@ class TelegramPublisher:
         content: str,
         slug: str,
         cover_image: Optional[str] = None,
-        excerpt: Optional[str] = None
+        excerpt: Optional[str] = None,
+        telegram_content: Optional[str] = None
     ) -> bool:
         """
         Publish blog post to Telegram channel with cover image
 
         Now uses two-message approach:
-        1. Long text message (3/4 of content)
+        1. Long text message (telegram_content or fallback)
         2. Photo without caption
 
         If cover_image is not provided or file not found,
@@ -107,10 +121,11 @@ class TelegramPublisher:
 
         Args:
             title: Article title
-            content: Full article content
+            content: Full article content (fallback)
             slug: URL slug for the article
             cover_image: Path to cover image (e.g., "/static/blog/covers/slug.png")
             excerpt: Optional custom excerpt
+            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
 
         Returns:
             True if published successfully, False otherwise
@@ -121,13 +136,13 @@ class TelegramPublisher:
 
         # If no cover - use text-only method
         if not cover_image:
-            return self.publish_post(title, content, slug)
+            return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
         # Check file exists
         image_path = cover_image.lstrip('/')  # "/static/..." -> "static/..."
         if not os.path.exists(image_path):
             logger.warning(f"Cover image not found: {image_path}, falling back to text")
-            return self.publish_post(title, content, slug)
+            return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
         # Delegate to the two-message method
         return self.publish_post_with_text_and_photos(
@@ -135,7 +150,8 @@ class TelegramPublisher:
             content=content,
             slug=slug,
             images=[cover_image],
-            excerpt=excerpt
+            excerpt=excerpt,
+            telegram_content=telegram_content
         )
 
     def publish_post_with_text_and_photos(
@@ -144,21 +160,23 @@ class TelegramPublisher:
         content: str,
         slug: str,
         images: List[str],
-        excerpt: Optional[str] = None
+        excerpt: Optional[str] = None,
+        telegram_content: Optional[str] = None
     ) -> bool:
         """
         Publish blog post as TWO messages: long text first, then photos
 
         This approach allows:
-        - Text message: up to 4096 chars (we use 3/4 of content = ~1500+ chars)
+        - Text message: up to 4096 chars (telegram_content ~1200-1500 chars)
         - Photos: sent separately without caption limit
 
         Args:
             title: Article title
-            content: Full article content
+            content: Full article content (fallback)
             slug: URL slug for the article
             images: List of image paths
             excerpt: Optional custom excerpt
+            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
 
         Returns:
             True if published successfully, False otherwise
@@ -179,13 +197,23 @@ class TelegramPublisher:
         # If no valid images, fall back to text-only
         if not valid_images:
             logger.warning("No valid images, using text-only publish")
-            return self.publish_post(title, content, slug)
+            return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
         try:
             article_url = f"{self.site_url}/blog/{slug}"
 
-            # Step 1: Send long text message (3/4 of content)
-            preview_text = self._generate_preview(content)
+            # Step 1: Send long text message (use telegram_content if available)
+            if telegram_content:
+                preview_text = telegram_content
+            else:
+                # Fallback: simple truncation (legacy behavior)
+                preview_text = content[:self.max_symbols]
+                if len(content) > self.max_symbols:
+                    for char in '.!?':
+                        pos = preview_text.rfind(char)
+                        if pos > self.max_symbols * 0.7:
+                            preview_text = preview_text[:pos + 1]
+                            break
 
             message = f"<b>{title}</b>\n\n"
             message += f"{preview_text}\n\n"
@@ -272,7 +300,7 @@ class TelegramPublisher:
 
         except Exception as e:
             logger.error(f"Failed to publish with text and photos: {e}")
-            return self.publish_post(title, content, slug)
+            return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
     def publish_post_with_gallery(
         self,
@@ -280,7 +308,8 @@ class TelegramPublisher:
         content: str,
         slug: str,
         images: List[str],
-        excerpt: Optional[str] = None
+        excerpt: Optional[str] = None,
+        telegram_content: Optional[str] = None
     ) -> bool:
         """
         Publish blog post with multiple images as Telegram media group
@@ -300,6 +329,7 @@ class TelegramPublisher:
             slug: URL slug for the article
             images: List of image paths (e.g., ["/static/blog/covers/slug.jpg", ...])
             excerpt: Optional custom excerpt
+            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
 
         Returns:
             True if published successfully, False otherwise
@@ -310,105 +340,9 @@ class TelegramPublisher:
             content=content,
             slug=slug,
             images=images,
-            excerpt=excerpt
+            excerpt=excerpt,
+            telegram_content=telegram_content
         )
-
-    def _build_photo_caption(
-        self,
-        title: str,
-        content: str,
-        excerpt: Optional[str],
-        article_url: str
-    ) -> str:
-        """
-        Build caption for photo post with 1020 char limit
-
-        Structure:
-        <b>Title</b>
-
-        Preview text truncated at sentence boundary...
-
-        <a href="url">Читать полностью на сайте</a>
-        """
-        MAX_CAPTION = 1020  # Safe limit (Telegram: 1024)
-
-        # Fixed parts
-        link_text = f'<a href="{article_url}">Читать полностью на сайте</a>'
-        title_formatted = f"<b>{title}</b>"
-
-        # Calculate available space for preview
-        fixed_length = len(title_formatted) + len(link_text) + 4  # 4 = two "\n\n"
-        max_preview_length = MAX_CAPTION - fixed_length
-
-        # Get preview
-        if excerpt and len(excerpt) <= max_preview_length:
-            preview = excerpt
-        else:
-            preview = self._generate_short_preview(content, max_preview_length)
-
-        # Build caption
-        caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
-
-        # Final length check
-        if len(caption) > MAX_CAPTION:
-            overflow = len(caption) - MAX_CAPTION
-            preview = preview[:len(preview) - overflow - 3] + "..."
-            caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
-
-        return caption
-
-    def _generate_short_preview(self, content: str, max_length: int) -> str:
-        """
-        Generate short preview for photo caption
-
-        - Removes promotional content (HOUSLER mentions, CTAs)
-        - Truncates at sentence boundary
-        - Max length enforced
-        """
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
-
-        if not paragraphs:
-            return content[:max_length]
-
-        # Filter promo content
-        skip_words = [
-            'housler', 'оставьте заявку', 'свяжется с вами',
-            'агентство', '[оставьте заявку]', 'эксперт свяжется'
-        ]
-
-        content_paragraphs = []
-        for paragraph in paragraphs:
-            if any(word in paragraph.lower() for word in skip_words):
-                continue
-            content_paragraphs.append(paragraph)
-
-        if not content_paragraphs:
-            content_paragraphs = paragraphs[:2]
-
-        # Build text up to limit
-        result = ''
-        for paragraph in content_paragraphs:
-            test_result = result + ('\n\n' if result else '') + paragraph
-
-            if len(test_result) > max_length:
-                remaining = max_length - len(result) - (2 if result else 0)
-                if remaining > 50:
-                    partial = paragraph[:remaining]
-                    # Find sentence end
-                    for char in '.!?':
-                        pos = partial.rfind(char)
-                        if pos > remaining * 0.5:
-                            result += ('\n\n' if result else '') + partial[:pos + 1]
-                            break
-                    else:
-                        last_space = partial.rfind(' ')
-                        if last_space > remaining * 0.5:
-                            result += ('\n\n' if result else '') + partial[:last_space] + '...'
-                break
-            else:
-                result = test_result
-
-        return result.strip() or content[:max_length]
 
     def test_connection(self) -> bool:
         """Test bot connection and channel access"""
@@ -431,114 +365,3 @@ class TelegramPublisher:
         except Exception as e:
             logger.error(f"Failed to test Telegram connection: {e}")
             return False
-
-    def _generate_preview(self, content: str) -> str:
-        """
-        Generate preview with 60-70% of article content
-
-        Args:
-            content: Full article content
-
-        Returns:
-            Preview text for Telegram
-        """
-        # Split into paragraphs and filter promotional content
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
-
-        if not paragraphs:
-            return content[:self.max_symbols]
-
-        # Remove promotional/CTA paragraphs
-        content_paragraphs = []
-        skip_words = [
-            'housler', 'оставьте заявку', 'свяжется с вами',
-            'агентство', '[оставьте заявку]', 'эксперт свяжется'
-        ]
-        for paragraph in paragraphs:
-            if any(word in paragraph.lower() for word in skip_words):
-                continue
-            content_paragraphs.append(paragraph)
-
-        if not content_paragraphs:
-            return content[:self.max_symbols]
-
-        # Calculate target length
-        full_text = '\n\n'.join(content_paragraphs)
-        target_length = self._calculate_target_length(len(full_text))
-
-        # Take sequential paragraphs up to target length
-        result = ''
-        current_length = 0
-
-        for paragraph in content_paragraphs:
-            paragraph_text = paragraph + '\n\n' if result else paragraph
-            new_length = current_length + len(paragraph_text)
-
-            if new_length > target_length:
-                # Try to fit partial paragraph
-                remaining = target_length - current_length
-                if remaining > 100:
-                    partial = paragraph[:remaining]
-                    # Cut at sentence boundary
-                    for char in '.!?':
-                        pos = partial.rfind(char)
-                        if pos > remaining * 0.6:
-                            result += ('\n\n' if result else '') + partial[:pos + 1]
-                            break
-                break
-            else:
-                result += paragraph_text
-                current_length = new_length
-
-        result = result.strip()
-
-        # Ensure we don't exceed Telegram limit
-        if len(result) > self.max_symbols:
-            result = self._truncate_at_sentence(result, self.max_symbols)
-
-        return result
-
-    def _calculate_target_length(self, content_length: int) -> int:
-        """
-        Calculate target length for preview (60-70% of content)
-        Aims for 3400-3900 symbols for optimal Telegram display
-        """
-        target_min, target_max = 3400, 3900
-        target_avg = (target_min + target_max) / 2
-
-        if content_length <= target_avg:
-            # Short articles: take up to 95%
-            ratio = 0.95
-        else:
-            # Long articles: calculate ratio to reach target_avg
-            ratio = target_avg / content_length
-
-        # Keep ratio between content_ratio and 95%
-        ratio = min(0.95, max(self.content_ratio, ratio))
-
-        result = int(content_length * ratio)
-
-        # Ensure minimum length for long articles
-        if content_length > target_max and result < target_min:
-            result = target_min
-
-        return min(result, self.max_symbols)
-
-    def _truncate_at_sentence(self, text: str, max_length: int) -> str:
-        """Truncate text at sentence boundary"""
-        if len(text) <= max_length:
-            return text
-
-        truncated = text[:max_length]
-
-        # Find last sentence ending
-        cut_point = -1
-        for char in '.!?':
-            pos = truncated.rfind(char)
-            if pos > cut_point:
-                cut_point = pos
-
-        if cut_point > max_length * 0.7:
-            return truncated[:cut_point + 1]
-
-        return truncated.rstrip() + '...'

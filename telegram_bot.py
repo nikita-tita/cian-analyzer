@@ -241,6 +241,7 @@ async def process_blog_post(
     new_title = rewritten['title']
     new_content = rewritten['content']
     excerpt = rewritten.get('excerpt', '')
+    telegram_content = rewritten.get('telegram_content', '')
 
     slug = create_slug(new_title)
 
@@ -304,7 +305,8 @@ async def process_blog_post(
         original_title=title,
         cover_image=cover_image,
         gallery_images=gallery_images if gallery_images else None,
-        telegram_post_type="manual"
+        telegram_post_type="manual",
+        telegram_content=telegram_content
     )
 
     logger.info(f"Created blog post: {new_title} (ID: {post_id})")
@@ -324,7 +326,8 @@ async def process_blog_post(
             content=new_content,
             slug=slug,
             images=all_images,
-            excerpt=excerpt
+            excerpt=excerpt,
+            telegram_content=telegram_content
         )
     else:
         telegram_pub.publish_post_with_image(
@@ -332,7 +335,8 @@ async def process_blog_post(
             content=new_content,
             slug=slug,
             cover_image=cover_image,
-            excerpt=excerpt
+            excerpt=excerpt,
+            telegram_content=telegram_content
         )
 
     # Mark as published
