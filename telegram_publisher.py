@@ -110,14 +110,11 @@ class TelegramPublisher:
         telegram_content: Optional[str] = None
     ) -> bool:
         """
-        Publish blog post to Telegram channel with cover image
+        Publish blog post to Telegram channel with cover image as SINGLE message
 
-        Now uses two-message approach:
-        1. Long text message (telegram_content or fallback)
-        2. Photo without caption
-
+        Uses sendPhoto with caption (limit 1024 chars).
         If cover_image is not provided or file not found,
-        falls back to text-only publish_post().
+        falls back to text-only publish_post() with full telegram_content.
 
         Args:
             title: Article title
@@ -125,7 +122,7 @@ class TelegramPublisher:
             slug: URL slug for the article
             cover_image: Path to cover image (e.g., "/static/blog/covers/slug.png")
             excerpt: Optional custom excerpt
-            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
+            telegram_content: Pre-generated shortened content for Telegram
 
         Returns:
             True if published successfully, False otherwise
@@ -134,7 +131,7 @@ class TelegramPublisher:
             logger.warning("Telegram publishing skipped - no bot token")
             return False
 
-        # If no cover - use text-only method
+        # If no cover - use text-only method (full telegram_content up to 4096)
         if not cover_image:
             return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
@@ -144,15 +141,47 @@ class TelegramPublisher:
             logger.warning(f"Cover image not found: {image_path}, falling back to text")
             return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
-        # Delegate to the two-message method
-        return self.publish_post_with_text_and_photos(
-            title=title,
-            content=content,
-            slug=slug,
-            images=[cover_image],
-            excerpt=excerpt,
-            telegram_content=telegram_content
-        )
+        try:
+            article_url = f"{self.site_url}/blog/{slug}"
+
+            # Build caption (max 1024 chars for photo caption)
+            caption = self._build_photo_caption(
+                title=title,
+                content=content,
+                telegram_content=telegram_content,
+                article_url=article_url
+            )
+
+            # Send photo with caption
+            photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+            with open(image_path, 'rb') as photo:
+                response = requests.post(
+                    photo_url,
+                    data={
+                        "chat_id": self.channel_id,
+                        "caption": caption,
+                        "parse_mode": "HTML"
+                    },
+                    files={"photo": photo},
+                    timeout=60
+                )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info(f"Published photo with caption to Telegram: {title[:50]}... ({len(caption)} chars)")
+                    return True
+                else:
+                    logger.error(f"Telegram API error: {result.get('description')}")
+                    return False
+            else:
+                logger.error(f"Telegram API HTTP error: {response.status_code}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to publish with image: {e}")
+            # Fallback to text-only
+            return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
     def publish_post_with_text_and_photos(
         self,
@@ -164,11 +193,10 @@ class TelegramPublisher:
         telegram_content: Optional[str] = None
     ) -> bool:
         """
-        Publish blog post as TWO messages: long text first, then photos
+        Publish blog post with multiple photos as media group (single message)
 
-        This approach allows:
-        - Text message: up to 4096 chars (telegram_content ~1200-1500 chars)
-        - Photos: sent separately without caption limit
+        Uses sendMediaGroup with caption on first image (limit 1024 chars).
+        For single image, delegates to publish_post_with_image.
 
         Args:
             title: Article title
@@ -176,7 +204,7 @@ class TelegramPublisher:
             slug: URL slug for the article
             images: List of image paths
             excerpt: Optional custom excerpt
-            telegram_content: Pre-generated shortened content for Telegram (1200-1500 chars)
+            telegram_content: Pre-generated shortened content for Telegram
 
         Returns:
             True if published successfully, False otherwise
@@ -199,107 +227,77 @@ class TelegramPublisher:
             logger.warning("No valid images, using text-only publish")
             return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
+        # Single image - use simpler method
+        if len(valid_images) == 1:
+            return self.publish_post_with_image(
+                title=title,
+                content=content,
+                slug=slug,
+                cover_image=f"/{valid_images[0]}",
+                telegram_content=telegram_content
+            )
+
         try:
             article_url = f"{self.site_url}/blog/{slug}"
 
-            # Step 1: Send long text message (use telegram_content if available)
-            if telegram_content:
-                preview_text = telegram_content
-            else:
-                # Fallback: simple truncation (legacy behavior)
-                preview_text = content[:self.max_symbols]
-                if len(content) > self.max_symbols:
-                    for char in '.!?':
-                        pos = preview_text.rfind(char)
-                        if pos > self.max_symbols * 0.7:
-                            preview_text = preview_text[:pos + 1]
-                            break
-
-            message = f"<b>{title}</b>\n\n"
-            message += f"{preview_text}\n\n"
-            message += f'<a href="{article_url}">Читать полностью на сайте</a>'
-
-            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-            text_response = requests.post(
-                api_url,
-                json={
-                    "chat_id": self.channel_id,
-                    "text": message,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True  # Disable preview since we send photos
-                },
-                timeout=30
+            # Build caption for first image (max 1024 chars)
+            caption = self._build_photo_caption(
+                title=title,
+                content=content,
+                telegram_content=telegram_content,
+                article_url=article_url
             )
 
-            if text_response.status_code != 200:
-                logger.error(f"Failed to send text: {text_response.status_code}")
-                return False
-
-            text_result = text_response.json()
-            if not text_result.get('ok'):
-                logger.error(f"Telegram API error: {text_result.get('description')}")
-                return False
-
-            logger.info(f"Sent text message for: {title[:50]}... ({len(preview_text)} chars)")
-
-            # Step 2: Send photos (single or media group)
             # Limit to 10 images (Telegram limit)
             if len(valid_images) > 10:
                 valid_images = valid_images[:10]
 
-            if len(valid_images) == 1:
-                # Single photo - use sendPhoto without caption
-                photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
-                with open(valid_images[0], 'rb') as photo:
-                    photo_response = requests.post(
-                        photo_url,
-                        data={"chat_id": self.channel_id},
-                        files={"photo": photo},
-                        timeout=60
-                    )
-            else:
-                # Multiple photos - use sendMediaGroup without captions
-                media = []
-                files = {}
+            # Build media group - caption only on first image
+            media = []
+            files = {}
 
-                for i, img_path in enumerate(valid_images):
-                    file_key = f"photo{i}"
-                    media.append({
-                        "type": "photo",
-                        "media": f"attach://{file_key}"
-                    })
-                    files[file_key] = open(img_path, 'rb')
+            for i, img_path in enumerate(valid_images):
+                file_key = f"photo{i}"
+                media_item = {
+                    "type": "photo",
+                    "media": f"attach://{file_key}"
+                }
+                # Add caption only to first image
+                if i == 0:
+                    media_item["caption"] = caption
+                    media_item["parse_mode"] = "HTML"
+                media.append(media_item)
+                files[file_key] = open(img_path, 'rb')
 
-                photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendMediaGroup"
-                photo_response = requests.post(
-                    photo_url,
-                    data={
-                        "chat_id": self.channel_id,
-                        "media": json.dumps(media)
-                    },
-                    files=files,
-                    timeout=120
-                )
+            photo_url = f"https://api.telegram.org/bot{self.bot_token}/sendMediaGroup"
+            response = requests.post(
+                photo_url,
+                data={
+                    "chat_id": self.channel_id,
+                    "media": json.dumps(media)
+                },
+                files=files,
+                timeout=120
+            )
 
-                # Close all file handles
-                for f in files.values():
-                    f.close()
+            # Close all file handles
+            for f in files.values():
+                f.close()
 
-            if photo_response.status_code == 200:
-                photo_result = photo_response.json()
-                if photo_result.get('ok'):
-                    logger.info(f"Published {len(valid_images)} photo(s) to Telegram: {title[:50]}...")
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info(f"Published {len(valid_images)} photos with caption to Telegram: {title[:50]}... ({len(caption)} chars)")
                     return True
                 else:
-                    logger.error(f"Photo upload error: {photo_result.get('description')}")
-                    # Text was sent, photos failed - still partial success
-                    return True
+                    logger.error(f"Media group error: {result.get('description')}")
+                    return False
             else:
-                logger.error(f"Photo upload HTTP error: {photo_response.status_code}")
-                return True  # Text was sent successfully
+                logger.error(f"Media group HTTP error: {response.status_code}")
+                return False
 
         except Exception as e:
-            logger.error(f"Failed to publish with text and photos: {e}")
+            logger.error(f"Failed to publish media group: {e}")
             return self.publish_post(title, content, slug, telegram_content=telegram_content)
 
     def publish_post_with_gallery(
@@ -365,3 +363,65 @@ class TelegramPublisher:
         except Exception as e:
             logger.error(f"Failed to test Telegram connection: {e}")
             return False
+
+    def _build_photo_caption(
+        self,
+        title: str,
+        content: str,
+        telegram_content: Optional[str],
+        article_url: str
+    ) -> str:
+        """
+        Build caption for photo post with 1024 char limit
+
+        Structure:
+        <b>Title</b>
+
+        Preview text (truncated to fit)...
+
+        <a href="url">Читать полностью на сайте</a>
+        """
+        MAX_CAPTION = 1020  # Safe limit (Telegram: 1024)
+
+        # Fixed parts
+        link_text = f'<a href="{article_url}">Читать полностью на сайте</a>'
+        title_formatted = f"<b>{title}</b>"
+
+        # Calculate available space for preview
+        # Format: title + \n\n + preview + \n\n + link
+        fixed_length = len(title_formatted) + len(link_text) + 4  # 4 = two "\n\n"
+        max_preview_length = MAX_CAPTION - fixed_length
+
+        # Use telegram_content if available, otherwise truncate content
+        if telegram_content:
+            preview = telegram_content
+        else:
+            preview = content
+
+        # Truncate preview if needed
+        if len(preview) > max_preview_length:
+            preview = preview[:max_preview_length]
+            # Try to cut at sentence boundary
+            for char in '.!?':
+                pos = preview.rfind(char)
+                if pos > max_preview_length * 0.6:
+                    preview = preview[:pos + 1]
+                    break
+            else:
+                # Cut at word boundary
+                last_space = preview.rfind(' ')
+                if last_space > max_preview_length * 0.6:
+                    preview = preview[:last_space] + '...'
+                else:
+                    preview = preview + '...'
+
+        # Build caption
+        caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
+
+        # Final safety check
+        if len(caption) > MAX_CAPTION:
+            overflow = len(caption) - MAX_CAPTION
+            preview = preview[:len(preview) - overflow - 3] + "..."
+            caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
+
+        return caption
