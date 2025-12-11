@@ -103,6 +103,8 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 slug=slug,
                 cover_image=cover_image
             )
+            # Mark as published to avoid duplicate from scheduler
+            db.mark_telegram_published(post_id)
 
             published_count += 1
 
@@ -192,6 +194,8 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 slug=slug,
                 cover_image=cover_image
             )
+            # Mark as published to avoid duplicate from scheduler
+            db.mark_telegram_published(post_id)
 
             published_count += 1
 
@@ -281,6 +285,8 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 slug=slug,
                 cover_image=cover_image
             )
+            # Mark as published to avoid duplicate from scheduler
+            db.mark_telegram_published(post_id)
 
             published_count += 1
 
@@ -370,6 +376,8 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                 slug=slug,
                 cover_image=cover_image
             )
+            # Mark as published to avoid duplicate from scheduler
+            db.mark_telegram_published(post_id)
 
             published_count += 1
 
