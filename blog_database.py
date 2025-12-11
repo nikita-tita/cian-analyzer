@@ -69,6 +69,13 @@ class BlogDatabase:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Add gallery_images column if it doesn't exist (migration)
+        # Stores JSON array of image paths: ["/static/blog/images/slug/1.jpg", ...]
+        try:
+            c.execute('ALTER TABLE blog_posts ADD COLUMN gallery_images TEXT DEFAULT NULL')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -82,7 +89,8 @@ class BlogDatabase:
         original_title: Optional[str] = None,
         published_at: Optional[str] = None,
         telegram_post_type: Optional[str] = None,
-        cover_image: Optional[str] = None
+        cover_image: Optional[str] = None,
+        gallery_images: Optional[List[str]] = None
     ) -> int:
         """Create new blog post"""
         conn = sqlite3.connect(self.db_path)
@@ -96,19 +104,35 @@ class BlogDatabase:
         if telegram_post_type is None:
             telegram_post_type = "full_summary"
 
+        # Serialize gallery_images to JSON
+        gallery_json = json.dumps(gallery_images) if gallery_images else None
+
         c.execute('''
             INSERT INTO blog_posts
             (slug, title, excerpt, content, original_url, original_title,
-             published_at, created_at, updated_at, telegram_post_type, cover_image)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             published_at, created_at, updated_at, telegram_post_type, cover_image, gallery_images)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (slug, title, excerpt, content, original_url, original_title,
-              published_at, now, now, telegram_post_type, cover_image))
+              published_at, now, now, telegram_post_type, cover_image, gallery_json))
 
         post_id = c.lastrowid
         conn.commit()
         conn.close()
 
         return post_id
+
+    def _deserialize_post(self, row: sqlite3.Row) -> Dict:
+        """Convert row to dict and deserialize JSON fields"""
+        post = dict(row)
+        # Deserialize gallery_images from JSON
+        if post.get('gallery_images'):
+            try:
+                post['gallery_images'] = json.loads(post['gallery_images'])
+            except (json.JSONDecodeError, TypeError):
+                post['gallery_images'] = []
+        else:
+            post['gallery_images'] = []
+        return post
 
     def get_post_by_slug(self, slug: str) -> Optional[Dict]:
         """Get single post by slug"""
@@ -125,7 +149,7 @@ class BlogDatabase:
         conn.close()
 
         if row:
-            return dict(row)
+            return self._deserialize_post(row)
         return None
 
     def get_all_posts(
@@ -161,7 +185,7 @@ class BlogDatabase:
         rows = c.fetchall()
         conn.close()
 
-        return [dict(row) for row in rows]
+        return [self._deserialize_post(row) for row in rows]
 
     def get_recent_posts(self, limit: int = 4) -> List[Dict]:
         """Get recent posts for homepage preview"""
@@ -237,7 +261,7 @@ class BlogDatabase:
         rows = c.fetchall()
         conn.close()
 
-        return [dict(row) for row in rows]
+        return [self._deserialize_post(row) for row in rows]
 
     def mark_telegram_published(self, post_id: int):
         """Mark post as published to Telegram"""
@@ -294,4 +318,4 @@ class BlogDatabase:
         rows = c.fetchall()
         conn.close()
 
-        return [dict(row) for row in rows]
+        return [self._deserialize_post(row) for row in rows]

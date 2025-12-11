@@ -79,3 +79,55 @@ else
     ssh -i "$SSH_KEY" "$SERVER" "journalctl -u $SERVICE_NAME -n 30 --no-pager"
     exit 1
 fi
+
+# Шаг 7: Docker rebuild (если используется)
+if ssh -i "$SSH_KEY" "$SERVER" "test -f $REMOTE_PATH/docker-compose.yml"; then
+    echo -e "\n${YELLOW}🐳 Перезапуск Docker...${NC}"
+    ssh -i "$SSH_KEY" "$SERVER" "cd $REMOTE_PATH && docker-compose up -d --build app 2>&1 | tail -5"
+    sleep 5
+    echo -e "${GREEN}✓ Docker перезапущен${NC}"
+fi
+
+# Шаг 8: Smoke-тесты
+echo -e "\n${YELLOW}🧪 Smoke-тесты...${NC}"
+ERRORS=0
+
+# Тест 1: Сайт доступен
+if curl -sf "https://housler.ru/health" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Сайт доступен${NC}"
+else
+    echo -e "${RED}✗ Сайт недоступен${NC}"
+    ERRORS=$((ERRORS+1))
+fi
+
+# Тест 2: Блог работает
+if curl -sf "https://housler.ru/blog" | grep -q "blog-entry"; then
+    echo -e "${GREEN}✓ Блог работает${NC}"
+else
+    echo -e "${RED}✗ Блог не работает${NC}"
+    ERRORS=$((ERRORS+1))
+fi
+
+# Тест 3: База данных доступна на запись
+if ssh -i "$SSH_KEY" "$SERVER" "docker exec housler-app python3 -c \"from blog_database import BlogDatabase; db = BlogDatabase(); print('DB OK')\"" 2>/dev/null | grep -q "DB OK"; then
+    echo -e "${GREEN}✓ База данных доступна${NC}"
+else
+    echo -e "${RED}✗ Проблема с базой данных${NC}"
+    ERRORS=$((ERRORS+1))
+fi
+
+# Тест 4: Обложки примонтированы
+COVERS_HOST=$(ssh -i "$SSH_KEY" "$SERVER" "ls /var/www/housler/static/blog/covers/*.png 2>/dev/null | wc -l")
+COVERS_CONTAINER=$(ssh -i "$SSH_KEY" "$SERVER" "docker exec housler-app ls /app/static/blog/covers/*.png 2>/dev/null | wc -l")
+if [ "$COVERS_HOST" = "$COVERS_CONTAINER" ] && [ "$COVERS_HOST" -gt "0" ]; then
+    echo -e "${GREEN}✓ Обложки синхронизированы ($COVERS_HOST файлов)${NC}"
+else
+    echo -e "${RED}✗ Обложки не синхронизированы (host: $COVERS_HOST, container: $COVERS_CONTAINER)${NC}"
+    ERRORS=$((ERRORS+1))
+fi
+
+if [ $ERRORS -gt 0 ]; then
+    echo -e "\n${RED}⚠️  Обнаружено $ERRORS проблем! Проверьте логи.${NC}"
+else
+    echo -e "\n${GREEN}✅ Все тесты пройдены!${NC}"
+fi

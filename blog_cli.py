@@ -300,92 +300,114 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
 def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: str = None):
     """Parse news from multiple RSS sources and publish to blog"""
     from multi_rss_parser import MultiRSSParser
+    from alert_bot import ParseResult, send_parse_report
 
     logger.info(f"Starting multi-source RSS parsing (limit={limit_per_source} per source)...")
 
-    parser = MultiRSSParser()
-    gpt = YandexGPT()
-    art = YandexART()
-    db = BlogDatabase()
-    telegram = TelegramPublisher()
+    # Result for reporting
+    result = ParseResult(source="RSS Multi-Source")
 
-    # Get articles based on language filter
-    if language == 'ru':
-        articles = parser.get_russian_articles(limit_per_source)
-    elif language == 'en':
-        articles = parser.get_international_articles(limit_per_source)
-    else:
-        articles = parser.get_all_articles(limit_per_source)
+    try:
+        parser = MultiRSSParser()
+        gpt = YandexGPT()
+        art = YandexART()
+        db = BlogDatabase()
+        telegram = TelegramPublisher()
 
-    logger.info(f"Found {len(articles)} articles from all sources")
+        # Get articles based on language filter
+        if language == 'ru':
+            articles = parser.get_russian_articles(limit_per_source)
+        elif language == 'en':
+            articles = parser.get_international_articles(limit_per_source)
+        else:
+            articles = parser.get_all_articles(limit_per_source)
 
-    # Filter to only articles with full text
-    articles_with_content = [a for a in articles if a.get('has_full_text') and a.get('content')]
-    logger.info(f"Articles with full text: {len(articles_with_content)}")
+        result.articles_found = len(articles)
+        logger.info(f"Found {len(articles)} articles from all sources")
 
-    published_count = 0
+        # Filter to only articles with full text
+        articles_with_content = [a for a in articles if a.get('has_full_text') and a.get('content')]
+        logger.info(f"Articles with full text: {len(articles_with_content)}")
 
-    for article in articles_with_content:
-        try:
-            logger.info(f"Processing [{article['source']}]: {article['title']}")
+        for article in articles_with_content:
+            try:
+                logger.info(f"Processing [{article['source']}]: {article['title']}")
 
-            # Create slug
-            slug = parser.create_slug(article['title'])
+                # Create slug
+                slug = parser.create_slug(article['title'])
 
-            # Check if exists
-            if db.post_exists(slug) and not force:
-                logger.info(f"Article already exists: {slug}")
+                # Check if exists
+                if db.post_exists(slug) and not force:
+                    logger.info(f"Article already exists: {slug}")
+                    continue
+
+                result.articles_parsed += 1
+
+                # Rewrite with Yandex GPT
+                logger.info("Rewriting article with Yandex GPT...")
+                rewritten = gpt.rewrite_article(
+                    original_title=article['title'],
+                    original_content=article['content'],
+                    original_excerpt=article.get('excerpt')
+                )
+                result.articles_rewritten += 1
+
+                # Track token usage
+                usage = rewritten.get('usage')
+                if usage:
+                    result.input_tokens += usage.input_tokens
+                    result.output_tokens += usage.output_tokens
+
+                # Generate cover (doesn't block publishing on error)
+                cover_image = None
+                try:
+                    cover_image = art.generate_cover(
+                        title=rewritten['title'],
+                        slug=slug
+                    )
+                except Exception as e:
+                    logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
+                # Save to DB
+                post_id = db.create_post(
+                    slug=slug,
+                    title=rewritten['title'],
+                    content=rewritten['content'],
+                    excerpt=rewritten['excerpt'],
+                    original_url=article['url'],
+                    original_title=article['title'],
+                    published_at=article.get('published_date') or datetime.now().isoformat(),
+                    cover_image=cover_image
+                )
+
+                result.articles_published_site += 1
+                result.published_titles.append(rewritten['title'])
+                logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
+
+                # Publish to Telegram with cover
+                telegram.publish_post_with_image(
+                    title=rewritten['title'],
+                    content=rewritten['content'],
+                    slug=slug,
+                    cover_image=cover_image
+                )
+                # Mark as published to avoid duplicate from scheduler
+                db.mark_telegram_published(post_id)
+
+            except Exception as e:
+                result.errors.append(f"Ошибка обработки: {str(e)[:50]}")
+                logger.error(f"Failed to process article: {e}")
                 continue
 
-            # Rewrite with Yandex GPT
-            logger.info("Rewriting article with Yandex GPT...")
-            rewritten = gpt.rewrite_article(
-                original_title=article['title'],
-                original_content=article['content'],
-                original_excerpt=article.get('excerpt')
-            )
+        result.pending_telegram = db.count_unpublished_telegram()
+        logger.info(f"Done! Published {result.articles_published_site} articles from multiple sources")
 
-            # Generate cover (doesn't block publishing on error)
-            cover_image = None
-            try:
-                cover_image = art.generate_cover(
-                    title=rewritten['title'],
-                    slug=slug
-                )
-            except Exception as e:
-                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+    except Exception as e:
+        result.errors.append(f"Критическая ошибка: {str(e)}")
+        logger.error(f"Fatal error in RSS parser: {e}")
 
-            # Save to DB
-            post_id = db.create_post(
-                slug=slug,
-                title=rewritten['title'],
-                content=rewritten['content'],
-                excerpt=rewritten['excerpt'],
-                original_url=article['url'],
-                original_title=article['title'],
-                published_at=article.get('published_date') or datetime.now().isoformat(),
-                cover_image=cover_image
-            )
-
-            logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
-
-            # Publish to Telegram with cover
-            telegram.publish_post_with_image(
-                title=rewritten['title'],
-                content=rewritten['content'],
-                slug=slug,
-                cover_image=cover_image
-            )
-            # Mark as published to avoid duplicate from scheduler
-            db.mark_telegram_published(post_id)
-
-            published_count += 1
-
-        except Exception as e:
-            logger.error(f"Failed to process article: {e}")
-            continue
-
-    logger.info(f"Done! Published {published_count} articles from multiple sources")
+    # Send report to Telegram
+    send_parse_report(result)
 
 
 def list_sources():
