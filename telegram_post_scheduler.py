@@ -53,10 +53,13 @@ def publish_one_post():
     logger.info(f"Publishing to Telegram: {post['title']}")
 
     try:
-        success = tg.publish_post(
+        # Используем publish_post_with_image для поддержки обложек
+        success = tg.publish_post_with_image(
             title=post['title'],
             content=post['content'],
-            slug=post['slug']
+            slug=post['slug'],
+            cover_image=post.get('cover_image'),
+            excerpt=post.get('excerpt')
         )
 
         if success:

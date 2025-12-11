@@ -63,6 +63,12 @@ class BlogDatabase:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Add cover_image column if it doesn't exist (migration)
+        try:
+            c.execute('ALTER TABLE blog_posts ADD COLUMN cover_image TEXT DEFAULT NULL')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -75,7 +81,8 @@ class BlogDatabase:
         original_url: Optional[str] = None,
         original_title: Optional[str] = None,
         published_at: Optional[str] = None,
-        telegram_post_type: Optional[str] = None
+        telegram_post_type: Optional[str] = None,
+        cover_image: Optional[str] = None
     ) -> int:
         """Create new blog post"""
         conn = sqlite3.connect(self.db_path)
@@ -92,10 +99,10 @@ class BlogDatabase:
         c.execute('''
             INSERT INTO blog_posts
             (slug, title, excerpt, content, original_url, original_title,
-             published_at, created_at, updated_at, telegram_post_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             published_at, created_at, updated_at, telegram_post_type, cover_image)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (slug, title, excerpt, content, original_url, original_title,
-              published_at, now, now, telegram_post_type))
+              published_at, now, now, telegram_post_type, cover_image))
 
         post_id = c.lastrowid
         conn.commit()
@@ -256,3 +263,35 @@ class BlogDatabase:
         conn.close()
 
         return count
+
+    def update_cover_image(self, post_id: int, cover_image: str):
+        """Update cover image for existing post"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('''
+            UPDATE blog_posts
+            SET cover_image = ?, updated_at = ?
+            WHERE id = ?
+        ''', (cover_image, datetime.now().isoformat(), post_id))
+
+        conn.commit()
+        conn.close()
+
+    def get_posts_without_cover(self, limit: int = 10) -> List[Dict]:
+        """Get posts that don't have cover images"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        c.execute('''
+            SELECT * FROM blog_posts
+            WHERE is_published = 1 AND (cover_image IS NULL OR cover_image = '')
+            ORDER BY created_at DESC
+            LIMIT ?
+        ''', (limit,))
+
+        rows = c.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]

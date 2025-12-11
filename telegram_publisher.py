@@ -6,6 +6,7 @@ Publishes new articles to Telegram channel
 import os
 import requests
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,183 @@ class TelegramPublisher:
         except Exception as e:
             logger.error(f"Failed to publish to Telegram: {e}")
             return False
+
+    def publish_post_with_image(
+        self,
+        title: str,
+        content: str,
+        slug: str,
+        cover_image: Optional[str] = None,
+        excerpt: Optional[str] = None
+    ) -> bool:
+        """
+        Publish blog post to Telegram channel with cover image
+
+        Telegram sendPhoto caption limit: 1024 characters
+        We use 1020 as safe limit.
+
+        If cover_image is not provided or file not found,
+        falls back to text-only publish_post() with full 3400 chars.
+
+        Args:
+            title: Article title
+            content: Full article content
+            slug: URL slug for the article
+            cover_image: Path to cover image (e.g., "/static/blog/covers/slug.png")
+            excerpt: Optional custom excerpt
+
+        Returns:
+            True if published successfully, False otherwise
+        """
+        if not self.bot_token:
+            logger.warning("Telegram publishing skipped - no bot token")
+            return False
+
+        # If no cover - use text-only method (3400 chars)
+        if not cover_image:
+            return self.publish_post(title, content, slug)
+
+        # Check file exists
+        image_path = cover_image.lstrip('/')  # "/static/..." -> "static/..."
+        if not os.path.exists(image_path):
+            logger.warning(f"Cover image not found: {image_path}, falling back to text")
+            return self.publish_post(title, content, slug)
+
+        try:
+            article_url = f"{self.site_url}/blog/{slug}"
+
+            # Build caption with 1020 char limit
+            caption = self._build_photo_caption(title, content, excerpt, article_url)
+
+            # Send photo
+            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+
+            with open(image_path, 'rb') as photo:
+                response = requests.post(
+                    api_url,
+                    data={
+                        "chat_id": self.channel_id,
+                        "caption": caption,
+                        "parse_mode": "HTML"
+                    },
+                    files={
+                        "photo": photo
+                    },
+                    timeout=60  # larger timeout for file upload
+                )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info(f"Published to Telegram with image: {title[:50]}...")
+                    return True
+                else:
+                    logger.error(f"Telegram API error: {result.get('description')}")
+                    return self.publish_post(title, content, slug)
+            else:
+                logger.error(f"Telegram API HTTP error: {response.status_code}")
+                return self.publish_post(title, content, slug)
+
+        except Exception as e:
+            logger.error(f"Failed to publish with image: {e}")
+            return self.publish_post(title, content, slug)
+
+    def _build_photo_caption(
+        self,
+        title: str,
+        content: str,
+        excerpt: Optional[str],
+        article_url: str
+    ) -> str:
+        """
+        Build caption for photo post with 1020 char limit
+
+        Structure:
+        <b>Title</b>
+
+        Preview text truncated at sentence boundary...
+
+        <a href="url">Читать полностью на сайте</a>
+        """
+        MAX_CAPTION = 1020  # Safe limit (Telegram: 1024)
+
+        # Fixed parts
+        link_text = f'<a href="{article_url}">Читать полностью на сайте</a>'
+        title_formatted = f"<b>{title}</b>"
+
+        # Calculate available space for preview
+        fixed_length = len(title_formatted) + len(link_text) + 4  # 4 = two "\n\n"
+        max_preview_length = MAX_CAPTION - fixed_length
+
+        # Get preview
+        if excerpt and len(excerpt) <= max_preview_length:
+            preview = excerpt
+        else:
+            preview = self._generate_short_preview(content, max_preview_length)
+
+        # Build caption
+        caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
+
+        # Final length check
+        if len(caption) > MAX_CAPTION:
+            overflow = len(caption) - MAX_CAPTION
+            preview = preview[:len(preview) - overflow - 3] + "..."
+            caption = f"{title_formatted}\n\n{preview}\n\n{link_text}"
+
+        return caption
+
+    def _generate_short_preview(self, content: str, max_length: int) -> str:
+        """
+        Generate short preview for photo caption
+
+        - Removes promotional content (HOUSLER mentions, CTAs)
+        - Truncates at sentence boundary
+        - Max length enforced
+        """
+        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+
+        if not paragraphs:
+            return content[:max_length]
+
+        # Filter promo content
+        skip_words = [
+            'housler', 'оставьте заявку', 'свяжется с вами',
+            'агентство', '[оставьте заявку]', 'эксперт свяжется'
+        ]
+
+        content_paragraphs = []
+        for paragraph in paragraphs:
+            if any(word in paragraph.lower() for word in skip_words):
+                continue
+            content_paragraphs.append(paragraph)
+
+        if not content_paragraphs:
+            content_paragraphs = paragraphs[:2]
+
+        # Build text up to limit
+        result = ''
+        for paragraph in content_paragraphs:
+            test_result = result + ('\n\n' if result else '') + paragraph
+
+            if len(test_result) > max_length:
+                remaining = max_length - len(result) - (2 if result else 0)
+                if remaining > 50:
+                    partial = paragraph[:remaining]
+                    # Find sentence end
+                    for char in '.!?':
+                        pos = partial.rfind(char)
+                        if pos > remaining * 0.5:
+                            result += ('\n\n' if result else '') + partial[:pos + 1]
+                            break
+                    else:
+                        last_space = partial.rfind(' ')
+                        if last_space > remaining * 0.5:
+                            result += ('\n\n' if result else '') + partial[:last_space] + '...'
+                break
+            else:
+                result = test_result
+
+        return result.strip() or content[:max_length]
 
     def test_connection(self) -> bool:
         """Test bot connection and channel access"""

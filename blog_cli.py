@@ -13,6 +13,7 @@ load_dotenv()
 
 # Lazy imports to avoid loading playwright for RSS-only usage
 from yandex_gpt import YandexGPT
+from yandex_art import YandexART
 from blog_database import BlogDatabase
 from telegram_publisher import TelegramPublisher
 
@@ -31,6 +32,7 @@ def parse_and_publish(limit: int = 5, force: bool = False):
 
     parser = CianMagazineParserPlaywright(headless=True)
     gpt = YandexGPT()
+    art = YandexART()
     db = BlogDatabase()
     telegram = TelegramPublisher()
 
@@ -70,6 +72,16 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 original_excerpt=article_preview.get('excerpt')
             )
 
+            # Генерируем обложку (не блокирует публикацию при ошибке)
+            cover_image = None
+            try:
+                cover_image = art.generate_cover(
+                    title=rewritten['title'],
+                    slug=slug
+                )
+            except Exception as e:
+                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
             # Сохраняем в БД
             post_id = db.create_post(
                 slug=slug,
@@ -78,16 +90,18 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 excerpt=rewritten['excerpt'],
                 original_url=url,
                 original_title=full_article['title'],
-                published_at=full_article['published_at']
+                published_at=full_article['published_at'],
+                cover_image=cover_image
             )
 
             logger.info(f"✓ Published: {rewritten['title']} (ID: {post_id})")
 
-            # Публикуем в Telegram
-            telegram.publish_post(
+            # Публикуем в Telegram с обложкой
+            telegram.publish_post_with_image(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug
+                slug=slug,
+                cover_image=cover_image
             )
 
             published_count += 1
@@ -107,6 +121,7 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
 
     parser = YandexJournalParser()
     gpt = YandexGPT()
+    art = YandexART()
     db = BlogDatabase()
     telegram = TelegramPublisher()
 
@@ -146,6 +161,16 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 original_excerpt=article_preview.get('excerpt')
             )
 
+            # Generate cover (doesn't block publishing on error)
+            cover_image = None
+            try:
+                cover_image = art.generate_cover(
+                    title=rewritten['title'],
+                    slug=slug
+                )
+            except Exception as e:
+                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
             # Save to DB
             post_id = db.create_post(
                 slug=slug,
@@ -154,16 +179,18 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 excerpt=rewritten['excerpt'],
                 original_url=url,
                 original_title=full_article['title'],
-                published_at=full_article['published_at']
+                published_at=full_article['published_at'],
+                cover_image=cover_image
             )
 
             logger.info(f"✓ Published: {rewritten['title']} (ID: {post_id})")
 
-            # Публикуем в Telegram
-            telegram.publish_post(
+            # Publish to Telegram with cover
+            telegram.publish_post_with_image(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug
+                slug=slug,
+                cover_image=cover_image
             )
 
             published_count += 1
@@ -183,6 +210,7 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
 
     parser = CianRSSParser()
     gpt = YandexGPT()
+    art = YandexART()
     db = BlogDatabase()
     telegram = TelegramPublisher()
 
@@ -222,6 +250,16 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 original_excerpt=article_preview.get('excerpt')
             )
 
+            # Generate cover (doesn't block publishing on error)
+            cover_image = None
+            try:
+                cover_image = art.generate_cover(
+                    title=rewritten['title'],
+                    slug=slug
+                )
+            except Exception as e:
+                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
             # Save to DB
             post_id = db.create_post(
                 slug=slug,
@@ -230,16 +268,18 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 excerpt=rewritten['excerpt'],
                 original_url=url,
                 original_title=full_article['title'],
-                published_at=full_article['published_at']
+                published_at=full_article['published_at'],
+                cover_image=cover_image
             )
 
             logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
 
-            # Publish to Telegram
-            telegram.publish_post(
+            # Publish to Telegram with cover
+            telegram.publish_post_with_image(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug
+                slug=slug,
+                cover_image=cover_image
             )
 
             published_count += 1
@@ -259,6 +299,7 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
 
     parser = MultiRSSParser()
     gpt = YandexGPT()
+    art = YandexART()
     db = BlogDatabase()
     telegram = TelegramPublisher()
 
@@ -298,6 +339,16 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                 original_excerpt=article.get('excerpt')
             )
 
+            # Generate cover (doesn't block publishing on error)
+            cover_image = None
+            try:
+                cover_image = art.generate_cover(
+                    title=rewritten['title'],
+                    slug=slug
+                )
+            except Exception as e:
+                logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
             # Save to DB
             post_id = db.create_post(
                 slug=slug,
@@ -306,16 +357,18 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                 excerpt=rewritten['excerpt'],
                 original_url=article['url'],
                 original_title=article['title'],
-                published_at=article.get('published_date') or datetime.now().isoformat()
+                published_at=article.get('published_date') or datetime.now().isoformat(),
+                cover_image=cover_image
             )
 
             logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
 
-            # Publish to Telegram
-            telegram.publish_post(
+            # Publish to Telegram with cover
+            telegram.publish_post_with_image(
                 title=rewritten['title'],
                 content=rewritten['content'],
-                slug=slug
+                slug=slug,
+                cover_image=cover_image
             )
 
             published_count += 1
@@ -354,7 +407,86 @@ def list_posts():
         print(f"    Slug: {post['slug']}")
         print(f"    Published: {post['published_at']}")
         print(f"    Views: {post['view_count']}")
+        cover = post.get('cover_image') or 'No cover'
+        print(f"    Cover: {cover}")
         print()
+
+
+def generate_cover(slug: str, force: bool = False):
+    """Generate cover for a specific post"""
+    db = BlogDatabase()
+    art = YandexART()
+
+    post = db.get_post_by_slug(slug)
+    if not post:
+        logger.error(f"Post not found: {slug}")
+        return
+
+    # Check if cover exists
+    if post.get('cover_image') and not force:
+        logger.info(f"Cover already exists: {post['cover_image']}")
+        return
+
+    logger.info(f"Generating cover for: {post['title']}")
+
+    try:
+        cover_image = art.generate_cover(
+            title=post['title'],
+            slug=slug,
+            force=force
+        )
+
+        if cover_image:
+            db.update_cover_image(post['id'], cover_image)
+            logger.info(f"Cover saved: {cover_image}")
+        else:
+            logger.error("Cover generation failed")
+
+    except Exception as e:
+        logger.error(f"Error generating cover: {e}")
+
+
+def generate_all_covers(limit: int = 10, delay: int = 5):
+    """Generate covers for posts without covers"""
+    import time
+
+    db = BlogDatabase()
+    art = YandexART()
+
+    posts = db.get_posts_without_cover(limit=limit)
+    logger.info(f"Found {len(posts)} posts without covers")
+
+    if not posts:
+        logger.info("All posts have covers")
+        return
+
+    generated = 0
+    for i, post in enumerate(posts):
+        try:
+            logger.info(f"[{i+1}/{len(posts)}] Generating cover for: {post['title'][:50]}...")
+
+            cover_image = art.generate_cover(
+                title=post['title'],
+                slug=post['slug']
+            )
+
+            if cover_image:
+                db.update_cover_image(post['id'], cover_image)
+                generated += 1
+                logger.info(f"Cover saved: {cover_image}")
+
+                # Delay between generations (rate limiting)
+                if i < len(posts) - 1:
+                    logger.debug(f"Waiting {delay}s before next generation...")
+                    time.sleep(delay)
+            else:
+                logger.warning(f"Failed to generate cover for: {post['slug']}")
+
+        except Exception as e:
+            logger.error(f"Error generating cover for {post['slug']}: {e}")
+            continue
+
+    logger.info(f"Done! Generated {generated}/{len(posts)} covers")
 
 
 if __name__ == '__main__':
@@ -388,6 +520,16 @@ if __name__ == '__main__':
     # List command
     list_parser = subparsers.add_parser('list', help='List all posts')
 
+    # Generate cover for specific post
+    cover_parser = subparsers.add_parser('generate-cover', help='Generate cover for a specific post')
+    cover_parser.add_argument('slug', help='Post slug')
+    cover_parser.add_argument('-f', '--force', action='store_true', help='Regenerate even if exists')
+
+    # Generate covers for all posts without covers
+    all_covers_parser = subparsers.add_parser('generate-all-covers', help='Generate covers for posts without covers')
+    all_covers_parser.add_argument('-n', '--limit', type=int, default=10, help='Max posts to process')
+    all_covers_parser.add_argument('--delay', type=int, default=5, help='Delay between generations (seconds)')
+
     args = parser.parse_args()
 
     if args.command == 'parse':
@@ -402,5 +544,9 @@ if __name__ == '__main__':
         list_sources()
     elif args.command == 'list':
         list_posts()
+    elif args.command == 'generate-cover':
+        generate_cover(slug=args.slug, force=args.force)
+    elif args.command == 'generate-all-covers':
+        generate_all_covers(limit=args.limit, delay=args.delay)
     else:
         parser.print_help()

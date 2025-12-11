@@ -74,6 +74,19 @@
     line-height: 1.6;
 }
 
+/* Cover image */
+.blog-post-cover {
+    margin-top: 2rem;
+}
+
+.blog-post-cover img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--border-radius-sm);
+}
+
 .blog-post-body {
     font-size: 1.05rem;
     line-height: 1.8;

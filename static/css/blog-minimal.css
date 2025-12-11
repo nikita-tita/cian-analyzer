@@ -30,6 +30,24 @@
     box-shadow: var(--shadow-md);
 }
 
+/* Cover image in listing */
+.blog-entry-cover {
+    margin: -2rem -2rem 1.5rem -2rem;
+    overflow: hidden;
+}
+
+.blog-entry-cover img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    transition: transform var(--transition-base);
+}
+
+.blog-entry-link:hover .blog-entry-cover img {
+    transform: scale(1.03);
+}
+
 .blog-entry-meta {
     font-size: var(--text-sm);
     font-weight: 400;
@@ -77,6 +95,10 @@
 
     .blog-entry {
         padding: 1.5rem;
+    }
+
+    .blog-entry-cover {
+        margin: -1.5rem -1.5rem 1rem -1.5rem;
     }
 
     .blog-entry-title {

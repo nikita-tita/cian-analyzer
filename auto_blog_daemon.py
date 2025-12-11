@@ -45,6 +45,7 @@ def main(source: str = 'cian'):
     from rbc_realty_parser import RBCRealtyParser
     from yandex_journal_parser import YandexJournalParser
     from yandex_gpt import YandexGPT
+    from yandex_art import YandexART
     from blog_database import BlogDatabase
     from alert_bot import ParseResult, send_parse_report
 
@@ -69,6 +70,7 @@ def main(source: str = 'cian'):
         result.source = source_name
 
         gpt = YandexGPT()
+        art = YandexART()
         db = BlogDatabase()
 
         # Текущее количество статей
@@ -136,6 +138,18 @@ def main(source: str = 'cian'):
                     logger.error(f"GPT rewrite failed: {e}")
                     continue
 
+                # Генерируем обложку (не блокирует публикацию при ошибке)
+                cover_image = None
+                try:
+                    cover_image = art.generate_cover(
+                        title=rewritten['title'],
+                        slug=slug
+                    )
+                    if cover_image:
+                        logger.info(f"Cover generated: {cover_image}")
+                except Exception as e:
+                    logger.warning(f"Cover generation failed, continuing without cover: {e}")
+
                 # Сохраняем в БД
                 post_id = db.create_post(
                     slug=slug,
@@ -144,7 +158,8 @@ def main(source: str = 'cian'):
                     excerpt=rewritten['excerpt'],
                     original_url=url,
                     original_title=full_article['title'],
-                    published_at=full_article['published_at']
+                    published_at=full_article['published_at'],
+                    cover_image=cover_image
                 )
 
                 result.articles_published_site += 1

@@ -41,8 +41,8 @@
     {% endif %}
 
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/landing.css?v=20251126">
-    <link rel="stylesheet" href="/static/css/blog-minimal.css?v=20251126">
+    <link rel="stylesheet" href="/static/css/landing.css?v=20251211">
+    <link rel="stylesheet" href="/static/css/blog-minimal.css?v=20251211">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -87,13 +87,20 @@
             <div class="blog-listing">
                 {% if posts %}
                     {% for post in posts %}
-                    <a href="/blog/{{ post.slug }}" class="blog-entry-link">
+                    <a href="/blog/{{ post.slug }}" class="blog-entry-link{% if post.cover_image %} has-cover{% endif %}">
                         <article class="blog-entry">
-                            <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
-                            <h3 class="blog-entry-title">{{ post.title }}</h3>
-                            {% if post.excerpt %}
-                            <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                            {% if post.cover_image %}
+                            <div class="blog-entry-cover">
+                                <img src="{{ post.cover_image }}" alt="{{ post.title }}" loading="lazy">
+                            </div>
                             {% endif %}
+                            <div class="blog-entry-content">
+                                <div class="blog-entry-meta">{{ post.published_at[:10] }}</div>
+                                <h3 class="blog-entry-title">{{ post.title }}</h3>
+                                {% if post.excerpt %}
+                                <p class="blog-entry-excerpt">{{ post.excerpt }}</p>
+                                {% endif %}
+                            </div>
                         </article>
                     </a>
                     {% endfor %}

@@ -76,3 +76,7 @@ session_*.txt
 
 # Production database - should not be overwritten by deploys
 blog.db
+
+# Generated cover images (keep directory structure)
+static/blog/covers/*.png
+!static/blog/covers/.gitkeep
