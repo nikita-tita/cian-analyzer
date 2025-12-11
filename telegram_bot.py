@@ -72,6 +72,9 @@ def parse_blog_message(text: str) -> tuple:
        Заголовок (первая строка)
        Текст статьи...
 
+    3. #блог Заголовок - первое предложение
+       Остальной текст становится контентом
+
     Returns: (title, content) or (None, None) if parsing failed
     """
     if not text or '#блог' not in text.lower():
@@ -100,18 +103,51 @@ def parse_blog_message(text: str) -> tuple:
     if title is None:
         for i, line in enumerate(lines):
             if line.strip():
-                title = line.strip()
-                content_start = i + 1
+                first_line = line.strip()
+                # If line is too long, extract first sentence as title
+                if len(first_line) > 100:
+                    # Find first sentence end
+                    for sep in ['. ', '! ', '? ', ' - ', ' — ']:
+                        pos = first_line.find(sep)
+                        if 20 < pos < 150:
+                            title = first_line[:pos + 1].strip()
+                            # Rest of this line becomes part of content
+                            rest = first_line[pos + len(sep):].strip()
+                            if rest:
+                                lines[i] = rest
+                                content_start = i
+                            else:
+                                content_start = i + 1
+                            break
+                    else:
+                        # No sentence break found, truncate at ~100 chars
+                        space_pos = first_line.rfind(' ', 50, 120)
+                        if space_pos > 0:
+                            title = first_line[:space_pos].strip()
+                            lines[i] = first_line[space_pos:].strip()
+                            content_start = i
+                        else:
+                            title = first_line[:100]
+                            lines[i] = first_line[100:]
+                            content_start = i
+                else:
+                    title = first_line
+                    content_start = i + 1
                 break
 
     if not title:
         return None, None
 
     # Rest is content
-    content_lines = [l for l in lines[content_start:] if l.strip()]
+    content_lines = [l.strip() for l in lines[content_start:] if l.strip()]
     content = '\n\n'.join(content_lines)
 
-    return title, content
+    # If no separate content lines, the text might be one block
+    if not content and title:
+        # Title already extracted, but maybe there's more after first sentence
+        return title, text  # Use full text as content for GPT to process
+
+    return title, content if content else text
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
