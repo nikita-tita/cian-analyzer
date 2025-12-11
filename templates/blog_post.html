@@ -164,6 +164,15 @@
                         <img src="{{ post.cover_image }}" alt="{{ post.title }}" loading="lazy">
                     </div>
                     {% endif %}
+                    {% if post.gallery_images and post.gallery_images|length > 1 %}
+                    <div class="blog-gallery">
+                        {% for img in post.gallery_images[1:] %}
+                        <div class="blog-gallery-item">
+                            <img src="{{ img }}" alt="" loading="lazy" onclick="openLightbox(this.src)">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="blog-post-body">
@@ -327,9 +336,33 @@
         </div>
     </div>
 
+    <!-- Lightbox for gallery images -->
+    <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+        <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <img id="lightbox-img" src="" alt="">
+        </div>
+    </div>
+
     {% include '_footer.html' %}
 
     <script>
+        // Lightbox functions
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLightbox();
+        });
+
         // Mobile menu toggle
         const menuToggle = document.querySelector('.mobile-menu-toggle');
         const mobileMenu = document.querySelector('.mobile-menu');

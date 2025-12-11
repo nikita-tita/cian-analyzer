@@ -1,12 +1,14 @@
 """
 Telegram Publisher for Blog Posts
 Publishes new articles to Telegram channel
+Supports single image and media groups (galleries)
 """
 
 import os
+import json
 import requests
 import logging
-from typing import Optional
+from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +165,120 @@ class TelegramPublisher:
 
         except Exception as e:
             logger.error(f"Failed to publish with image: {e}")
+            return self.publish_post(title, content, slug)
+
+    def publish_post_with_gallery(
+        self,
+        title: str,
+        content: str,
+        slug: str,
+        images: List[str],
+        excerpt: Optional[str] = None
+    ) -> bool:
+        """
+        Publish blog post with multiple images as Telegram media group
+
+        Telegram sendMediaGroup:
+        - Max 10 media items
+        - Only first item can have caption (1024 chars)
+        - All media must be same type (photos)
+
+        Args:
+            title: Article title
+            content: Full article content
+            slug: URL slug for the article
+            images: List of image paths (e.g., ["/static/blog/covers/slug.jpg", ...])
+            excerpt: Optional custom excerpt
+
+        Returns:
+            True if published successfully, False otherwise
+        """
+        if not self.bot_token:
+            logger.warning("Telegram publishing skipped - no bot token")
+            return False
+
+        # Filter existing images
+        valid_images = []
+        for img in images:
+            img_path = img.lstrip('/')
+            if os.path.exists(img_path):
+                valid_images.append(img_path)
+            else:
+                logger.warning(f"Image not found: {img_path}")
+
+        if not valid_images:
+            logger.warning("No valid images for gallery, falling back to text")
+            return self.publish_post(title, content, slug)
+
+        if len(valid_images) == 1:
+            # Single image - use regular method
+            return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+
+        # Limit to 10 images (Telegram limit)
+        if len(valid_images) > 10:
+            valid_images = valid_images[:10]
+            logger.info(f"Trimmed gallery to 10 images")
+
+        try:
+            article_url = f"{self.site_url}/blog/{slug}"
+
+            # Build caption for first photo (1020 char limit)
+            caption = self._build_photo_caption(title, content, excerpt, article_url)
+
+            # Build media array for sendMediaGroup
+            media = []
+            files = {}
+
+            for i, img_path in enumerate(valid_images):
+                file_key = f"photo{i}"
+                media_item = {
+                    "type": "photo",
+                    "media": f"attach://{file_key}"
+                }
+
+                # Only first item gets caption
+                if i == 0:
+                    media_item["caption"] = caption
+                    media_item["parse_mode"] = "HTML"
+
+                media.append(media_item)
+                files[file_key] = open(img_path, 'rb')
+
+            # Send media group
+            api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMediaGroup"
+
+            response = requests.post(
+                api_url,
+                data={
+                    "chat_id": self.channel_id,
+                    "media": json.dumps(media)
+                },
+                files=files,
+                timeout=120  # Longer timeout for multiple files
+            )
+
+            # Close all file handles
+            for f in files.values():
+                f.close()
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info(f"Published gallery ({len(valid_images)} photos) to Telegram: {title[:50]}...")
+                    return True
+                else:
+                    logger.error(f"Telegram API error: {result.get('description')}")
+                    # Fallback to single image
+                    return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+            else:
+                logger.error(f"Telegram API HTTP error: {response.status_code}")
+                return self.publish_post_with_image(title, content, slug, images[0], excerpt)
+
+        except Exception as e:
+            logger.error(f"Failed to publish gallery: {e}")
+            # Fallback to single image
+            if valid_images:
+                return self.publish_post_with_image(title, content, slug, images[0], excerpt)
             return self.publish_post(title, content, slug)
 
     def _build_photo_caption(

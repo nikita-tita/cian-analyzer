@@ -1,15 +1,17 @@
 """
 Telegram бот для Housler
 Отправляет PDF отчеты пользователям через deep links
-Публикует статьи в блог по команде #блог
+Публикует статьи в блог по команде #блог (с диалоговым режимом)
 """
 
 import os
 import re
+import time
 import logging
 import requests
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
@@ -35,6 +37,11 @@ BLOG_ADMIN_USER_IDS = [
     for uid in os.getenv('BLOG_ADMIN_USER_IDS', '').split(',')
     if uid.strip().isdigit()
 ]
+
+# === Диалоговый режим для #блог ===
+# Хранит состояние ожидания контента: {user_id: {'timestamp': ..., 'photos': [...]}}
+pending_blog_posts = {}
+PENDING_TIMEOUT = 300  # 5 минут
 
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN не найден в .env файле")
@@ -150,6 +157,200 @@ def parse_blog_message(text: str) -> tuple:
     return title, content if content else text
 
 
+def is_pending_expired(user_id: int) -> bool:
+    """Check if pending blog post has expired"""
+    if user_id not in pending_blog_posts:
+        return True
+    return time.time() - pending_blog_posts[user_id]['timestamp'] > PENDING_TIMEOUT
+
+
+def clear_pending(user_id: int):
+    """Clear pending state for user"""
+    if user_id in pending_blog_posts:
+        del pending_blog_posts[user_id]
+
+
+async def download_photos(message, slug: str) -> List[str]:
+    """
+    Download all photos from message
+
+    Returns list of saved file paths
+    """
+    photos = []
+    if not message.photo:
+        return photos
+
+    photos_dir = Path("static/blog/images") / slug
+    photos_dir.mkdir(parents=True, exist_ok=True)
+
+    # Telegram sends multiple sizes, we take the largest (last)
+    photo = message.photo[-1]
+    photo_file = await photo.get_file()
+
+    # Determine filename
+    idx = len(list(photos_dir.glob("*.jpg")))
+    filename = f"{idx + 1}.jpg" if idx > 0 else "cover.jpg"
+    photo_path = photos_dir / filename
+
+    await photo_file.download_to_drive(str(photo_path))
+    logger.info(f"Downloaded photo to {photo_path}")
+
+    return [str(photo_path)]
+
+
+async def process_blog_post(
+    user_id: int,
+    title: str,
+    content: str,
+    photo_paths: List[str],
+    status_msg,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    """
+    Process and publish blog post
+
+    Args:
+        user_id: Telegram user ID
+        title: Article title
+        content: Article content
+        photo_paths: List of photo file paths
+        status_msg: Status message to update
+        context: Telegram context
+    """
+    from yandex_gpt import YandexGPT
+    from yandex_art import YandexART
+    from blog_database import BlogDatabase
+    from telegram_publisher import TelegramPublisher
+
+    gpt = YandexGPT()
+    art = YandexART()
+    db = BlogDatabase()
+    telegram_pub = TelegramPublisher()
+
+    # 1. Rewrite via YandexGPT
+    await status_msg.edit_text(
+        f"Обрабатываю статью: {title[:50]}...\n"
+        "Рерайт через YandexGPT..."
+    )
+
+    rewritten = gpt.rewrite_article(
+        original_title=title,
+        original_content=content
+    )
+
+    new_title = rewritten['title']
+    new_content = rewritten['content']
+    excerpt = rewritten.get('excerpt', '')
+
+    slug = create_slug(new_title)
+
+    # Check slug uniqueness
+    if db.post_exists(slug):
+        slug = f"{slug}-{datetime.now().strftime('%Y%m%d%H%M')}"
+
+    # 2. Handle images
+    cover_image = None
+    gallery_images = []
+
+    if photo_paths:
+        # First photo becomes cover
+        import shutil
+        covers_dir = Path("static/blog/covers")
+        covers_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy first photo as cover
+        first_photo = Path(photo_paths[0])
+        cover_dest = covers_dir / f"{slug}.jpg"
+        shutil.copy(first_photo, cover_dest)
+        cover_image = f"/static/blog/covers/{slug}.jpg"
+
+        # Rename photos to match new slug if needed
+        new_photos_dir = Path("static/blog/images") / slug
+        new_photos_dir.mkdir(parents=True, exist_ok=True)
+
+        for i, photo_path in enumerate(photo_paths):
+            old_path = Path(photo_path)
+            if old_path.exists():
+                new_filename = f"{i + 1}.jpg"
+                new_path = new_photos_dir / new_filename
+                if old_path != new_path:
+                    shutil.copy(old_path, new_path)
+                gallery_images.append(f"/static/blog/images/{slug}/{new_filename}")
+
+        logger.info(f"Processed {len(photo_paths)} photos, cover: {cover_image}")
+    else:
+        # Generate cover via YandexART
+        await status_msg.edit_text(
+            f"Обрабатываю статью: {new_title[:50]}...\n"
+            "Генерирую обложку..."
+        )
+        try:
+            cover_image = art.generate_cover(title=new_title, slug=slug)
+        except Exception as e:
+            logger.warning(f"Cover generation failed: {e}")
+
+    # 3. Save to DB
+    await status_msg.edit_text(
+        f"Обрабатываю статью: {new_title[:50]}...\n"
+        "Сохраняю в базу..."
+    )
+
+    post_id = db.create_post(
+        slug=slug,
+        title=new_title,
+        content=new_content,
+        excerpt=excerpt,
+        original_url=None,
+        original_title=title,
+        cover_image=cover_image,
+        gallery_images=gallery_images if gallery_images else None,
+        telegram_post_type="manual"
+    )
+
+    logger.info(f"Created blog post: {new_title} (ID: {post_id})")
+
+    # 4. Publish to Telegram channel
+    await status_msg.edit_text(
+        f"Обрабатываю статью: {new_title[:50]}...\n"
+        "Публикую в канал..."
+    )
+
+    # Use gallery method if multiple photos
+    all_images = [cover_image] + gallery_images[1:] if gallery_images else ([cover_image] if cover_image else [])
+
+    if len(all_images) > 1:
+        telegram_pub.publish_post_with_gallery(
+            title=new_title,
+            content=new_content,
+            slug=slug,
+            images=all_images,
+            excerpt=excerpt
+        )
+    else:
+        telegram_pub.publish_post_with_image(
+            title=new_title,
+            content=new_content,
+            slug=slug,
+            cover_image=cover_image,
+            excerpt=excerpt
+        )
+
+    # Mark as published
+    db.mark_telegram_published(post_id)
+
+    # 5. Reply to user
+    article_url = f"{SITE_URL}/blog/{slug}"
+    photos_info = f"\nФото: {len(gallery_images)}" if gallery_images else ""
+    await status_msg.edit_text(
+        f"Статья опубликована!\n\n"
+        f"Заголовок: {new_title}{photos_info}\n"
+        f"Ссылка: {article_url}"
+    )
+
+    logger.info(f"Blog post published successfully: {article_url}")
+    return True
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Обработчик команды /start
@@ -260,18 +461,26 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отмена ожидания контента для #блог"""
+    user = update.effective_user
+
+    if user.id in pending_blog_posts:
+        clear_pending(user.id)
+        await update.message.reply_text("Публикация отменена.")
+        logger.info(f"Blog post cancelled by user {user.id}")
+    else:
+        await update.message.reply_text("Нет активной публикации для отмены.")
+
+
 async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Обработчик сообщений с тегом #блог
 
-    Публикует статью в блог:
-    1. Проверяет авторизацию
-    2. Парсит сообщение (заголовок + текст)
-    3. Скачивает фото если есть
-    4. Рерайтит через YandexGPT
-    5. Генерирует обложку через YandexART
-    6. Сохраняет в БД
-    7. Публикует в Telegram канал
+    Диалоговый режим:
+    1. Если #блог с текстом — публикуем сразу
+    2. Если #блог без текста — ждём следующее сообщение с контентом
+    3. Фото собираются из обоих сообщений
     """
     user = update.effective_user
     message = update.message
@@ -289,148 +498,171 @@ async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Парсим сообщение
     text = message.text or message.caption or ''
-    logger.info(f"Raw message text ({len(text)} chars): {text[:200]}...")
+    logger.info(f"Raw message text ({len(text)} chars): {text[:100]}...")
 
     title, content = parse_blog_message(text)
-    logger.info(f"Parsed: title={title[:50] if title else None}..., content_len={len(content) if content else 0}")
+    logger.info(f"Parsed: title={title[:50] if title else None}, content_len={len(content) if content else 0}")
 
-    if not title or not content:
+    # 3. Скачиваем фото если есть
+    temp_slug = f"temp_{user.id}_{int(time.time())}"
+    photo_paths = await download_photos(message, temp_slug)
+
+    # 4. Если есть текст — публикуем сразу
+    if title and content:
+        # Clear any pending state
+        clear_pending(user.id)
+
+        status_msg = await message.reply_text(
+            f"Обрабатываю статью: {title[:50]}...\n"
+            "Рерайт текста..."
+        )
+
+        try:
+            await process_blog_post(
+                user_id=user.id,
+                title=title,
+                content=content,
+                photo_paths=photo_paths,
+                status_msg=status_msg,
+                context=context
+            )
+        except Exception as e:
+            logger.error(f"Failed to publish blog post: {e}", exc_info=True)
+            await status_msg.edit_text(
+                f"Ошибка публикации: {str(e)[:200]}\n\n"
+                "Попробуйте позже или обратитесь к разработчику."
+            )
+        return
+
+    # 5. Текста нет — переходим в режим ожидания
+    pending_blog_posts[user.id] = {
+        'timestamp': time.time(),
+        'photos': photo_paths
+    }
+
+    photos_info = f"\nФото получены: {len(photo_paths)}" if photo_paths else ""
+    await message.reply_text(
+        f"Отправьте текст статьи следующим сообщением.{photos_info}\n\n"
+        "Формат:\n"
+        "Первая строка — заголовок\n"
+        "Остальное — текст статьи\n\n"
+        "Для отмены: /cancel"
+    )
+    logger.info(f"Waiting for content from user {user.id}, photos: {len(photo_paths)}")
+
+
+async def handle_blog_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обработчик контента для ожидающего #блог
+
+    Срабатывает когда пользователь в pending отправляет сообщение без #блог
+    """
+    user = update.effective_user
+    message = update.message
+
+    # Проверяем что пользователь в режиме ожидания
+    if user.id not in pending_blog_posts:
+        return  # Не наше сообщение
+
+    # Проверяем timeout
+    if is_pending_expired(user.id):
+        clear_pending(user.id)
         await message.reply_text(
-            "Не удалось распознать статью.\n\n"
-            "Формат сообщения:\n"
-            "#блог\n"
-            "Тема: Заголовок статьи\n\n"
-            "Текст статьи..."
+            "Время ожидания истекло (5 минут).\n"
+            "Начните заново с #блог"
         )
         return
 
-    # Отправляем статус
+    # Проверяем авторизацию (на всякий случай)
+    if user.id not in BLOG_ADMIN_USER_IDS:
+        clear_pending(user.id)
+        return
+
+    logger.info(f"Received content from pending user {user.id}")
+
+    # Получаем сохранённые фото
+    pending = pending_blog_posts[user.id]
+    saved_photos = pending.get('photos', [])
+
+    # Скачиваем новые фото если есть
+    temp_slug = f"temp_{user.id}_{int(time.time())}"
+    new_photos = await download_photos(message, temp_slug)
+    all_photos = saved_photos + new_photos
+
+    # Парсим текст
+    text = message.text or message.caption or ''
+
+    if not text.strip():
+        photos_info = f" (фото: {len(all_photos)})" if all_photos else ""
+        await message.reply_text(
+            f"Текст не получен{photos_info}.\n"
+            "Отправьте текст статьи или /cancel для отмены."
+        )
+        # Обновляем фото в pending
+        pending_blog_posts[user.id]['photos'] = all_photos
+        return
+
+    # Парсим как обычный текст (без #блог)
+    lines = text.strip().split('\n')
+
+    # Первая строка — заголовок
+    title = None
+    content_start = 0
+
+    for i, line in enumerate(lines):
+        if line.strip():
+            first_line = line.strip()
+            # Если строка длинная — берём первое предложение
+            if len(first_line) > 100:
+                for sep in ['. ', '! ', '? ', ' - ', ' — ']:
+                    pos = first_line.find(sep)
+                    if 20 < pos < 150:
+                        title = first_line[:pos + 1].strip()
+                        lines[i] = first_line[pos + len(sep):].strip()
+                        content_start = i
+                        break
+                else:
+                    title = first_line[:100]
+                    lines[i] = first_line[100:]
+                    content_start = i
+            else:
+                title = first_line
+                content_start = i + 1
+            break
+
+    if not title:
+        await message.reply_text(
+            "Не удалось распознать заголовок.\n"
+            "Первая строка должна быть заголовком."
+        )
+        return
+
+    # Остальное — контент
+    content_lines = [l.strip() for l in lines[content_start:] if l.strip()]
+    content = '\n\n'.join(content_lines)
+
+    if not content:
+        content = title  # Если только заголовок — используем его как контент
+
+    # Очищаем pending
+    clear_pending(user.id)
+
+    # Публикуем
     status_msg = await message.reply_text(
         f"Обрабатываю статью: {title[:50]}...\n"
+        f"Фото: {len(all_photos)}\n"
         "Рерайт текста..."
     )
 
     try:
-        # Lazy imports (avoid loading at bot startup)
-        from yandex_gpt import YandexGPT
-        from yandex_art import YandexART
-        from blog_database import BlogDatabase
-        from telegram_publisher import TelegramPublisher
-
-        gpt = YandexGPT()
-        art = YandexART()
-        db = BlogDatabase()
-        telegram_pub = TelegramPublisher()
-
-        # 3. Проверяем, есть ли фото в сообщении
-        photo_path = None
-        if message.photo:
-            # Берём фото максимального размера
-            photo = message.photo[-1]
-            photo_file = await photo.get_file()
-
-            # Создаём slug для имени файла
-            slug = create_slug(title)
-
-            # Сохраняем фото
-            photos_dir = Path("static/blog/images") / slug
-            photos_dir.mkdir(parents=True, exist_ok=True)
-            photo_path = photos_dir / "cover.jpg"
-
-            await photo_file.download_to_drive(str(photo_path))
-            logger.info(f"Downloaded photo to {photo_path}")
-
-        # 4. Рерайтим через YandexGPT
-        await status_msg.edit_text(
-            f"Обрабатываю статью: {title[:50]}...\n"
-            "Рерайт через YandexGPT..."
+        await process_blog_post(
+            user_id=user.id,
+            title=title,
+            content=content,
+            photo_paths=all_photos,
+            status_msg=status_msg,
+            context=context
         )
-
-        rewritten = gpt.rewrite_article(
-            original_title=title,
-            original_content=content
-        )
-
-        new_title = rewritten['title']
-        new_content = rewritten['content']
-        excerpt = rewritten.get('excerpt', '')
-
-        slug = create_slug(new_title)
-
-        # Проверяем уникальность slug
-        if db.post_exists(slug):
-            slug = f"{slug}-{datetime.now().strftime('%Y%m%d%H%M')}"
-
-        # 5. Генерируем обложку
-        cover_image = None
-        if photo_path and photo_path.exists():
-            # Используем загруженное фото как обложку
-            # Копируем в папку covers
-            covers_dir = Path("static/blog/covers")
-            covers_dir.mkdir(parents=True, exist_ok=True)
-            cover_dest = covers_dir / f"{slug}.jpg"
-
-            import shutil
-            shutil.copy(photo_path, cover_dest)
-            cover_image = f"/static/blog/covers/{slug}.jpg"
-            logger.info(f"Using uploaded photo as cover: {cover_image}")
-        else:
-            # Генерируем через YandexART
-            await status_msg.edit_text(
-                f"Обрабатываю статью: {new_title[:50]}...\n"
-                "Генерирую обложку..."
-            )
-            try:
-                cover_image = art.generate_cover(title=new_title, slug=slug)
-            except Exception as e:
-                logger.warning(f"Cover generation failed: {e}")
-
-        # 6. Сохраняем в БД
-        await status_msg.edit_text(
-            f"Обрабатываю статью: {new_title[:50]}...\n"
-            "Сохраняю в базу..."
-        )
-
-        post_id = db.create_post(
-            slug=slug,
-            title=new_title,
-            content=new_content,
-            excerpt=excerpt,
-            original_url=None,  # Свой пост, не парсинг
-            original_title=title,
-            cover_image=cover_image,
-            telegram_post_type="manual"
-        )
-
-        logger.info(f"Created blog post: {new_title} (ID: {post_id})")
-
-        # 7. Публикуем в Telegram канал
-        await status_msg.edit_text(
-            f"Обрабатываю статью: {new_title[:50]}...\n"
-            "Публикую в канал..."
-        )
-
-        telegram_pub.publish_post_with_image(
-            title=new_title,
-            content=new_content,
-            slug=slug,
-            cover_image=cover_image,
-            excerpt=excerpt
-        )
-
-        # Помечаем как опубликованную в Telegram
-        db.mark_telegram_published(post_id)
-
-        # 8. Отвечаем пользователю
-        article_url = f"{SITE_URL}/blog/{slug}"
-        await status_msg.edit_text(
-            f"Статья опубликована!\n\n"
-            f"Заголовок: {new_title}\n"
-            f"Ссылка: {article_url}"
-        )
-
-        logger.info(f"Blog post published successfully: {article_url}")
-
     except Exception as e:
         logger.error(f"Failed to publish blog post: {e}", exc_info=True)
         await status_msg.edit_text(
@@ -449,10 +681,16 @@ def main():
     # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("cancel", cancel_command))
 
     # Обработчик сообщений с #блог (текст или фото с подписью)
-    blog_filter = filters.Regex(r'(?i)#блог') & (filters.TEXT | filters.PHOTO)
+    blog_filter = filters.Regex(r'(?i)#блог') & (filters.TEXT | filters.PHOTO | filters.CAPTION)
     application.add_handler(MessageHandler(blog_filter, handle_blog_post))
+
+    # Обработчик контента для ожидающих пользователей (без #блог)
+    # Важно: должен быть ПОСЛЕ blog_filter, чтобы не перехватывать #блог сообщения
+    content_filter = (filters.TEXT | filters.PHOTO | filters.CAPTION) & ~filters.COMMAND & ~filters.Regex(r'(?i)#блог')
+    application.add_handler(MessageHandler(content_filter, handle_blog_content))
 
     # Логируем список админов
     if BLOG_ADMIN_USER_IDS:
