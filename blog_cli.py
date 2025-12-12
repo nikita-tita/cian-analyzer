@@ -15,7 +15,6 @@ load_dotenv()
 from yandex_gpt import YandexGPT
 from yandex_art import YandexART
 from blog_database import BlogDatabase
-from telegram_publisher import TelegramPublisher
 from alert_bot import send_cover_alert
 
 logging.basicConfig(
@@ -35,7 +34,6 @@ def parse_and_publish(limit: int = 5, force: bool = False):
     gpt = YandexGPT()
     art = YandexART()
     db = BlogDatabase()
-    telegram = TelegramPublisher()
 
     # Получаем список статей
     articles = parser.get_recent_articles(limit=limit * 2)  # Берём с запасом
@@ -100,18 +98,9 @@ def parse_and_publish(limit: int = 5, force: bool = False):
                 telegram_content=rewritten.get('telegram_content', '')
             )
 
-            logger.info(f"✓ Published: {rewritten['title']} (ID: {post_id})")
+            logger.info(f"Published to site: {rewritten['title']} (ID: {post_id})")
 
-            # Публикуем в Telegram с обложкой
-            telegram.publish_post_with_image(
-                title=rewritten['title'],
-                content=rewritten['content'],
-                slug=slug,
-                cover_image=cover_image,
-                telegram_content=rewritten.get('telegram_content', '')
-            )
-            # Mark as published to avoid duplicate from scheduler
-            db.mark_telegram_published(post_id)
+            # NOTE: Telegram publishing is now handled by unified_publisher.py
 
             published_count += 1
 
@@ -119,7 +108,7 @@ def parse_and_publish(limit: int = 5, force: bool = False):
             logger.error(f"Failed to process article: {e}")
             continue
 
-    logger.info(f"Done! Published {published_count} articles")
+    logger.info(f"Done! Published {published_count} articles to site")
 
 
 def parse_yandex_news(limit: int = 5, force: bool = False):
@@ -137,7 +126,6 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
         gpt = YandexGPT()
         art = YandexART()
         db = BlogDatabase()
-        telegram = TelegramPublisher()
 
         # Get list of articles
         articles = parser.get_recent_articles(limit=limit * 2)
@@ -213,18 +201,9 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
 
                 result.articles_published_site += 1
                 result.published_titles.append(rewritten['title'])
-                logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
+                logger.info(f"Published to site: {rewritten['title']} (ID: {post_id})")
 
-                # Publish to Telegram with cover
-                telegram.publish_post_with_image(
-                    title=rewritten['title'],
-                    content=rewritten['content'],
-                    slug=slug,
-                    cover_image=cover_image,
-                    telegram_content=rewritten.get('telegram_content', '')
-                )
-                # Mark as published to avoid duplicate from scheduler
-                db.mark_telegram_published(post_id)
+                # NOTE: Telegram publishing is now handled by unified_publisher.py
 
             except Exception as e:
                 result.errors.append(f"Ошибка: {str(e)[:50]}")
@@ -232,7 +211,8 @@ def parse_yandex_news(limit: int = 5, force: bool = False):
                 continue
 
         result.pending_telegram = db.count_unpublished_telegram()
-        logger.info(f"Done! Published {result.articles_published_site} articles from Yandex")
+        result.pending_without_cover = db.count_posts_without_cover()
+        logger.info(f"Done! Published {result.articles_published_site} articles to site from Yandex")
 
     except Exception as e:
         result.errors.append(f"Критическая ошибка: {str(e)}")
@@ -252,7 +232,6 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
     gpt = YandexGPT()
     art = YandexART()
     db = BlogDatabase()
-    telegram = TelegramPublisher()
 
     # Get list of articles from RSS
     articles = parser.get_recent_articles(limit=limit * 2)
@@ -317,18 +296,9 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
                 telegram_content=rewritten.get('telegram_content', '')
             )
 
-            logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
+            logger.info(f"Published to site: {rewritten['title']} (ID: {post_id})")
 
-            # Publish to Telegram with cover
-            telegram.publish_post_with_image(
-                title=rewritten['title'],
-                content=rewritten['content'],
-                slug=slug,
-                cover_image=cover_image,
-                telegram_content=rewritten.get('telegram_content', '')
-            )
-            # Mark as published to avoid duplicate from scheduler
-            db.mark_telegram_published(post_id)
+            # NOTE: Telegram publishing is now handled by unified_publisher.py
 
             published_count += 1
 
@@ -336,7 +306,7 @@ def parse_cian_rss(limit: int = 5, force: bool = False):
             logger.error(f"Failed to process article: {e}")
             continue
 
-    logger.info(f"Done! Published {published_count} articles from CIAN RSS")
+    logger.info(f"Done! Published {published_count} articles to site from CIAN RSS")
 
 
 def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: str = None):
@@ -354,7 +324,6 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
         gpt = YandexGPT()
         art = YandexART()
         db = BlogDatabase()
-        telegram = TelegramPublisher()
 
         # Get articles based on language filter
         if language == 'ru':
@@ -429,18 +398,10 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
 
                 result.articles_published_site += 1
                 result.published_titles.append(rewritten['title'])
-                logger.info(f"Published: {rewritten['title']} (ID: {post_id})")
+                logger.info(f"Published to site: {rewritten['title']} (ID: {post_id})")
 
-                # Publish to Telegram with cover
-                telegram.publish_post_with_image(
-                    title=rewritten['title'],
-                    content=rewritten['content'],
-                    slug=slug,
-                    cover_image=cover_image,
-                    telegram_content=rewritten.get('telegram_content', '')
-                )
-                # Mark as published to avoid duplicate from scheduler
-                db.mark_telegram_published(post_id)
+                # NOTE: Telegram publishing is now handled by unified_publisher.py
+                # Posts without cover will be published after cover regeneration
 
             except Exception as e:
                 result.errors.append(f"Ошибка обработки: {str(e)[:50]}")
@@ -448,7 +409,8 @@ def parse_multi_rss(limit_per_source: int = 3, force: bool = False, language: st
                 continue
 
         result.pending_telegram = db.count_unpublished_telegram()
-        logger.info(f"Done! Published {result.articles_published_site} articles from multiple sources")
+        result.pending_without_cover = db.count_posts_without_cover()
+        logger.info(f"Done! Published {result.articles_published_site} articles to site")
 
     except Exception as e:
         result.errors.append(f"Критическая ошибка: {str(e)}")
@@ -567,6 +529,61 @@ def generate_all_covers(limit: int = 10, delay: int = 5):
     logger.info(f"Done! Generated {generated}/{len(posts)} covers")
 
 
+# =========================================
+# Queue Management Functions
+# =========================================
+
+def queue_stats():
+    """Show article queue statistics"""
+    db = BlogDatabase()
+    stats = db.get_queue_stats()
+
+    print("\n=== Article Queue Stats ===")
+    print(f"Pending:    {stats.get('pending', 0)}")
+    print(f"Processing: {stats.get('processing', 0)}")
+    print(f"Failed:     {stats.get('failed', 0)}")
+    print(f"Total:      {stats.get('total', 0)}")
+    print()
+
+
+def queue_list(status: str = None, limit: int = 20):
+    """List items in article queue"""
+    db = BlogDatabase()
+    items = db.get_queue_items(status=status, limit=limit)
+
+    if not items:
+        print("\nQueue is empty")
+        return
+
+    print(f"\n=== Article Queue ({len(items)} items) ===\n")
+    for item in items:
+        status_icon = {'pending': '⏳', 'processing': '⚙️', 'failed': '❌'}.get(item['status'], '?')
+        print(f"{status_icon} [{item['id']}] {item['title'][:60]}...")
+        print(f"   Source: {item['source']} | Status: {item['status']}")
+        print(f"   URL: {item['url'][:80]}...")
+        if item.get('error_message'):
+            print(f"   Error: {item['error_message'][:60]}...")
+        print()
+
+
+def queue_clear(status: str = 'failed'):
+    """Clear items from queue by status"""
+    db = BlogDatabase()
+
+    if status == 'all':
+        # Clear all items
+        items = db.get_queue_items(limit=1000)
+        for item in items:
+            db.mark_queue_done(item['id'])
+        print(f"Cleared {len(items)} items from queue")
+    else:
+        # Clear by status
+        items = db.get_queue_items(status=status, limit=1000)
+        for item in items:
+            db.mark_queue_done(item['id'])
+        print(f"Cleared {len(items)} {status} items from queue")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Blog Management CLI')
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -608,6 +625,16 @@ if __name__ == '__main__':
     all_covers_parser.add_argument('-n', '--limit', type=int, default=10, help='Max posts to process')
     all_covers_parser.add_argument('--delay', type=int, default=5, help='Delay between generations (seconds)')
 
+    # Queue management commands
+    queue_stats_parser = subparsers.add_parser('queue-stats', help='Show article queue statistics')
+
+    queue_list_parser = subparsers.add_parser('queue-list', help='List items in article queue')
+    queue_list_parser.add_argument('--status', choices=['pending', 'processing', 'failed'], help='Filter by status')
+    queue_list_parser.add_argument('-n', '--limit', type=int, default=20, help='Max items to show')
+
+    queue_clear_parser = subparsers.add_parser('queue-clear', help='Clear items from queue')
+    queue_clear_parser.add_argument('--status', choices=['pending', 'processing', 'failed', 'all'], default='failed', help='Status to clear (default: failed)')
+
     args = parser.parse_args()
 
     if args.command == 'parse':
@@ -626,5 +653,11 @@ if __name__ == '__main__':
         generate_cover(slug=args.slug, force=args.force)
     elif args.command == 'generate-all-covers':
         generate_all_covers(limit=args.limit, delay=args.delay)
+    elif args.command == 'queue-stats':
+        queue_stats()
+    elif args.command == 'queue-list':
+        queue_list(status=args.status, limit=args.limit)
+    elif args.command == 'queue-clear':
+        queue_clear(status=args.status)
     else:
         parser.print_help()

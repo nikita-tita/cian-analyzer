@@ -1,14 +1,38 @@
 """
 Database for Blog Posts
 SQLite storage for parsed and rewritten articles
+Includes article_queue for scheduled publishing
 """
 
 import os
+import re
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from pathlib import Path
+
+
+# === Utility functions ===
+
+def create_slug(title: str) -> str:
+    """
+    Create URL-friendly slug from title (translit ru->en)
+    Centralized function to avoid duplication across parsers
+    """
+    translit_map = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+        'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+    }
+    slug = title.lower()
+    for ru, en in translit_map.items():
+        slug = slug.replace(ru, en)
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    slug = slug.strip('-')
+    return slug[:100]  # Limit length
 
 # Blog database path - use environment variable or default to protected location
 # In production: /var/www/housler_data/blog.db (outside git repo)
@@ -82,6 +106,30 @@ class BlogDatabase:
             c.execute('ALTER TABLE blog_posts ADD COLUMN telegram_content TEXT DEFAULT NULL')
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+        # === Article Queue table ===
+        # Queue for articles waiting to be processed and published
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS article_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT UNIQUE NOT NULL,
+                title TEXT NOT NULL,
+                source TEXT NOT NULL,
+                excerpt TEXT,
+                priority INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                error_message TEXT,
+                attempts INTEGER DEFAULT 0,
+                last_attempt_at TEXT
+            )
+        ''')
+
+        # Create index for faster queue queries
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_queue_status_priority
+            ON article_queue(status, priority DESC, created_at ASC)
+        ''')
 
         conn.commit()
         conn.close()
@@ -351,3 +399,209 @@ class BlogDatabase:
         conn.close()
 
         return [self._deserialize_post(row) for row in rows]
+
+    # =========================================
+    # Article Queue Methods
+    # =========================================
+
+    def add_to_queue(
+        self,
+        url: str,
+        title: str,
+        source: str,
+        excerpt: Optional[str] = None,
+        priority: int = 0
+    ) -> Optional[int]:
+        """
+        Add article to processing queue
+
+        Args:
+            url: Original article URL (unique)
+            title: Original article title
+            source: Source identifier (e.g., 'cian_rss', 'rbc', 'yandex')
+            excerpt: Optional excerpt/description
+            priority: Higher priority = processed first (default 0)
+
+        Returns:
+            Queue item ID or None if already exists
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        try:
+            c.execute('''
+                INSERT INTO article_queue (url, title, source, excerpt, priority, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending')
+            ''', (url, title, source, excerpt, priority, datetime.now().isoformat()))
+
+            queue_id = c.lastrowid
+            conn.commit()
+            return queue_id
+
+        except sqlite3.IntegrityError:
+            # URL already in queue
+            return None
+        finally:
+            conn.close()
+
+    def get_next_from_queue(self) -> Optional[Dict]:
+        """
+        Get next article from queue for processing
+
+        Returns highest priority pending article (FIFO within same priority)
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        c.execute('''
+            SELECT * FROM article_queue
+            WHERE status = 'pending'
+            ORDER BY priority DESC, created_at ASC
+            LIMIT 1
+        ''')
+
+        row = c.fetchone()
+        conn.close()
+
+        return dict(row) if row else None
+
+    def mark_queue_processing(self, queue_id: int):
+        """Mark queue item as currently being processed"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('''
+            UPDATE article_queue
+            SET status = 'processing', last_attempt_at = ?, attempts = attempts + 1
+            WHERE id = ?
+        ''', (datetime.now().isoformat(), queue_id))
+
+        conn.commit()
+        conn.close()
+
+    def mark_queue_done(self, queue_id: int):
+        """Remove successfully processed item from queue"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('DELETE FROM article_queue WHERE id = ?', (queue_id,))
+
+        conn.commit()
+        conn.close()
+
+    def mark_queue_failed(self, queue_id: int, error: str, max_attempts: int = 3):
+        """
+        Mark queue item as failed
+
+        If attempts < max_attempts: reset to pending for retry
+        If attempts >= max_attempts: mark as failed permanently
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        # Get current attempts
+        c.execute('SELECT attempts FROM article_queue WHERE id = ?', (queue_id,))
+        row = c.fetchone()
+
+        if row and row[0] >= max_attempts:
+            # Max retries reached - mark as failed
+            c.execute('''
+                UPDATE article_queue
+                SET status = 'failed', error_message = ?, last_attempt_at = ?
+                WHERE id = ?
+            ''', (error[:500], datetime.now().isoformat(), queue_id))
+        else:
+            # Retry later - reset to pending
+            c.execute('''
+                UPDATE article_queue
+                SET status = 'pending', error_message = ?, last_attempt_at = ?
+                WHERE id = ?
+            ''', (error[:500], datetime.now().isoformat(), queue_id))
+
+        conn.commit()
+        conn.close()
+
+    def is_url_in_queue(self, url: str) -> bool:
+        """Check if URL is already in queue"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('SELECT id FROM article_queue WHERE url = ?', (url,))
+        result = c.fetchone()
+        conn.close()
+
+        return result is not None
+
+    def is_url_published(self, url: str) -> bool:
+        """Check if URL was already published (by original_url)"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute('SELECT id FROM blog_posts WHERE original_url = ?', (url,))
+        result = c.fetchone()
+        conn.close()
+
+        return result is not None
+
+    def get_queue_stats(self) -> Dict:
+        """Get queue statistics"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        stats = {'pending': 0, 'processing': 0, 'failed': 0, 'total': 0}
+
+        c.execute('''
+            SELECT status, COUNT(*) FROM article_queue GROUP BY status
+        ''')
+
+        for row in c.fetchall():
+            stats[row[0]] = row[1]
+
+        stats['total'] = sum(stats.values())
+        conn.close()
+
+        return stats
+
+    def cleanup_old_queue_items(self, days: int = 7):
+        """Remove failed items older than specified days"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+        c.execute('''
+            DELETE FROM article_queue
+            WHERE status = 'failed' AND created_at < ?
+        ''', (cutoff,))
+
+        deleted = c.rowcount
+        conn.commit()
+        conn.close()
+
+        return deleted
+
+    def get_queue_items(self, status: Optional[str] = None, limit: int = 50) -> List[Dict]:
+        """Get queue items for inspection"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        if status:
+            c.execute('''
+                SELECT * FROM article_queue
+                WHERE status = ?
+                ORDER BY priority DESC, created_at ASC
+                LIMIT ?
+            ''', (status, limit))
+        else:
+            c.execute('''
+                SELECT * FROM article_queue
+                ORDER BY priority DESC, created_at ASC
+                LIMIT ?
+            ''', (limit,))
+
+        rows = c.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
