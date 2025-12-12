@@ -315,3 +315,41 @@ def send_cover_alert(title: str, slug: str, error: str) -> bool:
 ⚠️ Пост сохранён на сайте, но НЕ будет опубликован в Telegram пока нет обложки."""
 
     return alert_bot.send_alert(message)
+
+
+def send_covers_regenerated_report(
+    success_count: int,
+    failed_count: int,
+    remaining: int,
+    titles: List[str]
+) -> bool:
+    """
+    Отправить отчёт об успешной регенерации обложек
+
+    Вызывается из regenerate_covers.py после успешной генерации
+    """
+    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    # Формируем список сгенерированных обложек
+    titles_list = ""
+    if titles:
+        titles_list = "\n\n📝 <b>Обложки сгенерированы для:</b>\n"
+        for i, title in enumerate(titles[:5], 1):
+            titles_list += f"{i}. {title[:60]}{'...' if len(title) > 60 else ''}\n"
+        if len(titles) > 5:
+            titles_list += f"...и ещё {len(titles) - 5}\n"
+
+    # Формируем строку об ошибках
+    errors_line = ""
+    if failed_count > 0:
+        errors_line = f"\n❌ Ошибок: {failed_count}"
+
+    message = f"""🎨 <b>YandexART: обложки сгенерированы</b>
+
+📅 {now}
+
+📊 <b>Результат:</b>
+✓ Сгенерировано: {success_count}{errors_line}
+⏳ Осталось без обложки: {remaining}{titles_list}"""
+
+    return alert_bot.send_alert(message)
