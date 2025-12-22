@@ -1,0 +1,30 @@
+name: Test Decodo Proxy
+
+on:
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  test-proxy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test SOCKS5 proxy
+        env:
+          PROXY_USER: ${{ secrets.DECODO_USER }}
+          PROXY_PASS: ${{ secrets.DECODO_PASS }}
+        run: |
+          echo "Testing Decodo proxy from GitHub Actions..."
+          echo "Runner IP (without proxy):"
+          curl -s http://ip-api.com/json | jq -r '.query, .country, .isp'
+
+          echo ""
+          echo "Testing with SOCKS5 proxy..."
+          curl -s --max-time 30 \
+            --socks5-hostname "${PROXY_USER}:${PROXY_PASS}@ru.decodo.com:40000" \
+            http://ip-api.com/json | jq -r '.query, .country, .isp' || echo "SOCKS5 failed"
+
+          echo ""
+          echo "Testing with HTTP proxy..."
+          curl -s --max-time 30 \
+            -x "http://${PROXY_USER}:${PROXY_PASS}@gate.decodo.com:7000" \
+            http://ip-api.com/json | jq -r '.query, .country, .isp' || echo "HTTP failed"
