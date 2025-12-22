@@ -16,10 +16,12 @@ Features:
 import logging
 import threading
 import time
-from typing import Optional, List
+from typing import Optional, List, Dict
 from dataclasses import dataclass, field
 from datetime import datetime
 from playwright.sync_api import sync_playwright, Browser, BrowserContext
+
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +66,8 @@ class BrowserPool:
         max_browsers: int = 5,
         max_age_seconds: int = 3600,  # 1 час
         headless: bool = True,
-        block_resources: bool = True
+        block_resources: bool = True,
+        proxy_config: Optional[Dict] = None
     ):
         """
         Args:
@@ -72,11 +75,19 @@ class BrowserPool:
             max_age_seconds: Максимальный возраст браузера (секунды)
             headless: Запускать браузеры в headless режиме
             block_resources: Блокировать ненужные ресурсы (картинки, шрифты)
+            proxy_config: Конфигурация прокси (если None - берётся из settings)
         """
         self.max_browsers = max_browsers
         self.max_age_seconds = max_age_seconds
         self.headless = headless
         self.block_resources = block_resources
+
+        # Получаем прокси из настроек если не передан явно
+        if proxy_config is None:
+            settings = get_settings()
+            self.proxy_config = settings.proxy_config
+        else:
+            self.proxy_config = proxy_config
 
         self.playwright = None
         self.browsers: List[BrowserInstance] = []
@@ -88,7 +99,8 @@ class BrowserPool:
         self.total_created = 0
         self.total_destroyed = 0
 
-        logger.info(f"Browser Pool initialized: max_browsers={max_browsers}, headless={headless}")
+        proxy_info = f", proxy={self.proxy_config['server']}" if self.proxy_config else ""
+        logger.info(f"Browser Pool initialized: max_browsers={max_browsers}, headless={headless}{proxy_info}")
 
     def start(self):
         """Запуск Playwright (необходимо перед использованием)"""
@@ -123,12 +135,20 @@ class BrowserPool:
                 ]
             )
 
-            context = browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                locale='ru-RU',
-                timezone_id='Europe/Moscow',
-            )
+            # Настройки контекста
+            context_options = {
+                'viewport': {'width': 1920, 'height': 1080},
+                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'locale': 'ru-RU',
+                'timezone_id': 'Europe/Moscow',
+            }
+
+            # Добавляем прокси если настроен
+            if self.proxy_config:
+                context_options['proxy'] = self.proxy_config
+                logger.info(f"Browser using proxy: {self.proxy_config['server']}")
+
+            context = browser.new_context(**context_options)
 
             # Скрываем автоматизацию
             context.add_init_script("""
