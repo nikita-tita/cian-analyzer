@@ -761,9 +761,16 @@ class PlaywrightParser(BaseCianParser):
             )
 
             # Настройки контекста
+            import random
+            viewports = [
+                {'width': 1920, 'height': 1080},
+                {'width': 1536, 'height': 864},
+                {'width': 1440, 'height': 900},
+                {'width': 1366, 'height': 768},
+            ]
             context_options = {
-                'viewport': {'width': 1920, 'height': 1080},
-                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'viewport': random.choice(viewports),
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 'locale': 'ru-RU',
                 'timezone_id': 'Europe/Moscow',
             }
@@ -775,12 +782,67 @@ class PlaywrightParser(BaseCianParser):
 
             self.context = self.browser.new_context(**context_options)
 
-            # Скрываем автоматизацию
+            # Скрываем автоматизацию (расширенный stealth)
             self.context.add_init_script("""
+                // Удаляем webdriver флаг
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
-                window.chrome = { runtime: {} };
+
+                // Добавляем chrome runtime
+                window.chrome = {
+                    runtime: {},
+                    loadTimes: function() { return {}; },
+                    csi: function() { return {}; },
+                    app: { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' } }
+                };
+
+                // Скрываем автоматизацию в plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+
+                // Скрываем languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['ru-RU', 'ru', 'en-US', 'en']
+                });
+
+                // Подмена permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+
+                // Скрываем headless в User-Agent data
+                Object.defineProperty(navigator, 'userAgentData', {
+                    get: () => ({
+                        brands: [
+                            { brand: 'Google Chrome', version: '131' },
+                            { brand: 'Chromium', version: '131' },
+                            { brand: 'Not_A Brand', version: '24' }
+                        ],
+                        mobile: false,
+                        platform: 'Windows'
+                    })
+                });
+
+                // Эмуляция WebGL vendor/renderer
+                const getParameterProxyHandler = {
+                    apply: function(target, ctx, args) {
+                        if (args[0] === 37445) return 'Intel Inc.';
+                        if (args[0] === 37446) return 'Intel Iris OpenGL Engine';
+                        return Reflect.apply(target, ctx, args);
+                    }
+                };
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (gl) {
+                        gl.getParameter = new Proxy(gl.getParameter.bind(gl), getParameterProxyHandler);
+                    }
+                } catch(e) {}
             """)
 
             # Блокируем ненужные ресурсы для ускорения
@@ -931,12 +993,28 @@ class PlaywrightParser(BaseCianParser):
                 # PATCH: Добавляем случайный User-Agent (защита от блокировок)
                 import random
                 user_agents = [
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
                 ]
+                chosen_ua = random.choice(user_agents)
                 page.set_extra_http_headers({
-                    'User-Agent': random.choice(user_agents)
+                    'User-Agent': chosen_ua,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Cache-Control': 'no-cache',
+                    'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                    'Sec-Ch-Ua-Mobile': '?0',
+                    'Sec-Ch-Ua-Platform': '"Windows"' if 'Windows' in chosen_ua else '"macOS"',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Upgrade-Insecure-Requests': '1',
                 })
 
                 logger.info(f"Загрузка страницы (попытка {attempt}/{max_retries}): {url}")
