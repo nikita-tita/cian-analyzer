@@ -14,6 +14,7 @@ from .base_real_estate_parser import BaseRealEstateParser, ParserCapabilities
 from .playwright_parser import PlaywrightParser as LegacyPlaywrightParser
 from .parser_registry import register_parser
 from .field_mapper import get_field_mapper
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +38,23 @@ class CianParser(BaseRealEstateParser):
         super().__init__(delay, cache)
         self.region = region
 
+        # Получаем настройки прокси
+        settings = get_settings()
+        proxy_config = settings.proxy_config
+
         # Создаем экземпляр старого парсера
         self._legacy_parser = LegacyPlaywrightParser(
             delay=delay,
             cache=cache,
-            region=region
+            region=region,
+            proxy_config=proxy_config
         )
 
         # Маппер полей (хотя для Циана он почти не нужен)
         self.field_mapper = get_field_mapper('cian')
 
-        logger.info(f"✓ Инициализирован CianParser (регион: {region})")
+        proxy_info = f", proxy={proxy_config['server']}" if proxy_config else ""
+        logger.info(f"Инициализирован CianParser (регион: {region}{proxy_info})")
 
     def _get_page_content(self, url: str) -> Optional[str]:
         """

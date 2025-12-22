@@ -6,6 +6,7 @@ Playwright-Stealth Strategy - Браузер с антидетект патча�
 2. Скрытие автоматизации (webdriver, chrome.runtime и т.д.)
 3. Имитация реального поведения пользователя
 4. Обход PerimeterX, DataDome (частично)
+5. Поддержка прокси (Decodo/Smartproxy)
 
 Применение:
 - Cian (PerimeterX защита)
@@ -15,7 +16,7 @@ Playwright-Stealth Strategy - Браузер с антидетект патча�
 
 import logging
 import time
-from typing import Optional
+from typing import Optional, Dict
 from .base_strategy import BaseParsingStrategy
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,8 @@ class PlaywrightStealthStrategy(BaseParsingStrategy):
         headless: bool = True,
         block_resources: bool = True,
         stealth_mode: bool = True,
-        timeout: int = 30000
+        timeout: int = 30000,
+        proxy_config: Optional[Dict] = None
     ):
         """
         Args:
@@ -56,6 +58,7 @@ class PlaywrightStealthStrategy(BaseParsingStrategy):
             block_resources: Блокировать картинки/шрифты для ускорения
             stealth_mode: Включить stealth патчи
             timeout: Таймаут загрузки страницы (миллисекунды)
+            proxy_config: Конфигурация прокси {'server': 'http://host:port', 'username': '...', 'password': '...'}
         """
         super().__init__(name='playwright_stealth')
 
@@ -63,27 +66,30 @@ class PlaywrightStealthStrategy(BaseParsingStrategy):
             raise ImportError("Playwright не установлен")
 
         if stealth_mode and not STEALTH_AVAILABLE:
-            logger.warning("⚠️ Stealth патчи недоступны, используется обычный Playwright")
+            logger.warning("Stealth патчи недоступны, используется обычный Playwright")
             stealth_mode = False
 
         self.headless = headless
         self.block_resources = block_resources
         self.stealth_mode = stealth_mode
         self.timeout = timeout
+        self.proxy_config = proxy_config
 
         # Браузер (ленивая инициализация)
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
 
-        logger.info(f"✓ PlaywrightStealthStrategy инициализирован (stealth={stealth_mode})")
+        proxy_info = f", proxy={proxy_config['server']}" if proxy_config else ""
+        logger.info(f"PlaywrightStealthStrategy инициализирован (stealth={stealth_mode}{proxy_info})")
 
     def _start_browser(self):
         """Запустить браузер"""
         if self.browser:
             return
 
-        logger.info("🚀 Запуск Playwright браузера с stealth патчами...")
+        proxy_info = f" (proxy: {self.proxy_config['server']})" if self.proxy_config else ""
+        logger.info(f"Запуск Playwright браузера с stealth патчами{proxy_info}...")
 
         self.playwright = sync_playwright().start()
 
@@ -99,13 +105,21 @@ class PlaywrightStealthStrategy(BaseParsingStrategy):
             ]
         )
 
-        self.context = self.browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            locale='ru-RU',
-            timezone_id='Europe/Moscow',
-            permissions=['geolocation'],  # Даем разрешения как реальный пользователь
-        )
+        # Настройки контекста
+        context_options = {
+            'viewport': {'width': 1920, 'height': 1080},
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'locale': 'ru-RU',
+            'timezone_id': 'Europe/Moscow',
+            'permissions': ['geolocation'],  # Даем разрешения как реальный пользователь
+        }
+
+        # Добавляем прокси если настроен
+        if self.proxy_config:
+            context_options['proxy'] = self.proxy_config
+            logger.info(f"Прокси настроен: {self.proxy_config['server']}")
+
+        self.context = self.browser.new_context(**context_options)
 
         # Скрываем автоматизацию (базовые патчи)
         self.context.add_init_script("""

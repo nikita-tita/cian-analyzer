@@ -537,7 +537,8 @@ class PlaywrightParser(BaseCianParser):
         block_resources: bool = True,
         cache=None,
         region: str = 'spb',
-        browser_pool=None
+        browser_pool=None,
+        proxy_config: Optional[Dict] = None
     ):
         """
         Args:
@@ -547,6 +548,7 @@ class PlaywrightParser(BaseCianParser):
             cache: PropertyCache instance (опционально)
             region: Регион поиска ('spb' или 'msk')
             browser_pool: BrowserPool instance (опционально, рекомендуется для production)
+            proxy_config: Конфигурация прокси {'server': 'http://host:port', 'username': '...', 'password': '...'}
         """
         super().__init__(delay, cache=cache)
         self.headless = headless
@@ -556,6 +558,7 @@ class PlaywrightParser(BaseCianParser):
         self.context: Optional[BrowserContext] = None
         self.browser_pool = browser_pool
         self.using_pool = browser_pool is not None
+        self.proxy_config = proxy_config
 
         # Полный маппинг регионов на коды ЦИАН (получено из API ЦИАН)
         self.region_codes = {
@@ -757,12 +760,20 @@ class PlaywrightParser(BaseCianParser):
                 ]
             )
 
-            self.context = self.browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                locale='ru-RU',
-                timezone_id='Europe/Moscow',
-            )
+            # Настройки контекста
+            context_options = {
+                'viewport': {'width': 1920, 'height': 1080},
+                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'locale': 'ru-RU',
+                'timezone_id': 'Europe/Moscow',
+            }
+
+            # Добавляем прокси если настроен
+            if self.proxy_config:
+                context_options['proxy'] = self.proxy_config
+                logger.info(f"Прокси настроен: {self.proxy_config['server']}")
+
+            self.context = self.browser.new_context(**context_options)
 
             # Скрываем автоматизацию
             self.context.add_init_script("""

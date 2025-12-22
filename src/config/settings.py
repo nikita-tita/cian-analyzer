@@ -148,6 +148,17 @@ class Settings:
         self.GRAFANA_ENABLED: bool = os.getenv('GRAFANA_ENABLED', 'false').lower() == 'true'
 
         # ═══════════════════════════════════════════════════════════════════
+        # PROXY (Decodo/Smartproxy)
+        # ═══════════════════════════════════════════════════════════════════
+        self.PROXY_ENABLED: bool = os.getenv('PROXY_ENABLED', 'false').lower() == 'true'
+        self.PROXY_HOST: str = os.getenv('PROXY_HOST', 'gate.decodo.com')
+        self.PROXY_PORT: int = int(os.getenv('PROXY_PORT', '10001'))
+        self.PROXY_USERNAME: Optional[str] = os.getenv('PROXY_USERNAME') or None
+        self.PROXY_PASSWORD: Optional[str] = os.getenv('PROXY_PASSWORD') or None
+        self.PROXY_TYPE: str = os.getenv('PROXY_TYPE', 'http')  # http, https, socks5
+        self.PROXY_LOCATION: str = os.getenv('PROXY_LOCATION', 'RU')
+
+        # ═══════════════════════════════════════════════════════════════════
         # APPLICATION INFO
         # ═══════════════════════════════════════════════════════════════════
         self.APP_NAME: str = 'HOUSLER'
@@ -180,6 +191,30 @@ class Settings:
         if self.REDIS_ENABLED:
             return self.redis_url
         return 'memory://'
+
+    @property
+    def proxy_url(self) -> Optional[str]:
+        """
+        URL прокси для HTTP клиентов (curl_cffi, httpx)
+        Формат: http://user:pass@host:port
+        """
+        if not self.PROXY_ENABLED or not self.PROXY_USERNAME:
+            return None
+        return f"{self.PROXY_TYPE}://{self.PROXY_USERNAME}:{self.PROXY_PASSWORD}@{self.PROXY_HOST}:{self.PROXY_PORT}"
+
+    @property
+    def proxy_config(self) -> Optional[dict]:
+        """
+        Конфигурация прокси для Playwright
+        Формат: {'server': 'http://host:port', 'username': '...', 'password': '...'}
+        """
+        if not self.PROXY_ENABLED or not self.PROXY_USERNAME:
+            return None
+        return {
+            'server': f"{self.PROXY_TYPE}://{self.PROXY_HOST}:{self.PROXY_PORT}",
+            'username': self.PROXY_USERNAME,
+            'password': self.PROXY_PASSWORD,
+        }
 
     def validate(self) -> List[str]:
         """
