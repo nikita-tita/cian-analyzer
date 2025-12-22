@@ -674,6 +674,15 @@ class BaseCianParser(ABC):
             if cached_data:
                 self.stats['cache_hits'] += 1
                 logger.info(f"Cache HIT: {url[:60]}...")
+
+                # Миграция старых данных: заполняем total_area из characteristics если отсутствует
+                if not cached_data.get('total_area') and cached_data.get('characteristics'):
+                    self._promote_key_fields(cached_data)
+                    # Обновляем кэш с исправленными данными
+                    if cached_data.get('total_area'):
+                        self.cache.set_property(url, cached_data, ttl_hours=24)
+                        logger.info(f"Cache migrated: total_area={cached_data.get('total_area')}")
+
                 return cached_data
             else:
                 self.stats['cache_misses'] += 1

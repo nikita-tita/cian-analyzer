@@ -169,6 +169,15 @@ class BaseRealEstateParser(ABC):
             if cached_data:
                 self.stats['cache_hits'] += 1
                 logger.info(f"✅ Cache HIT [{self.get_source_name()}]: {url[:60]}...")
+
+                # Миграция старых данных: заполняем total_area из characteristics
+                if not cached_data.get('total_area') and cached_data.get('characteristics'):
+                    if hasattr(self, '_promote_key_fields'):
+                        self._promote_key_fields(cached_data)
+                        if cached_data.get('total_area'):
+                            self.cache.set_property(url, cached_data, ttl_hours=24)
+                            logger.info(f"Cache migrated: total_area={cached_data.get('total_area')}")
+
                 return cached_data
             else:
                 self.stats['cache_misses'] += 1

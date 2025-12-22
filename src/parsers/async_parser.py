@@ -279,6 +279,14 @@ class AsyncPlaywrightParser(BaseCianParser):
                     if cached_data:
                         self.stats['cache_hits'] += 1
                         logger.debug(f"✅ Cache HIT: {url[:60]}")
+
+                        # Миграция старых данных: заполняем total_area из characteristics
+                        if not cached_data.get('total_area') and cached_data.get('characteristics'):
+                            self._promote_key_fields(cached_data)
+                            if cached_data.get('total_area'):
+                                self.cache.set_property(url, cached_data, ttl_hours=24)
+                                logger.debug(f"Cache migrated: total_area={cached_data.get('total_area')}")
+
                         return ParseResult(
                             url=url,
                             ok=True,
@@ -390,6 +398,14 @@ class AsyncPlaywrightParser(BaseCianParser):
             if cached_data:
                 self.stats['cache_hits'] += 1
                 logger.debug(f"✅ Cache HIT: {url[:60]}")
+
+                # Миграция старых данных: заполняем total_area из characteristics
+                if not cached_data.get('total_area') and cached_data.get('characteristics'):
+                    self._promote_key_fields(cached_data)
+                    if cached_data.get('total_area'):
+                        self.cache.set_property(url, cached_data, ttl_hours=24)
+                        logger.debug(f"Cache migrated: total_area={cached_data.get('total_area')}")
+
                 return cached_data
             else:
                 self.stats['cache_misses'] += 1
