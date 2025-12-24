@@ -3,6 +3,10 @@ Housler - Интеллектуальный анализ недвижимости
 Веб-интерфейс с 3-экранным wizard UX
 """
 
+# Load .env before any other imports
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, render_template, request, jsonify, session
 import os
 import uuid
