@@ -77,6 +77,9 @@ session_*.txt
 # Production database - should not be overwritten by deploys
 blog.db
 
+# Proxy configuration with credentials (use proxy_pool.example.json as template)
+config/proxy_pool.json
+
 # Generated cover images (keep directory structure)
 static/blog/covers/*.png
 !static/blog/covers/.gitkeep

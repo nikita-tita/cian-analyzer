@@ -7,6 +7,7 @@ Telegram бот для Housler
 import os
 import re
 import time
+import asyncio
 import logging
 import requests
 from datetime import datetime
@@ -41,6 +42,7 @@ BLOG_ADMIN_USER_IDS = [
 # === Диалоговый режим для #блог ===
 # Хранит состояние ожидания контента: {user_id: {'timestamp': ..., 'photos': [...]}}
 pending_blog_posts = {}
+_pending_lock = asyncio.Lock()  # Protects pending_blog_posts from concurrent access
 PENDING_TIMEOUT = 300  # 5 минут
 
 if not TELEGRAM_BOT_TOKEN:
@@ -160,17 +162,19 @@ def parse_blog_message(text: str) -> tuple:
     return title, content if content else text
 
 
-def is_pending_expired(user_id: int) -> bool:
-    """Check if pending blog post has expired"""
-    if user_id not in pending_blog_posts:
-        return True
-    return time.time() - pending_blog_posts[user_id]['timestamp'] > PENDING_TIMEOUT
+async def is_pending_expired(user_id: int) -> bool:
+    """Check if pending blog post has expired (thread-safe)"""
+    async with _pending_lock:
+        if user_id not in pending_blog_posts:
+            return True
+        return time.time() - pending_blog_posts[user_id]['timestamp'] > PENDING_TIMEOUT
 
 
-def clear_pending(user_id: int):
-    """Clear pending state for user"""
-    if user_id in pending_blog_posts:
-        del pending_blog_posts[user_id]
+async def clear_pending(user_id: int):
+    """Clear pending state for user (thread-safe)"""
+    async with _pending_lock:
+        if user_id in pending_blog_posts:
+            del pending_blog_posts[user_id]
 
 
 async def download_photos(message, slug: str) -> List[str]:
@@ -493,12 +497,13 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена ожидания контента для #блог"""
     user = update.effective_user
 
-    if user.id in pending_blog_posts:
-        clear_pending(user.id)
-        await update.message.reply_text("Публикация отменена.")
-        logger.info(f"Blog post cancelled by user {user.id}")
-    else:
-        await update.message.reply_text("Нет активной публикации для отмены.")
+    async with _pending_lock:
+        if user.id in pending_blog_posts:
+            del pending_blog_posts[user.id]
+            await update.message.reply_text("Публикация отменена.")
+            logger.info(f"Blog post cancelled by user {user.id}")
+        else:
+            await update.message.reply_text("Нет активной публикации для отмены.")
 
 
 async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -538,7 +543,7 @@ async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. Если есть текст — публикуем сразу
     if title and content:
         # Clear any pending state
-        clear_pending(user.id)
+        await clear_pending(user.id)
 
         status_msg = await message.reply_text(
             f"Обрабатываю статью: {title[:50]}...\n"
@@ -563,10 +568,11 @@ async def handle_blog_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 5. Текста нет — переходим в режим ожидания
-    pending_blog_posts[user.id] = {
-        'timestamp': time.time(),
-        'photos': photo_paths
-    }
+    async with _pending_lock:
+        pending_blog_posts[user.id] = {
+            'timestamp': time.time(),
+            'photos': photo_paths
+        }
 
     photos_info = f"\nФото получены: {len(photo_paths)}" if photo_paths else ""
     await message.reply_text(
@@ -588,13 +594,14 @@ async def handle_blog_content(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     message = update.message
 
-    # Проверяем что пользователь в режиме ожидания
-    if user.id not in pending_blog_posts:
-        return  # Не наше сообщение
+    # Проверяем что пользователь в режиме ожидания (thread-safe)
+    async with _pending_lock:
+        if user.id not in pending_blog_posts:
+            return  # Не наше сообщение
 
     # Проверяем timeout
-    if is_pending_expired(user.id):
-        clear_pending(user.id)
+    if await is_pending_expired(user.id):
+        await clear_pending(user.id)
         await message.reply_text(
             "Время ожидания истекло (5 минут).\n"
             "Начните заново с #блог"
@@ -603,14 +610,15 @@ async def handle_blog_content(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Проверяем авторизацию (на всякий случай)
     if user.id not in BLOG_ADMIN_USER_IDS:
-        clear_pending(user.id)
+        await clear_pending(user.id)
         return
 
     logger.info(f"Received content from pending user {user.id}")
 
-    # Получаем сохранённые фото
-    pending = pending_blog_posts[user.id]
-    saved_photos = pending.get('photos', [])
+    # Получаем сохранённые фото (thread-safe)
+    async with _pending_lock:
+        pending = pending_blog_posts.get(user.id, {})
+        saved_photos = pending.get('photos', [])
 
     # Скачиваем новые фото если есть
     temp_slug = f"temp_{user.id}_{int(time.time())}"
@@ -626,8 +634,10 @@ async def handle_blog_content(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"Текст не получен{photos_info}.\n"
             "Отправьте текст статьи или /cancel для отмены."
         )
-        # Обновляем фото в pending
-        pending_blog_posts[user.id]['photos'] = all_photos
+        # Обновляем фото в pending (thread-safe)
+        async with _pending_lock:
+            if user.id in pending_blog_posts:
+                pending_blog_posts[user.id]['photos'] = all_photos
         return
 
     # Парсим как обычный текст (без #блог)
@@ -673,7 +683,7 @@ async def handle_blog_content(update: Update, context: ContextTypes.DEFAULT_TYPE
         content = title  # Если только заголовок — используем его как контент
 
     # Очищаем pending
-    clear_pending(user.id)
+    await clear_pending(user.id)
 
     # Публикуем
     status_msg = await message.reply_text(

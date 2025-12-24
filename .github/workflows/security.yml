@@ -1,3 +1,12 @@
+# Security Scanning Pipeline
+#
+# NOTE: Security scans use continue-on-error intentionally because:
+# 1. Security tools often produce false positives
+# 2. We want visibility into issues without blocking all PRs
+# 3. Critical issues are reviewed manually via artifacts
+#
+# TODO: Configure severity thresholds to fail on HIGH/CRITICAL only
+
 name: Security Scanning
 
 on:

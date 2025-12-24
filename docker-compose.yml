@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Redis для кэширования
   redis:
@@ -16,6 +14,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - housler-network
 
@@ -60,6 +63,8 @@ services:
       - /var/www/housler_data/blog.db:/app/blog.db
       # Обложки блога - должны быть доступны nginx на хосте
       - ./static/blog/covers:/app/static/blog/covers
+      # Config для прокси
+      - ./config:/app/config
     networks:
       - housler-network
     healthcheck:
@@ -68,6 +73,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Prometheus для мониторинга (опционально)
   prometheus:
@@ -86,6 +96,11 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - housler-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     profiles:
       - monitoring
 
@@ -97,7 +112,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      # SECURITY: Use env variable, never commit real password
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme_on_first_login}
       GF_INSTALL_PLUGINS: redis-datasource
     volumes:
       - grafana_data:/var/lib/grafana
@@ -107,6 +123,11 @@ services:
       - prometheus
     networks:
       - housler-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     profiles:
       - monitoring
 
@@ -126,6 +147,11 @@ services:
       - app
     networks:
       - housler-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     profiles:
       - production
 

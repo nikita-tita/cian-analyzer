@@ -32,7 +32,7 @@ jobs:
         python -m playwright install chromium
 
     - name: Run Unit Tests
-      continue-on-error: true
+      # Tests MUST pass - this is a quality gate
       run: |
         python -m pytest tests/ \
           --ignore=tests/test_e2e_full_flow.py \
@@ -54,7 +54,7 @@ jobs:
           htmlcov/
 
     - name: Check coverage threshold
-      continue-on-error: true
+      # Coverage MUST meet threshold - this is a quality gate
       run: |
         python -m pytest tests/ \
           --ignore=tests/test_e2e_full_flow.py \

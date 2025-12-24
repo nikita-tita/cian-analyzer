@@ -139,6 +139,37 @@ else:
     logger.info("Browser pool disabled (for local dev or parsers not available)")
 
 # ═══════════════════════════════════════════════════════════════════════════
+# PROXY ROTATOR INITIALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
+# Прокси для защиты IP сервера от блокировок
+proxy_rotator = None
+PROXY_ENABLED = os.getenv('PROXY_ENABLED', 'false').lower() == 'true'
+PROXY_POOL_FILE = os.getenv('PROXY_POOL_FILE', 'config/proxy_pool.json')
+
+if PROXY_ENABLED and os.path.exists(PROXY_POOL_FILE):
+    try:
+        from src.parsers.proxy_rotator import ProxyRotator
+        
+        with open(PROXY_POOL_FILE) as f:
+            proxy_pool = json.load(f)
+        
+        proxy_rotator = ProxyRotator(
+            proxies=proxy_pool,
+            strategy=os.getenv('PROXY_STRATEGY', 'round_robin'),
+            max_failures=int(os.getenv('PROXY_MAX_FAILURES', '3')),
+            cooldown_seconds=int(os.getenv('PROXY_COOLDOWN_SECONDS', '300'))
+        )
+        
+        logger.info(f"🔒 ProxyRotator инициализирован: {len(proxy_pool)} прокси")
+    except Exception as e:
+        logger.error(f"❌ Ошибка инициализации ProxyRotator: {e}")
+        proxy_rotator = None
+elif PROXY_ENABLED:
+    logger.warning(f"⚠️ PROXY_ENABLED=true но файл {PROXY_POOL_FILE} не найден")
+else:
+    logger.info("🌐 Прокси отключен - используется прямое соединение")
+
+# ═══════════════════════════════════════════════════════════════════════════
 # PARSER REGISTRY INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 # Глобальный реестр парсеров с кэшем
@@ -187,7 +218,7 @@ except ImportError as e:
     logger.warning(f"⚠️ Contacts Blueprint недоступен: {e}")
 
 
-def get_parser_for_url(url: str, region: str = 'spb'):
+def get_parser_for_url(url: str, region: str = 'spb', proxy_config: Optional[Dict] = None):
     """
     Получить парсер для заданного URL
 
@@ -198,6 +229,7 @@ def get_parser_for_url(url: str, region: str = 'spb'):
     Args:
         url: URL объявления
         region: Регион (только для ЦИАН)
+        proxy_config: Конфигурация прокси (опционально)
 
     Returns:
         Парсер с методами parse_detail_page() и search_similar()
@@ -210,7 +242,8 @@ def get_parser_for_url(url: str, region: str = 'spb'):
             delay=1.0,
             cache=property_cache,
             region=region,
-            browser_pool=browser_pool
+            browser_pool=browser_pool,
+            proxy_config=proxy_config
         )
 
     # Определяем источник
@@ -224,7 +257,8 @@ def get_parser_for_url(url: str, region: str = 'spb'):
             delay=1.0,
             cache=property_cache,
             region=region,
-            browser_pool=browser_pool
+            browser_pool=browser_pool,
+            proxy_config=proxy_config
         )
     elif source:
         # Для остальных источников используем registry
@@ -933,6 +967,49 @@ def metrics():
     return '\n'.join(lines) + '\n', 200, {'Content-Type': 'text/plain'}
 
 
+@app.route('/api/admin/proxy-stats', methods=['GET'])
+@limiter.exempt  # Admin endpoint - не ограничиваем
+def proxy_stats():
+    """
+    Статистика использования прокси (требует авторизации)
+
+    Headers:
+        X-Admin-Key: <ADMIN_API_KEY from .env>
+
+    Returns:
+        JSON с детальной статистикой по всем прокси
+    """
+    # Check admin authentication (same pattern as /api/cache/clear)
+    admin_key = os.environ.get('ADMIN_API_KEY')
+    provided_key = request.headers.get('X-Admin-Key')
+
+    if not admin_key:
+        logger.warning("ADMIN_API_KEY not configured, proxy-stats disabled")
+        return jsonify({
+            'status': 'error',
+            'message': 'Admin API not configured'
+        }), 503
+
+    if not provided_key or provided_key != admin_key:
+        logger.warning(f"Unauthorized proxy-stats attempt from IP: {request.remote_addr}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Unauthorized'
+        }), 401
+
+    if not proxy_rotator:
+        return jsonify({
+            'enabled': False,
+            'message': 'Прокси отключен'
+        })
+
+    stats = proxy_rotator.get_stats()
+    return jsonify({
+        'enabled': True,
+        'stats': stats
+    })
+
+
 @app.route('/calculator')
 def calculator():
     """Property calculator - main analysis tool"""
@@ -980,10 +1057,27 @@ def parse_url():
 
         # SECURITY: Парсинг с timeout (защита от DoS)
         # Используем fallback регион для парсинга, если не удалось определить
+        
+        # Получаем прокси из ротатора (если включен)
+        proxy_config = None
+        proxy_idx = None
+        import time as time_module
+        
+        if proxy_rotator:
+            proxy_info, proxy_idx = proxy_rotator.get_next_proxy()
+            proxy_config = proxy_info.to_dict()
+            logger.info(f"🔒 Используем прокси #{proxy_idx}: {proxy_info.server}")
+        
         try:
-            with timeout_context(60, 'Парсинг занял слишком много времени (>60s)'):
-                with get_parser_for_url(url, region=region or 'spb') as parser:
+            with timeout_context(150, 'Парсинг занял слишком много времени (>150s)'):
+                with get_parser_for_url(url, region=region or 'spb', proxy_config=proxy_config) as parser:
+                    start_time = time_module.time()
                     parsed_data = parser.parse_detail_page(url)
+                    response_time = time_module.time() - start_time
+                    
+                    # Отмечаем успех прокси
+                    if proxy_rotator and proxy_idx is not None:
+                        proxy_rotator.mark_success(proxy_idx, response_time)
         except TimeoutError as e:
             logger.error(f"Parsing timeout for {url}: {e}")
             return jsonify({
@@ -1042,6 +1136,14 @@ def parse_url():
         })
 
     except Exception as e:
+        # Отмечаем ошибку в proxy_rotator
+        if proxy_rotator and proxy_idx is not None:
+            error_str = str(e).lower()
+            if 'captcha' in error_str or 'blocked' in error_str:
+                proxy_rotator.mark_captcha(proxy_idx)
+            else:
+                proxy_rotator.mark_failed(proxy_idx, reason=str(e)[:100])
+        
         logger.error(f"Ошибка парсинга: {e}", exc_info=True)
 
         # Определяем тип ошибки
