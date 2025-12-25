@@ -86,6 +86,36 @@ from src.utils.session_storage import get_session_storage
 from src.cache import init_cache, get_cache
 from src.utils.duplicate_detector import DuplicateDetector
 
+
+def safe_error_message(e: Exception, include_details: bool = False) -> str:
+    """
+    Return safe error message for API responses.
+
+    In production: returns generic message to avoid leaking sensitive data
+    In development: returns full error details for debugging
+
+    Args:
+        e: The exception to process
+        include_details: Force include details (for known safe errors)
+    """
+    # Known safe error types that have controlled messages
+    safe_types = (
+        URLValidationError,
+        SSRFError,
+        ValueError,  # Usually controlled validation errors
+    )
+
+    if include_details or isinstance(e, safe_types):
+        return str(e)
+
+    # In production, hide internal error details
+    if os.getenv('FLASK_ENV') == 'production':
+        return "Internal server error. Please try again later."
+
+    # In development, return full error for debugging
+    return str(e)
+
+
 # Task Queue (async operations)
 try:
     from src.tasks import init_task_queue
@@ -1309,7 +1339,7 @@ def create_manual():
         logger.error(f"[create-manual] Необработанная ошибка: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -1357,7 +1387,7 @@ def update_target():
         logger.error(f"Ошибка обновления: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2008,7 +2038,7 @@ def add_comparable():
         logger.error(f"Ошибка добавления: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2049,7 +2079,7 @@ def exclude_comparable():
         logger.error(f"Ошибка исключения: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2090,7 +2120,7 @@ def include_comparable():
         logger.error(f"Ошибка возврата: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2331,7 +2361,7 @@ def cache_stats():
         logger.error(f"Ошибка получения статистики кэша: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2388,7 +2418,7 @@ def cache_clear():
         logger.error(f"Ошибка очистки кэша: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': safe_error_message(e)
         }), 500
 
 
@@ -2476,7 +2506,7 @@ def export_report(session_id):
         logger.error(f"Ошибка экспорта отчета: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
-            'message': f'Ошибка генерации отчета: {str(e)}'
+            'message': f'Ошибка генерации отчета: {safe_error_message(e)}'
         }), 500
 
 
@@ -2527,7 +2557,7 @@ def view_report(session_id):
 
     except Exception as e:
         logger.error(f"Ошибка отображения отчета: {e}", exc_info=True)
-        return f"Ошибка генерации отчета: {str(e)}", 500
+        return f"Ошибка генерации отчета: {safe_error_message(e)}", 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════
