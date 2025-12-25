@@ -113,6 +113,13 @@ app.config['WTF_CSRF_SSL_STRICT'] = settings.is_production
 app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
 logger.info("CSRF protection enabled")
 
+# SECURITY: Session cookie flags
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Prevent CSRF via third-party sites
+app.config['SESSION_COOKIE_SECURE'] = settings.is_production  # HTTPS only in production
+if settings.is_production:
+    logger.info("Session cookies: Secure=True, HttpOnly=True, SameSite=Lax")
+
 # Инициализация Redis кэша (настройки из централизованного конфига)
 property_cache = init_cache(
     host=settings.REDIS_HOST,
@@ -972,7 +979,7 @@ def metrics():
 
 
 @app.route('/api/admin/proxy-stats', methods=['GET'])
-@limiter.exempt  # Admin endpoint - не ограничиваем
+@limiter.limit("10 per minute")  # Strict limit to prevent API key brute force
 def proxy_stats():
     """
     Статистика использования прокси (требует авторизации)
@@ -2329,6 +2336,7 @@ def cache_stats():
 
 
 @app.route('/api/cache/clear', methods=['POST'])
+@limiter.limit("10 per minute")  # Strict limit to prevent API key brute force
 def cache_clear():
     """
     API: Очистка кэша (для админов)
