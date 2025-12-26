@@ -559,6 +559,7 @@ class PlaywrightParser(BaseCianParser):
         self.browser_pool = browser_pool
         self.using_pool = browser_pool is not None
         self.proxy_config = proxy_config
+        self._own_context = False  # Флаг: контекст создан нами (для прокси)
 
         # Полный маппинг регионов на коды ЦИАН (получено из API ЦИАН)
         self.region_codes = {
@@ -731,6 +732,57 @@ class PlaywrightParser(BaseCianParser):
         """Context manager выход"""
         self.close()
 
+    def _create_context_with_proxy(self) -> None:
+        """
+        Создаёт новый контекст браузера с прокси.
+        Используется при работе с browser_pool для ротации прокси.
+        """
+        import random
+        
+        viewports = [
+            {'width': 1920, 'height': 1080},
+            {'width': 1536, 'height': 864},
+            {'width': 1440, 'height': 900},
+            {'width': 1366, 'height': 768},
+        ]
+        
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        ]
+        
+        context_options = {
+            'viewport': random.choice(viewports),
+            'user_agent': random.choice(user_agents),
+            'locale': 'ru-RU',
+            'timezone_id': 'Europe/Moscow',
+        }
+        
+        # Добавляем прокси
+        if self.proxy_config:
+            context_options['proxy'] = self.proxy_config
+        
+        self.context = self.browser.new_context(**context_options)
+        
+        # Скрываем автоматизацию (stealth)
+        self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            delete navigator.__proto__.webdriver;
+            window.chrome = { runtime: {}, loadTimes: function() { return {}; }, csi: function() { return {}; } };
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['ru-RU', 'ru', 'en-US', 'en'] });
+        """)
+        
+        # Блокируем ненужные ресурсы для ускорения
+        if self.block_resources:
+            self.context.route(
+                "**/*.{png,jpg,jpeg,gif,svg,webp,woff,woff2,ttf,mp4,mp3,pdf}",
+                lambda route: route.abort()
+            )
+        
+        logger.info(f"✓ Контекст создан с прокси: {self.proxy_config.get('server', 'unknown')}")
+
     def start(self) -> None:
         """Запуск браузера (один раз за сессию) или получение из пула"""
         if self.browser:
@@ -741,7 +793,19 @@ class PlaywrightParser(BaseCianParser):
             # Если используем browser pool, получаем браузер из пула
             if self.using_pool:
                 logger.info("Acquiring browser from pool...")
-                self.browser, self.context = self.browser_pool.acquire(timeout=30.0)
+                self.browser, pool_context = self.browser_pool.acquire(timeout=30.0)
+                
+                # КРИТИЧНО: Если есть proxy_config, создаём НОВЫЙ контекст с прокси
+                # вместо использования контекста из пула (который без прокси)
+                if self.proxy_config:
+                    logger.info(f"🔒 Создаём новый контекст с прокси: {self.proxy_config['server']}")
+                    self._own_context = True
+                    self._create_context_with_proxy()
+                else:
+                    # Нет прокси - используем контекст из пула
+                    self.context = pool_context
+                    self._own_context = False
+                
                 logger.info("Браузер получен из пула")
                 return
 
@@ -757,6 +821,15 @@ class PlaywrightParser(BaseCianParser):
                     '--no-sandbox',
                     '--disable-gpu',
                     '--disable-software-rasterizer',
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-setuid-sandbox',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
                 ]
             )
 
@@ -788,6 +861,9 @@ class PlaywrightParser(BaseCianParser):
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
+
+                // Удаляем automation флаг
+                delete navigator.__proto__.webdriver;
 
                 // Добавляем chrome runtime
                 window.chrome = {
@@ -843,6 +919,37 @@ class PlaywrightParser(BaseCianParser):
                         gl.getParameter = new Proxy(gl.getParameter.bind(gl), getParameterProxyHandler);
                     }
                 } catch(e) {}
+
+                // Подмена battery API
+                Object.defineProperty(navigator, 'getBattery', {
+                    value: () => Promise.resolve({
+                        charging: true,
+                        chargingTime: 0,
+                        dischargingTime: Infinity,
+                        level: 1
+                    })
+                });
+
+                // Подмена connection API
+                Object.defineProperty(navigator, 'connection', {
+                    value: {
+                        effectiveType: '4g',
+                        rtt: 50,
+                        downlink: 10,
+                        saveData: false
+                    },
+                    writable: false
+                });
+
+                // Подмена hardwareConcurrency
+                Object.defineProperty(navigator, 'hardwareConcurrency', {
+                    get: () => 8
+                });
+
+                // Подмена deviceMemory
+                Object.defineProperty(navigator, 'deviceMemory', {
+                    get: () => 8
+                });
             """)
 
             # Блокируем ненужные ресурсы для ускорения
@@ -865,10 +972,21 @@ class PlaywrightParser(BaseCianParser):
         # Если используем browser pool, возвращаем браузер в пул
         if self.using_pool and self.browser:
             try:
+                # КРИТИЧНО: Если мы создали свой контекст (для прокси), закрываем его
+                if self._own_context and self.context:
+                    try:
+                        logger.info("Закрываем созданный контекст с прокси...")
+                        self.context.close()
+                    except Exception as e:
+                        logger.warning(f"Ошибка при закрытии контекста: {e}")
+                    finally:
+                        self.context = None
+                
                 logger.info("Returning browser to pool...")
                 self.browser_pool.release(self.browser)
                 self.browser = None
                 self.context = None
+                self._own_context = False
                 logger.info("Browser returned to pool")
                 return
             except Exception as e:
@@ -959,7 +1077,7 @@ class PlaywrightParser(BaseCianParser):
             logger.warning(f"Страница загружена ({len(html)} bytes) но контент не найден: {url}")
             raise ContentBlockedError(url, reason="no_content_found")
 
-    def _get_page_content(self, url: str, max_retries: int = 3) -> Optional[str]:
+    def _get_page_content(self, url: str, max_retries: int = 5) -> Optional[str]:
         """
         Получить HTML контент через Playwright с retry логикой
 
@@ -1022,17 +1140,38 @@ class PlaywrightParser(BaseCianParser):
                 # Загружаем страницу
                 page.goto(url, wait_until='domcontentloaded', timeout=30000)
 
+                # Случайная задержка для имитации человека
+                time.sleep(random.uniform(2.0, 4.0))
+
+                # Имитация движения мыши (защита от антибота)
+                try:
+                    page.mouse.move(random.randint(100, 300), random.randint(100, 300))
+                    time.sleep(random.uniform(0.3, 0.6))
+                    page.mouse.move(random.randint(400, 600), random.randint(200, 400))
+                    time.sleep(random.uniform(0.2, 0.5))
+                except:
+                    pass
+
+                # Имитация скроллинга (защита от антибота)
+                try:
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight / 4)")
+                    time.sleep(random.uniform(0.8, 1.5))
+                    page.evaluate("window.scrollTo(0, 0)")
+                    time.sleep(random.uniform(0.5, 1.0))
+                except:
+                    pass
+
                 # Ждем появления контента
                 try:
                     page.wait_for_selector(
                         'h1, [data-mark="OfferTitle"], script[type="application/ld+json"]',
-                        timeout=10000
+                        timeout=25000  # Увеличили timeout до 25 секунд
                     )
                 except Exception as e:
                     logger.warning(f"Селекторы не найдены, но продолжаем: {e}")
 
                 # Дополнительное ожидание для динамического контента
-                time.sleep(1)
+                time.sleep(random.uniform(1.0, 2.0))
 
                 html = page.content()
 
@@ -1050,7 +1189,10 @@ class PlaywrightParser(BaseCianParser):
                 last_error = e
                 logger.warning(f"Попытка {attempt}/{max_retries}: {type(e).__name__}")
                 if attempt < max_retries:
-                    time.sleep(10)
+                    # Увеличенная случайная задержка для обхода капчи
+                    delay = random.uniform(15, 25)
+                    logger.info(f"   ⏳ Задержка {delay:.1f}с перед попыткой #{attempt + 1}")
+                    time.sleep(delay)
 
             except Exception as e:
                 last_error = e

@@ -1,0 +1,12 @@
+# AWS Lambda Parser Dependencies
+# Lightweight dependencies for serverless parsing
+
+# HTTP client with SOCKS5 proxy support
+httpx[socks]>=0.25.0
+
+# HTML parsing
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# AWS SDK (for Secrets Manager)
+boto3>=1.34.0

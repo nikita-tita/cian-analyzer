@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Housler Cian Parser - Lambda function with Decodo proxy
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+    Runtime: python3.11
+
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  ParserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub housler-parser-${Stage}
+      CodeUri: .
+      Handler: handler.lambda_handler
+      Description: Cian property parser with SOCKS5 proxy
+      Environment:
+        Variables:
+          PROXY_SECRET_NAME: !Sub decodo/proxy-${Stage}
+          LOG_LEVEL: INFO
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:decodo/proxy-${Stage}*
+      Events:
+        ParseApi:
+          Type: Api
+          Properties:
+            Path: /parse
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/parse
+
+  FunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt ParserFunction.Arn
