@@ -196,11 +196,13 @@ class Settings:
     def proxy_url(self) -> Optional[str]:
         """
         URL прокси для HTTP клиентов (curl_cffi, httpx)
-        Формат: http://user:pass@host:port
+        Формат: http://user:pass@host:port или socks5://host:port
         """
-        if not self.PROXY_ENABLED or not self.PROXY_USERNAME:
+        if not self.PROXY_ENABLED:
             return None
-        return f"{self.PROXY_TYPE}://{self.PROXY_USERNAME}:{self.PROXY_PASSWORD}@{self.PROXY_HOST}:{self.PROXY_PORT}"
+        if self.PROXY_USERNAME and self.PROXY_PASSWORD:
+            return f"{self.PROXY_TYPE}://{self.PROXY_USERNAME}:{self.PROXY_PASSWORD}@{self.PROXY_HOST}:{self.PROXY_PORT}"
+        return f"{self.PROXY_TYPE}://{self.PROXY_HOST}:{self.PROXY_PORT}"
 
     @property
     def proxy_config(self) -> Optional[dict]:
@@ -208,13 +210,15 @@ class Settings:
         Конфигурация прокси для Playwright
         Формат: {'server': 'http://host:port', 'username': '...', 'password': '...'}
         """
-        if not self.PROXY_ENABLED or not self.PROXY_USERNAME:
+        if not self.PROXY_ENABLED:
             return None
-        return {
+        config = {
             'server': f"{self.PROXY_TYPE}://{self.PROXY_HOST}:{self.PROXY_PORT}",
-            'username': self.PROXY_USERNAME,
-            'password': self.PROXY_PASSWORD,
         }
+        if self.PROXY_USERNAME and self.PROXY_PASSWORD:
+            config['username'] = self.PROXY_USERNAME
+            config['password'] = self.PROXY_PASSWORD
+        return config
 
     def validate(self) -> List[str]:
         """
