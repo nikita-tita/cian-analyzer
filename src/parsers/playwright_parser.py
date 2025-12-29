@@ -301,6 +301,7 @@ class PlaywrightParser(BaseCianParser):
     MAX_ADDRESS_LENGTH = 200  # Максимальная длина адреса (символов)
     MIN_RESULTS_THRESHOLD = 5  # Минимум аналогов для завершения уровня 0
     PREFERRED_RESULTS_THRESHOLD = 10  # Предпочтительное количество аналогов
+    MIN_LOCAL_FOR_STOP = 5  # Минимум близких аналогов для остановки БЕЗ расширения на город
 
     # Словарь соседних станций метро Москвы (основные линии)
     # Формат: 'станция': ['соседняя1', 'соседняя2', ...]
@@ -1946,6 +1947,57 @@ class PlaywrightParser(BaseCianParser):
         logger.debug(f"   📍 Парсинг адреса '{address}' -> {result}")
         return result
 
+    def _filter_by_house_proximity(
+        self,
+        results: List[Dict],
+        target_address: str,
+        max_distance: int = 5
+    ) -> List[Dict]:
+        """
+        Фильтрует результаты по близости номера дома к целевому.
+
+        Args:
+            results: Список объявлений с полем 'address'
+            target_address: Адрес целевого объекта
+            max_distance: Максимальная разница в номерах домов (по умолчанию ±5)
+
+        Returns:
+            Отфильтрованный и отсортированный список (ближайшие дома первые)
+        """
+        target_parsed = self._parse_address(target_address)
+        try:
+            target_house = int(target_parsed.get('house', 0))
+        except (ValueError, TypeError):
+            target_house = 0
+
+        if not target_house:
+            logger.debug("   Не удалось определить номер целевого дома, фильтрация пропущена")
+            return results
+
+        filtered = []
+        for r in results:
+            result_address = r.get('address', '')
+            if not result_address:
+                continue
+
+            parsed = self._parse_address(result_address)
+            try:
+                result_house = int(parsed.get('house', 0))
+            except (ValueError, TypeError):
+                result_house = 0
+
+            if result_house:
+                distance = abs(result_house - target_house)
+                if distance <= max_distance:
+                    r['_house_distance'] = distance
+                    filtered.append(r)
+
+        # Сортируем по близости (ближайшие первые)
+        filtered.sort(key=lambda x: x.get('_house_distance', 999))
+
+        logger.debug(f"   Фильтр по близости дома: {len(results)} -> {len(filtered)} (±{max_distance} от дома {target_house})")
+        return filtered
+
     def _generate_nearby_houses(self, parsed_address: dict, radius: int = 3) -> List[str]:
         """
         Генерирует список соседних домов для поиска аналогов
@@ -2406,6 +2458,13 @@ class PlaywrightParser(BaseCianParser):
                 results_street = self.parse_search_page(street_url)
                 logger.info(f"   Найдено объявлений на улице: {len(results_street)}")
 
+                # НОВОЕ: Фильтруем по близости номера дома (±5 домов)
+                if results_street and target_address:
+                    results_street = self._filter_by_house_proximity(
+                        results_street, target_address, max_distance=5
+                    )
+                    logger.info(f"   После фильтра по близости дома (±5): {len(results_street)}")
+
                 if results_street:
                     # Валидируем и добавляем
                     validated_street = self._validate_and_prepare_results(
@@ -2415,7 +2474,7 @@ class PlaywrightParser(BaseCianParser):
                     existing_urls = {r.get('url') for r in final_results}
                     new_street_results = [r for r in validated_street if r.get('url') not in existing_urls]
                     final_results.extend(new_street_results)
-                    logger.info(f"   УРОВЕНЬ 0.5: Добавлено {len(new_street_results)} аналогов с той же улицы")
+                    logger.info(f"   УРОВЕНЬ 0.5: Добавлено {len(new_street_results)} аналогов с той же улицы (близкие дома)")
 
                     # Если достаточно аналогов - можно завершать
                     if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
@@ -2515,7 +2574,7 @@ class PlaywrightParser(BaseCianParser):
 
             parsed_addr = self._parse_address(target_address)
             if parsed_addr.get('street'):
-                nearby_houses = self._generate_nearby_houses(parsed_addr, radius=5)
+                nearby_houses = self._generate_nearby_houses(parsed_addr, radius=2)  # Уменьшено с 5 до 2 для меньшего кол-ва запросов
                 logger.info(f"   📍 Улица: {parsed_addr.get('street')}, дом: {parsed_addr.get('house')}{parsed_addr.get('building', '')}")
                 logger.info(f"   Проверяем {len(nearby_houses)} вариантов соседних домов...")
 
@@ -2603,12 +2662,23 @@ class PlaywrightParser(BaseCianParser):
                 logger.info(f"   УРОВЕНЬ 1.6: Добавлено {len(new_results_level16)} аналогов с соседних станций")
                 logger.info("")
 
-        # Проверяем после уровня 1.6
-        if len(final_results) >= self.PREFERRED_RESULTS_THRESHOLD:
-            logger.info(f"Найдено достаточно аналогов ({len(final_results)} шт.), поиск завершен")
+        # Проверяем после уровня 1.6 - используем MIN_LOCAL_FOR_STOP вместо расширения на город
+        if len(final_results) >= self.MIN_LOCAL_FOR_STOP:
+            logger.info(f"Найдено {len(final_results)} близких аналогов (порог: {self.MIN_LOCAL_FOR_STOP}), поиск завершен БЕЗ расширения на город")
+            logger.info("=" * 80)
+            return final_results[:limit]
+        else:
+            logger.warning(f"Найдено только {len(final_results)} аналогов (порог: {self.MIN_LOCAL_FOR_STOP})")
+            logger.warning(f"Уровни 2-4 (расширение на город) отключены для приоритета близких аналогов")
             logger.info("=" * 80)
             return final_results[:limit]
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # УРОВНИ 2-4 ЗАКОММЕНТИРОВАНЫ: Приоритет близких аналогов вместо расширения на весь город
+        # Раскомментировать при необходимости расширенного поиска
+        # ═══════════════════════════════════════════════════════════════════════════
+
+        '''
         # ═══════════════════════════════════════════════════════════════════════════
         # УРОВЕНЬ 2: РЕАЛЬНЫЙ поиск по всему городу (новый запрос без фильтра локации)
         # ИСПРАВЛЕНО: Теперь делаем новый запрос к ЦИАН, а не переиспользуем результаты уровня 1
@@ -2853,5 +2923,7 @@ class PlaywrightParser(BaseCianParser):
                     logger.info(f"Разброс цен {spread:.0f}% в допустимых пределах")
 
         logger.info("=" * 80)
+        '''
+        # КОНЕЦ ЗАКОММЕНТИРОВАННЫХ УРОВНЕЙ 2-4
 
         return final_results[:limit]
