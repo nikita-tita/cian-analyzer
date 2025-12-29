@@ -2641,33 +2641,32 @@ class PlaywrightParser(BaseCianParser):
         logger.info(f"   DEBUG FALLBACK: street_url='{street_url[:50] if street_url else 'empty'}', region_code={self.region_code}")
         logger.info(f"   DEBUG: target_metro='{target_metro}', target_address='{target_address[:50] if target_address else ''}'")
         if not street_url and self.region_code == 1:  # Только для Москвы
-            logger.info(f"   DEBUG: Fallback условие выполнено, заходим в блок")
+            logger.info(f"   FALLBACK: Условие выполнено (нет street_url, Москва)")
             # Пытаемся определить округ из адреса целевого объекта
             target_okrug = self._extract_okrug(target_address)
-            logger.info(f"   DEBUG: target_okrug из адреса = '{target_okrug}'")
+            logger.info(f"   FALLBACK: target_okrug из адреса = '{target_okrug}'")
 
             # Если округ не определён из адреса, пробуем определить из первых аналогов с тем же метро
             if not target_okrug and target_metro and filtered_level1:
-                logger.info(f"   DEBUG: Пробуем определить округ из аналогов с метро '{target_metro}'")
+                logger.info(f"   FALLBACK: Пробуем определить округ из аналогов с метро '{target_metro}'")
                 for analog in filtered_level1[:5]:  # Проверяем первые 5
                     analog_metro_raw = analog.get('metro', '')
                     if isinstance(analog_metro_raw, list):
                         analog_metro = ', '.join(analog_metro_raw).lower()
                     else:
                         analog_metro = str(analog_metro_raw).lower() if analog_metro_raw else ''
-                    logger.info(f"   DEBUG: Аналог метро='{analog_metro}' vs target='{target_metro.lower()}'")
 
                     if target_metro.lower() in analog_metro or analog_metro in target_metro.lower():
                         detected_okrug = self._extract_okrug(analog.get('address', ''))
                         if detected_okrug:
                             target_okrug = detected_okrug
-                            logger.info(f"   Округ определён из аналога с тем же метро: {target_okrug}")
+                            logger.info(f"   FALLBACK: Округ определён из аналога с тем же метро: {target_okrug}")
                             break
 
-            logger.info(f"   DEBUG: После проверки аналогов target_okrug='{target_okrug}'")
             if target_okrug:
-                logger.info(f"   FALLBACK: Фильтрация по округу {target_okrug} (нет street_url)")
+                logger.info(f"   FALLBACK: Фильтрация по округу {target_okrug}")
                 filtered_level1 = self._filter_by_okrug(filtered_level1, target_okrug, fallback_metro=target_metro)
+                logger.info(f"   FALLBACK: После фильтрации по округу: {len(filtered_level1)} объявлений")
             elif target_metro:
                 logger.info(f"   FALLBACK: Округ не определён, фильтрация по метро {target_metro}")
                 # Усиленная фильтрация по метро когда нет округа
@@ -2681,13 +2680,13 @@ class PlaywrightParser(BaseCianParser):
 
                     if target_metro.lower() in result_metro or result_metro in target_metro.lower():
                         strict_metro_filtered.append(r)
-                logger.info(f"   После строгой фильтрации по метро: {len(strict_metro_filtered)} объявлений")
+                logger.info(f"   FALLBACK: После строгой фильтрации по метро: {len(strict_metro_filtered)} объявлений")
                 if len(strict_metro_filtered) == 0:
-                    logger.warning(f"   WARNING: Фильтрация по метро дала 0 результатов! Пропускаем фильтр")
+                    logger.warning(f"   FALLBACK: Фильтрация по метро дала 0 результатов, пропускаем")
                 else:
                     filtered_level1 = strict_metro_filtered
             else:
-                logger.info(f"   DEBUG: target_metro пустой, пропускаем fallback")
+                logger.info(f"   FALLBACK: target_metro пустой, пропускаем фильтрацию")
 
         # Валидация и добавление
         validated_level1 = self._validate_and_prepare_results(filtered_level1, limit, target_property=target_property)
