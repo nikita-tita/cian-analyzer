@@ -2638,17 +2638,13 @@ class PlaywrightParser(BaseCianParser):
         # FALLBACK: Если нет street_url - дополнительно фильтруем по округу
         # Это предотвращает выдачу аналогов из разных концов Москвы
         # ═══════════════════════════════════════════════════════════════════════════
-        logger.info(f"   DEBUG FALLBACK: street_url='{street_url[:50] if street_url else 'empty'}', region_code={self.region_code}")
-        logger.info(f"   DEBUG: target_metro='{target_metro}', target_address='{target_address[:50] if target_address else ''}'")
         if not street_url and str(self.region_code) == '1':  # Только для Москвы (region_code может быть str или int)
-            logger.info(f"   FALLBACK: Условие выполнено (нет street_url, Москва)")
+            logger.info(f"   FALLBACK: Нет street_url для Москвы, применяем фильтр по округу")
             # Пытаемся определить округ из адреса целевого объекта
             target_okrug = self._extract_okrug(target_address)
-            logger.info(f"   FALLBACK: target_okrug из адреса = '{target_okrug}'")
 
             # Если округ не определён из адреса, пробуем определить из первых аналогов с тем же метро
             if not target_okrug and target_metro and filtered_level1:
-                logger.info(f"   FALLBACK: Пробуем определить округ из аналогов с метро '{target_metro}'")
                 for analog in filtered_level1[:5]:  # Проверяем первые 5
                     analog_metro_raw = analog.get('metro', '')
                     if isinstance(analog_metro_raw, list):
