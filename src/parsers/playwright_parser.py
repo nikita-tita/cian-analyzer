@@ -2638,6 +2638,7 @@ class PlaywrightParser(BaseCianParser):
         # FALLBACK: Если нет street_url - дополнительно фильтруем по округу
         # Это предотвращает выдачу аналогов из разных концов Москвы
         # ═══════════════════════════════════════════════════════════════════════════
+        logger.info(f"   DEBUG FALLBACK: street_url='{street_url[:50] if street_url else 'empty'}', region_code={self.region_code}")
         if not street_url and self.region_code == 1:  # Только для Москвы
             # Пытаемся определить округ из адреса целевого объекта
             target_okrug = self._extract_okrug(target_address)
