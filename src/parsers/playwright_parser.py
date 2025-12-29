@@ -1998,6 +1998,91 @@ class PlaywrightParser(BaseCianParser):
         logger.debug(f"   Фильтр по близости дома: {len(results)} -> {len(filtered)} (±{max_distance} от дома {target_house})")
         return filtered
 
+    def _extract_okrug(self, address: str) -> str:
+        """
+        Извлекает административный округ Москвы из адреса.
+
+        Args:
+            address: Адрес объекта
+
+        Returns:
+            Код округа (ЦАО, ЮВАО, СЗАО и т.д.) или пустая строка
+        """
+        if not address:
+            return ''
+
+        address_upper = address.upper()
+
+        # Все округа Москвы (в порядке от более длинных к более коротким для корректного матчинга)
+        okrugs = [
+            'ЮВАО',   # Юго-Восточный
+            'ЮЗАО',   # Юго-Западный
+            'СВАО',   # Северо-Восточный
+            'СЗАО',   # Северо-Западный
+            'ЦАО',    # Центральный
+            'САО',    # Северный
+            'ВАО',    # Восточный
+            'ЗАО',    # Западный
+            'ЮАО',    # Южный
+            'НАО',    # Новомосковский (Новая Москва)
+            'ТАО',    # Троицкий (Новая Москва)
+            'ЗелАО',  # Зеленоградский
+        ]
+
+        for okrug in okrugs:
+            if okrug in address_upper:
+                return okrug
+
+        return ''
+
+    def _filter_by_okrug(
+        self,
+        results: List[Dict],
+        target_okrug: str,
+        fallback_metro: str = ''
+    ) -> List[Dict]:
+        """
+        Фильтрует результаты по административному округу Москвы.
+        Fallback: если округ не найден, фильтрует по метро.
+
+        Args:
+            results: Список найденных объявлений
+            target_okrug: Целевой округ (ЦАО, ЮВАО и т.д.)
+            fallback_metro: Метро для fallback если округ не определён
+
+        Returns:
+            Отфильтрованный список
+        """
+        if not results:
+            return results
+
+        filtered = []
+
+        for r in results:
+            result_address = r.get('address', '')
+            result_okrug = self._extract_okrug(result_address)
+
+            # Если есть целевой округ - фильтруем по нему
+            if target_okrug:
+                if result_okrug == target_okrug:
+                    filtered.append(r)
+                    continue
+
+            # Fallback: если нет округа, но есть метро - фильтруем по метро
+            if fallback_metro and not target_okrug:
+                result_metro_raw = r.get('metro', '')
+                if isinstance(result_metro_raw, list):
+                    result_metro = ', '.join(result_metro_raw).lower()
+                else:
+                    result_metro = str(result_metro_raw).lower() if result_metro_raw else ''
+
+                if fallback_metro.lower() in result_metro or result_metro in fallback_metro.lower():
+                    filtered.append(r)
+                    continue
+
+        logger.info(f"   Фильтр по округу: {len(results)} -> {len(filtered)} (округ: {target_okrug or 'не определён'})")
+        return filtered
+
     def _generate_nearby_houses(self, parsed_address: dict, radius: int = 3) -> List[str]:
         """
         Генерирует список соседних домов для поиска аналогов
@@ -2548,6 +2633,49 @@ class PlaywrightParser(BaseCianParser):
         else:
             filtered_level1 = results_level1
             logger.info(f"   Фильтрация по локации пропущена (нет данных о метро/адресе)")
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # FALLBACK: Если нет street_url - дополнительно фильтруем по округу
+        # Это предотвращает выдачу аналогов из разных концов Москвы
+        # ═══════════════════════════════════════════════════════════════════════════
+        if not street_url and self.region_code == 1:  # Только для Москвы
+            # Пытаемся определить округ из адреса целевого объекта
+            target_okrug = self._extract_okrug(target_address)
+
+            # Если округ не определён из адреса, пробуем определить из первых аналогов с тем же метро
+            if not target_okrug and target_metro and filtered_level1:
+                for analog in filtered_level1[:5]:  # Проверяем первые 5
+                    analog_metro_raw = analog.get('metro', '')
+                    if isinstance(analog_metro_raw, list):
+                        analog_metro = ', '.join(analog_metro_raw).lower()
+                    else:
+                        analog_metro = str(analog_metro_raw).lower() if analog_metro_raw else ''
+
+                    if target_metro.lower() in analog_metro or analog_metro in target_metro.lower():
+                        detected_okrug = self._extract_okrug(analog.get('address', ''))
+                        if detected_okrug:
+                            target_okrug = detected_okrug
+                            logger.info(f"   Округ определён из аналога с тем же метро: {target_okrug}")
+                            break
+
+            if target_okrug:
+                logger.info(f"   FALLBACK: Фильтрация по округу {target_okrug} (нет street_url)")
+                filtered_level1 = self._filter_by_okrug(filtered_level1, target_okrug, fallback_metro=target_metro)
+            elif target_metro:
+                logger.info(f"   FALLBACK: Округ не определён, фильтрация по метро {target_metro}")
+                # Усиленная фильтрация по метро когда нет округа
+                strict_metro_filtered = []
+                for r in filtered_level1:
+                    result_metro_raw = r.get('metro', '')
+                    if isinstance(result_metro_raw, list):
+                        result_metro = ', '.join(result_metro_raw).lower()
+                    else:
+                        result_metro = str(result_metro_raw).lower() if result_metro_raw else ''
+
+                    if target_metro.lower() in result_metro or result_metro in target_metro.lower():
+                        strict_metro_filtered.append(r)
+                logger.info(f"   После строгой фильтрации по метро: {len(strict_metro_filtered)} объявлений")
+                filtered_level1 = strict_metro_filtered
 
         # Валидация и добавление
         validated_level1 = self._validate_and_prepare_results(filtered_level1, limit, target_property=target_property)
