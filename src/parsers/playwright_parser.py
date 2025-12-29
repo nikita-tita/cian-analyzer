@@ -2646,12 +2646,19 @@ class PlaywrightParser(BaseCianParser):
         # ═══════════════════════════════════════════════════════════════════════════
         if not street_url and str(self.region_code) == '1':  # Только для Москвы (region_code может быть str или int)
             logger.info(f"   FALLBACK: Нет street_url для Москвы, применяем фильтр по округу")
+
+            # ВАЖНО: Если фильтр по локации вернул 0, работаем с исходными результатами
+            # Это исправляет баг когда все 28 результатов имеют пустое metro поле
+            fallback_source = filtered_level1 if filtered_level1 else results_level1
+            if not filtered_level1 and results_level1:
+                logger.info(f"   FALLBACK: Фильтр локации пустой, используем исходные {len(results_level1)} результатов")
+
             # Пытаемся определить округ из адреса целевого объекта
             target_okrug = self._extract_okrug(target_address)
 
             # Если округ не определён из адреса, пробуем определить из первых аналогов с тем же метро
-            if not target_okrug and target_metro and filtered_level1:
-                for analog in filtered_level1[:5]:  # Проверяем первые 5
+            if not target_okrug and target_metro and fallback_source:
+                for analog in fallback_source[:10]:  # Проверяем первые 10
                     analog_metro_raw = analog.get('metro', '')
                     if isinstance(analog_metro_raw, list):
                         analog_metro = ', '.join(analog_metro_raw).lower()
@@ -2666,15 +2673,45 @@ class PlaywrightParser(BaseCianParser):
                             logger.info(f"   FALLBACK: Округ определён из аналога с метро '{analog_metro}': {target_okrug}")
                             break
 
+            # ВАЖНО: Если metro пустое у всех аналогов, определяем target_okrug по метро Москвы
+            if not target_okrug and target_metro:
+                # Маппинг станций метро на округа Москвы
+                METRO_TO_OKRUG = {
+                    # ЮАО (Южный административный округ)
+                    'автозаводская': 'ЮАО', 'коломенская': 'ЮАО', 'каширская': 'ЮАО', 'кантемировская': 'ЮАО',
+                    'технопарк': 'ЮАО', 'царицыно': 'ЮАО', 'орехово': 'ЮАО', 'домодедовская': 'ЮАО',
+                    'красногвардейская': 'ЮАО', 'алма-атинская': 'ЮАО', 'зябликово': 'ЮАО', 'шипиловская': 'ЮАО',
+                    'борисово': 'ЮАО', 'марьино': 'ЮАО', 'братиславская': 'ЮАО', 'люблино': 'ЮАО',
+                    'волжская': 'ЮАО', 'печатники': 'ЮАО', 'текстильщики': 'ЮАО', 'нагатинская': 'ЮАО',
+                    'нагорная': 'ЮАО', 'нахимовский проспект': 'ЮАО', 'варшавская': 'ЮАО', 'каховская': 'ЮАО',
+                    # ЮВАО (Юго-Восточный)
+                    'кузьминки': 'ЮВАО', 'рязанский проспект': 'ЮВАО', 'выхино': 'ЮВАО', 'лермонтовский проспект': 'ЮВАО',
+                    'жулебино': 'ЮВАО', 'котельники': 'ЮВАО', 'дубровка': 'ЮВАО', 'кожуховская': 'ЮВАО',
+                    'авиамоторная': 'ЮВАО', 'окская': 'ЮВАО', 'стахановская': 'ЮВАО', 'некрасовка': 'ЮВАО',
+                    # ЦАО (Центральный)
+                    'охотный ряд': 'ЦАО', 'театральная': 'ЦАО', 'площадь революции': 'ЦАО', 'кузнецкий мост': 'ЦАО',
+                    'лубянка': 'ЦАО', 'чистые пруды': 'ЦАО', 'красные ворота': 'ЦАО', 'китай-город': 'ЦАО',
+                    'тверская': 'ЦАО', 'пушкинская': 'ЦАО', 'чеховская': 'ЦАО', 'цветной бульвар': 'ЦАО',
+                    'арбатская': 'ЦАО', 'смоленская': 'ЦАО', 'кропоткинская': 'ЦАО', 'боровицкая': 'ЦАО',
+                    'библиотека имени ленина': 'ЦАО', 'александровский сад': 'ЦАО', 'новокузнецкая': 'ЦАО',
+                    'третьяковская': 'ЦАО', 'полянка': 'ЦАО', 'серпуховская': 'ЦАО', 'добрынинская': 'ЦАО',
+                    'октябрьская': 'ЦАО', 'павелецкая': 'ЦАО', 'таганская': 'ЦАО', 'курская': 'ЦАО',
+                    'комсомольская': 'ЦАО', 'маяковская': 'ЦАО', 'белорусская': 'ЦАО', 'менделеевская': 'ЦАО',
+                }
+                metro_lower = target_metro.lower().strip()
+                if metro_lower in METRO_TO_OKRUG:
+                    target_okrug = METRO_TO_OKRUG[metro_lower]
+                    logger.info(f"   FALLBACK: Округ определён по станции метро '{target_metro}': {target_okrug}")
+
             if target_okrug:
                 logger.info(f"   FALLBACK: Фильтрация по округу {target_okrug}")
-                filtered_level1 = self._filter_by_okrug(filtered_level1, target_okrug, fallback_metro=target_metro)
+                filtered_level1 = self._filter_by_okrug(fallback_source, target_okrug, fallback_metro=target_metro)
                 logger.info(f"   FALLBACK: После фильтрации по округу: {len(filtered_level1)} объявлений")
             elif target_metro:
                 logger.info(f"   FALLBACK: Округ не определён, фильтрация по метро {target_metro}")
                 # Усиленная фильтрация по метро когда нет округа
                 strict_metro_filtered = []
-                for r in filtered_level1:
+                for r in fallback_source:
                     result_metro_raw = r.get('metro', '')
                     if isinstance(result_metro_raw, list):
                         result_metro = ', '.join(result_metro_raw).lower()
