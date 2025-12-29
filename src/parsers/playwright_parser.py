@@ -2076,7 +2076,8 @@ class PlaywrightParser(BaseCianParser):
                 else:
                     result_metro = str(result_metro_raw).lower() if result_metro_raw else ''
 
-                if fallback_metro.lower() in result_metro or result_metro in fallback_metro.lower():
+                # ВАЖНО: проверяем что обе строки непустые, иначе "" in "любая" = True
+                if result_metro and fallback_metro and (fallback_metro.lower() in result_metro or result_metro in fallback_metro.lower()):
                     filtered.append(r)
                     continue
 
@@ -2404,8 +2405,9 @@ class PlaywrightParser(BaseCianParser):
             result_address = result.get('address', '').lower().strip() if result.get('address') else ''
 
             # Строгий режим: совпадение метро
+            # ВАЖНО: проверяем что result_metro непустое, иначе "" in "любая" = True
             if strict and target_metro:
-                if target_metro in result_metro or result_metro in target_metro:
+                if result_metro and (target_metro in result_metro or result_metro in target_metro):
                     filtered.append(result)
                     continue
 
@@ -2652,11 +2654,12 @@ class PlaywrightParser(BaseCianParser):
                     else:
                         analog_metro = str(analog_metro_raw).lower() if analog_metro_raw else ''
 
-                    if target_metro.lower() in analog_metro or analog_metro in target_metro.lower():
+                    # КРИТИЧНО: analog_metro должен быть непустым, иначе "" in "автозаводская" = True
+                    if analog_metro and (target_metro.lower() in analog_metro or analog_metro in target_metro.lower()):
                         detected_okrug = self._extract_okrug(analog.get('address', ''))
                         if detected_okrug:
                             target_okrug = detected_okrug
-                            logger.info(f"   FALLBACK: Округ определён из аналога с тем же метро: {target_okrug}")
+                            logger.info(f"   FALLBACK: Округ определён из аналога с метро '{analog_metro}': {target_okrug}")
                             break
 
             if target_okrug:
@@ -2674,7 +2677,8 @@ class PlaywrightParser(BaseCianParser):
                     else:
                         result_metro = str(result_metro_raw).lower() if result_metro_raw else ''
 
-                    if target_metro.lower() in result_metro or result_metro in target_metro.lower():
+                    # КРИТИЧНО: result_metro должен быть непустым, иначе "" in "любая" = True
+                    if result_metro and (target_metro.lower() in result_metro or result_metro in target_metro.lower()):
                         strict_metro_filtered.append(r)
                 logger.info(f"   FALLBACK: После строгой фильтрации по метро: {len(strict_metro_filtered)} объявлений")
                 if len(strict_metro_filtered) == 0:
@@ -2781,7 +2785,8 @@ class PlaywrightParser(BaseCianParser):
                     metro_results = []
                     for r in results_level1:  # Используем результаты Level 1 (весь город)
                         result_metro = r.get('metro', '').lower() if r.get('metro') else ''
-                        if metro_station in result_metro and r.get('url') not in existing_urls:
+                        # КРИТИЧНО: оба должны быть непустыми, иначе "" in "любая" = True
+                        if result_metro and metro_station and metro_station in result_metro and r.get('url') not in existing_urls:
                             metro_results.append(r)
 
                     if metro_results:
