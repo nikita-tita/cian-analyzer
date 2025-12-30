@@ -1623,6 +1623,11 @@ class PlaywrightParser(BaseCianParser):
         # ═══════════════════════════════════════════════════════════════════════════
         if target_property:
             target_price = target_property.get('price', 0)
+            # Ensure target_price is numeric
+            if isinstance(target_price, str):
+                target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 0
+            target_price = float(target_price) if target_price else 0
+
             target_area = target_property.get('total_area', 0)
 
             # Адаптивные пороги в зависимости от режима
@@ -2283,6 +2288,11 @@ class PlaywrightParser(BaseCianParser):
             return []
 
         target_price = target_property.get('price', 100_000_000)
+        # Ensure target_price is numeric
+        if isinstance(target_price, str):
+            target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 100_000_000
+        target_price = float(target_price) if target_price else 100_000_000
+
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
 
@@ -2601,6 +2611,11 @@ class PlaywrightParser(BaseCianParser):
 
         # Формируем критерии поиска
         target_price = target_property.get('price', 100_000_000)
+        # Ensure target_price is numeric (may come as string from manual input)
+        if isinstance(target_price, str):
+            target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 100_000_000
+        target_price = float(target_price) if target_price else 100_000_000
+
         target_area = target_property.get('total_area', 100)
         target_rooms = target_property.get('rooms', 2)
 
