@@ -97,9 +97,8 @@ class SSRFError(ValidationError):
     error_code = 'SSRF_BLOCKED'
     http_status = 403
 
-    def __init__(self, url: str, reason: str):
-        message = f"Доступ заблокирован: {reason}"
-        super().__init__(message, details={'url': url, 'reason': reason})
+    def __init__(self, message: str, details: Dict[str, Any] = None):
+        super().__init__(message, details=details)
 
 
 class PropertyValidationError(ValidationError):

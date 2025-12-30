@@ -181,7 +181,7 @@ class TestParseEndpoint:
         assert 'data' in data
 
     def test_parse_invalid_url(self, client, disable_rate_limiting):
-        """Test parsing with invalid URL fails"""
+        """Test parsing with invalid URL fails (forbidden domain returns 403)"""
         payload = {'url': 'https://malicious-site.com/attack'}
 
         response = client.post(
@@ -190,10 +190,10 @@ class TestParseEndpoint:
             content_type='application/json'
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 403  # SSRFError returns 403 Forbidden
         data = response.get_json()
         assert data['status'] == 'error'
-        assert 'не разрешен' in data['message'].lower() or 'запрещен' in data['message'].lower()
+        assert 'не разрешён' in data['message'].lower() or 'не разрешен' in data['message'].lower()
 
     def test_parse_missing_url(self, client, disable_rate_limiting):
         """Test error when URL is missing"""

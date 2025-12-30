@@ -43,13 +43,13 @@ class TestParseEndpointEdgeCases:
         assert response.status_code in [400, 422, 500]
 
     def test_parse_non_cian_url(self, client):
-        """Test parse endpoint with non-CIAN URL"""
+        """Test parse endpoint with non-CIAN URL (returns 403 for forbidden domains)"""
         response = client.post(
             '/api/parse',
             json={'url': 'https://www.google.com'}
         )
 
-        assert response.status_code in [400, 422, 500]
+        assert response.status_code in [400, 403, 422, 500]
         data = response.get_json()
         assert data is not None
 
