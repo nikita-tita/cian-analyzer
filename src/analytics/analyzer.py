@@ -36,6 +36,7 @@ from .attractiveness_index import calculate_attractiveness_index
 from .time_forecast import forecast_time_to_sell, forecast_at_different_prices
 from .recommendations import RecommendationEngine
 from .liquidity_profile import build_liquidity_profile
+from .confidence_interval import calculate_price_confidence
 
 # Импорт валидатора данных
 try:
@@ -318,6 +319,12 @@ class RealEstateAnalyzer:
             attractiveness_index=attractiveness.get('total_index', 50)
         )
 
+        # 5. Доверительные интервалы цены
+        confidence_interval = calculate_price_confidence(
+            target=request.target_property,
+            comparables=self.filtered_comparables
+        )
+
         # Метрики
         end_time = datetime.now()
         self.metrics['calculation_time_ms'] = int((end_time - start_time).total_seconds() * 1000)
@@ -346,6 +353,7 @@ class RealEstateAnalyzer:
             self.property_log.attractiveness_index = attractiveness
             self.property_log.time_forecast = time_forecast
             self.property_log.price_sensitivity = price_sensitivity
+            self.property_log.confidence_interval = confidence_interval
             self._log_event(EventType.ANALYSIS_COMPLETED,
                 f"Анализ завершён за {self.metrics['calculation_time_ms']} мс")
             self.tracker.complete_property(self.property_id, "completed")
@@ -366,6 +374,7 @@ class RealEstateAnalyzer:
             attractiveness_index=attractiveness,
             time_forecast=time_forecast,
             price_sensitivity=price_sensitivity,
+            confidence_interval=confidence_interval,
             # Рекомендации
             recommendations=recommendations
         )

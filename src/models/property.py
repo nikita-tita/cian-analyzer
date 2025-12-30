@@ -345,6 +345,9 @@ class AnalysisResult(BaseModel):
     # Анализ чувствительности к цене
     price_sensitivity: List[Dict[str, Any]] = []
 
+    # Доверительные интервалы цены (80% и 95%)
+    confidence_interval: Dict[str, Any] = {}
+
     # Рекомендации
     recommendations: List[Dict[str, Any]] = []
 
