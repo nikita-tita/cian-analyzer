@@ -1956,7 +1956,17 @@ class PlaywrightParser(BaseCianParser):
 
         # Метод 4: Эвристика - без отделки + высокая цена за м²
         repair_level = target_property.get('repair_level', '').lower()
-        price_per_sqm = target_property.get('price_per_sqm', 0) or target_property.get('price', 0) / max(target_property.get('total_area', 1), 1)
+        price_per_sqm = target_property.get('price_per_sqm', 0)
+        if not price_per_sqm:
+            raw_price = target_property.get('price', 0)
+            # Convert string price to float (e.g., "12 000 000 ₽" -> 12000000.0)
+            if isinstance(raw_price, str):
+                import re
+                cleaned = re.sub(r'[^\d.,]', '', raw_price.replace(',', '.'))
+                raw_price = float(cleaned) if cleaned else 0
+            raw_price = float(raw_price) if raw_price else 0
+            total_area = float(target_property.get('total_area', 1) or 1)
+            price_per_sqm = raw_price / max(total_area, 1)
 
         if 'без отделки' in repair_level and price_per_sqm > 200_000:  # Премиум без отделки = скорее всего новостройка
             logger.info(f"   Определен как новостройка (без отделки + цена {price_per_sqm:,.0f} ₽/м²)")
