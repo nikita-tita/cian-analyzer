@@ -1457,29 +1457,69 @@ class PlaywrightParser(BaseCianParser):
         if metro_elem:
             data['metro'] = metro_elem.get_text(strip=True)
 
-        # Подзаголовок с характеристиками (ПРИОРИТЕТ - здесь содержится площадь!)
-        # Формат: "2-комн. квартира, 85 м², 4/9 этаж"
-        subtitle_elem = card.find('span', {'data-mark': 'OfferSubtitle'})
-        if subtitle_elem:
-            subtitle_text = subtitle_elem.get_text(strip=True)
-            import re
+        # UPDATED 2025-12: Циан изменил структуру - площадь теперь в OfferTitle, не OfferSubtitle
+        # Формат OfferTitle: "2-комн. квартира, 85 м², 4/9 этаж"
+        # OfferSubtitle теперь содержит: "Секция 1 • Сдача корпуса 4 кв. 2025"
+        import re
 
-            # Извлекаем площадь (85 м²)
+        # ПРИОРИТЕТ 1: Извлекаем из заголовка OfferTitle (новая структура Циана)
+        title_elem = card.find(attrs={'data-mark': 'OfferTitle'})
+        if title_elem and not data['area_value']:
+            title_text = title_elem.get_text(strip=True)
+            area_match = re.search(r'([\d,\.]+)\s*м²', title_text)
+            if area_match:
+                data['area'] = area_match.group(0)
+                area_str = area_match.group(1).replace(',', '.')
+                try:
+                    data['area_value'] = float(area_str)
+                except ValueError:
+                    pass
+            # Извлекаем этаж из заголовка
+            if not data.get('floor'):
+                data['floor'] = extract_floor_from_text(title_text)
+            # Извлекаем комнаты из заголовка
+            if not data['rooms']:
+                data['rooms'] = extract_rooms_from_text(title_text)
+
+        # ПРИОРИТЕТ 2: Извлекаем из GeneralInfoSectionRowComponent (альтернативная структура)
+        if not data['area_value']:
+            info_rows = card.find_all(attrs={'data-name': 'GeneralInfoSectionRowComponent'})
+            for row in info_rows[:3]:  # Проверяем первые 3 строки
+                row_text = row.get_text(strip=True)
+                area_match = re.search(r'([\d,\.]+)\s*м²', row_text)
+                if area_match:
+                    data['area'] = area_match.group(0)
+                    area_str = area_match.group(1).replace(',', '.')
+                    try:
+                        data['area_value'] = float(area_str)
+                    except ValueError:
+                        pass
+                    # Извлекаем этаж
+                    if not data.get('floor'):
+                        data['floor'] = extract_floor_from_text(row_text)
+                    # Извлекаем комнаты
+                    if not data['rooms']:
+                        data['rooms'] = extract_rooms_from_text(row_text)
+                    break
+
+        # ПРИОРИТЕТ 3 (legacy): Подзаголовок OfferSubtitle
+        subtitle_elem = card.find('span', {'data-mark': 'OfferSubtitle'})
+        if subtitle_elem and not data['area_value']:
+            subtitle_text = subtitle_elem.get_text(strip=True)
+
             area_match = re.search(r'([\d,\.]+)\s*м²', subtitle_text)
             if area_match:
-                data['area'] = area_match.group(0)  # "85 м²"
+                data['area'] = area_match.group(0)
                 area_str = area_match.group(1).replace(',', '.')
                 try:
                     data['area_value'] = float(area_str)
                 except ValueError:
                     pass
 
-            # Извлекаем этаж используя новую функцию
             if not data.get('floor'):
                 data['floor'] = extract_floor_from_text(subtitle_text)
 
-            # Извлекаем количество комнат (2-комн.)
-            if not data['rooms']:  # Если еще не извлекли из заголовка
+            if not data['rooms']:
                 data['rooms'] = extract_rooms_from_text(subtitle_text)
 
         # Если площадь не найдена в подзаголовке, используем адаптивные селекторы
