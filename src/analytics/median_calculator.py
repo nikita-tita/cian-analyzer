@@ -6,7 +6,6 @@
 """
 
 import statistics
-from collections import Counter
 from typing import List, Dict, Any
 from ..models.property import ComparableProperty, TargetProperty
 from .parameter_classifier import get_variable_parameters
@@ -37,8 +36,7 @@ def calculate_medians_from_comparables(
         'ceiling_height': [],
         'bathrooms': [],
         'floor': [],
-        'metro_distance_min': [],
-        'parking_spaces': [],
+        'total_floors': [],
     }
 
     # Категориальные параметры (будем искать моду)
@@ -47,8 +45,6 @@ def calculate_medians_from_comparables(
         'window_type': [],
         'elevator_count': [],
         'view_type': [],
-        'noise_level': [],
-        'crowded_level': [],
         'photo_type': [],
         'object_status': [],
     }
@@ -75,11 +71,8 @@ def calculate_medians_from_comparables(
         if comp.floor:
             numeric_params['floor'].append(comp.floor)
 
-        if hasattr(comp, 'metro_distance_min') and comp.metro_distance_min:
-            numeric_params['metro_distance_min'].append(comp.metro_distance_min)
-
-        if hasattr(comp, 'parking_spaces') and comp.parking_spaces:
-            numeric_params['parking_spaces'].append(comp.parking_spaces)
+        if comp.total_floors:
+            numeric_params['total_floors'].append(comp.total_floors)
 
         # Категориальные параметры
         if hasattr(comp, 'repair_level') and comp.repair_level:
@@ -93,12 +86,6 @@ def calculate_medians_from_comparables(
 
         if hasattr(comp, 'view_type') and comp.view_type:
             categorical_params['view_type'].append(comp.view_type)
-
-        if hasattr(comp, 'noise_level') and comp.noise_level:
-            categorical_params['noise_level'].append(comp.noise_level)
-
-        if hasattr(comp, 'crowded_level') and comp.crowded_level:
-            categorical_params['crowded_level'].append(comp.crowded_level)
 
         if hasattr(comp, 'photo_type') and comp.photo_type:
             categorical_params['photo_type'].append(comp.photo_type)
@@ -122,25 +109,12 @@ def calculate_medians_from_comparables(
             medians[param_name] = values[0]
 
     # Рассчитываем моду (наиболее частое значение) для категориальных
+    # Используем multimode для корректной обработки мультимодальных распределений
     for param_name, values in categorical_params.items():
-        if not values:
-            continue
-
-        try:
-            medians[param_name] = statistics.mode(values)
-        except statistics.StatisticsError:
-            # Несколько значений с одинаковой частотой — выбираем первое встреченное
-            counter = Counter(values)
-            max_count = max(counter.values())
-            top_candidates = {value for value, count in counter.items() if count == max_count}
-
-            for value in values:
-                if value in top_candidates:
-                    medians[param_name] = value
-                    break
-            else:
-                # Fallback на первое значение, если список неожиданно пуст
-                medians[param_name] = values[0]
+        if values:
+            modes = statistics.multimode(values)
+            if modes:
+                medians[param_name] = modes[0]
 
     # Специальные медианы
     if build_years and len(build_years) >= 2:
@@ -191,7 +165,7 @@ def compare_target_with_medians(
     # Числовые параметры
     numeric_params = [
         'total_area', 'living_area', 'ceiling_height', 'bathrooms',
-        'floor', 'metro_distance_min', 'parking_spaces', 'build_year'
+        'floor', 'build_year'
     ]
 
     for param_name in numeric_params:
@@ -217,7 +191,7 @@ def compare_target_with_medians(
     # Категориальные параметры
     categorical_params = [
         'repair_level', 'window_type', 'elevator_count', 'view_type',
-        'noise_level', 'crowded_level', 'photo_type', 'object_status'
+        'photo_type', 'object_status'
     ]
 
     for param_name in categorical_params:
