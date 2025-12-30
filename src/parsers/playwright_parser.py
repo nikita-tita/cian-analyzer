@@ -2039,6 +2039,49 @@ class PlaywrightParser(BaseCianParser):
 
         return ''
 
+    def _extract_district_spb(self, address: str) -> str:
+        """
+        Извлекает район Санкт-Петербурга из адреса.
+
+        Args:
+            address: Адрес объекта
+
+        Returns:
+            Название района или пустая строка
+        """
+        if not address:
+            return ''
+
+        address_lower = address.lower()
+
+        # Районы СПб (18 районов) - порядок от более длинных к коротким
+        districts = [
+            ('красногвардейский', 'Красногвардейский'),
+            ('красносельский', 'Красносельский'),
+            ('василеостровский', 'Василеостровский'),
+            ('петродворцовый', 'Петродворцовый'),
+            ('адмиралтейский', 'Адмиралтейский'),
+            ('калининский', 'Калининский'),
+            ('кронштадтский', 'Кронштадтский'),
+            ('петроградский', 'Петроградский'),
+            ('фрунзенский', 'Фрунзенский'),
+            ('выборгский', 'Выборгский'),
+            ('колпинский', 'Колпинский'),
+            ('курортный', 'Курортный'),
+            ('московский', 'Московский'),
+            ('приморский', 'Приморский'),
+            ('пушкинский', 'Пушкинский'),
+            ('центральный', 'Центральный'),
+            ('кировский', 'Кировский'),
+            ('невский', 'Невский'),
+        ]
+
+        for pattern, district in districts:
+            if pattern in address_lower:
+                return district
+
+        return ''
+
     def _filter_by_okrug(
         self,
         results: List[Dict],
@@ -2773,6 +2816,123 @@ class PlaywrightParser(BaseCianParser):
                 if len(strict_metro_filtered) == 0:
                     logger.warning(f"   FALLBACK: Фильтрация по метро дала 0 результатов, пропускаем")
                 else:
+                    filtered_level1 = strict_metro_filtered
+            else:
+                logger.info(f"   FALLBACK: target_metro пустой, пропускаем фильтрацию")
+
+        # ═══════════════════════════════════════════════════════════════════════════
+        # FALLBACK для СПб: Если нет street_url - фильтруем по району
+        # Аналогично московскому fallback, но с районами вместо округов
+        # ═══════════════════════════════════════════════════════════════════════════
+        elif not street_url and str(self.region_code) == '2':  # Санкт-Петербург
+            logger.info(f"   FALLBACK: Нет street_url для СПб, применяем фильтр по району")
+
+            fallback_source = filtered_level1 if filtered_level1 else results_level1
+            if not filtered_level1 and results_level1:
+                logger.info(f"   FALLBACK: Фильтр локации пустой, используем исходные {len(results_level1)} результатов")
+
+            # Пытаемся определить район из адреса целевого объекта
+            target_district = self._extract_district_spb(target_address)
+
+            # Если район не определён из адреса, пробуем определить из аналогов с тем же метро
+            if not target_district and target_metro and fallback_source:
+                for analog in fallback_source[:10]:
+                    analog_metro_raw = analog.get('metro', '')
+                    if isinstance(analog_metro_raw, list):
+                        analog_metro = ', '.join(analog_metro_raw).lower()
+                    else:
+                        analog_metro = str(analog_metro_raw).lower() if analog_metro_raw else ''
+
+                    if analog_metro and (target_metro.lower() in analog_metro or analog_metro in target_metro.lower()):
+                        detected_district = self._extract_district_spb(analog.get('address', ''))
+                        if detected_district:
+                            target_district = detected_district
+                            logger.info(f"   FALLBACK: Район определён из аналога с метро '{analog_metro}': {target_district}")
+                            break
+
+            # Если район не определён, пробуем по метро СПб
+            if not target_district and target_metro:
+                # Маппинг станций метро СПб на районы (5 линий, ~72 станции)
+                METRO_TO_DISTRICT_SPB = {
+                    # Линия 1 (Кировско-Выборгская, красная)
+                    'девяткино': 'Выборгский', 'гражданский проспект': 'Калининский',
+                    'академическая': 'Калининский', 'политехническая': 'Калининский',
+                    'площадь мужества': 'Калининский', 'лесная': 'Выборгский',
+                    'выборгская': 'Выборгский', 'площадь ленина': 'Калининский',
+                    'чернышевская': 'Центральный', 'площадь восстания': 'Центральный',
+                    'владимирская': 'Центральный', 'пушкинская': 'Центральный',
+                    'технологический институт': 'Адмиралтейский', 'балтийская': 'Адмиралтейский',
+                    'нарвская': 'Кировский', 'кировский завод': 'Кировский',
+                    'автово': 'Кировский', 'ленинский проспект': 'Красносельский',
+                    'проспект ветеранов': 'Кировский',
+                    # Линия 2 (Московско-Петроградская, синяя)
+                    'парнас': 'Выборгский', 'проспект просвещения': 'Выборгский',
+                    'озерки': 'Выборгский', 'удельная': 'Выборгский',
+                    'пионерская': 'Приморский', 'чёрная речка': 'Приморский',
+                    'черная речка': 'Приморский',  # альтернативное написание
+                    'петроградская': 'Петроградский', 'горьковская': 'Петроградский',
+                    'невский проспект': 'Центральный', 'сенная площадь': 'Адмиралтейский',
+                    'фрунзенская': 'Адмиралтейский', 'московские ворота': 'Московский',
+                    'электросила': 'Московский', 'парк победы': 'Московский',
+                    'московская': 'Московский', 'звёздная': 'Московский',
+                    'звездная': 'Московский',  # альтернативное написание
+                    'купчино': 'Фрунзенский',
+                    # Линия 3 (Невско-Василеостровская, зелёная)
+                    'беговая': 'Приморский', 'новокрестовская': 'Приморский',
+                    'зенит': 'Приморский',  # новое название Новокрестовской
+                    'приморская': 'Василеостровский', 'василеостровская': 'Василеостровский',
+                    'гостиный двор': 'Центральный', 'маяковская': 'Центральный',
+                    'площадь александра невского': 'Центральный',
+                    'елизаровская': 'Невский', 'ломоносовская': 'Невский',
+                    'пролетарская': 'Невский', 'обухово': 'Невский', 'рыбацкое': 'Невский',
+                    # Линия 4 (Правобережная, оранжевая)
+                    'спасская': 'Адмиралтейский', 'достоевская': 'Центральный',
+                    'лиговский проспект': 'Центральный', 'новочеркасская': 'Красногвардейский',
+                    'ладожская': 'Красногвардейский', 'проспект большевиков': 'Невский',
+                    'улица дыбенко': 'Невский',
+                    # Линия 5 (Фрунзенско-Приморская, фиолетовая)
+                    'комендантский проспект': 'Приморский', 'старая деревня': 'Приморский',
+                    'крестовский остров': 'Петроградский', 'чкаловская': 'Петроградский',
+                    'спортивная': 'Петроградский', 'адмиралтейская': 'Адмиралтейский',
+                    'садовая': 'Адмиралтейский', 'звенигородская': 'Адмиралтейский',
+                    'обводный канал': 'Фрунзенский', 'волковская': 'Фрунзенский',
+                    'бухарестская': 'Фрунзенский', 'международная': 'Фрунзенский',
+                    'проспект славы': 'Фрунзенский', 'дунайская': 'Фрунзенский',
+                    'шушары': 'Пушкинский',
+                    # Будущие станции и альтернативные названия
+                    'театральная': 'Центральный',  # строится
+                    'горный институт': 'Василеостровский',  # строится
+                }
+                metro_lower = target_metro.lower().strip()
+                if metro_lower in METRO_TO_DISTRICT_SPB:
+                    target_district = METRO_TO_DISTRICT_SPB[metro_lower]
+                    logger.info(f"   FALLBACK: Район определён по станции метро '{target_metro}': {target_district}")
+
+            if target_district:
+                logger.info(f"   FALLBACK: Фильтрация по району {target_district}")
+                # Используем _filter_by_district_spb для СПб
+                filtered_by_district = []
+                for r in fallback_source:
+                    result_district = self._extract_district_spb(r.get('address', ''))
+                    if result_district == target_district:
+                        filtered_by_district.append(r)
+                logger.info(f"   FALLBACK: После фильтрации по району: {len(filtered_by_district)} объявлений")
+                if filtered_by_district:
+                    filtered_level1 = filtered_by_district
+            elif target_metro:
+                logger.info(f"   FALLBACK: Район не определён, фильтрация по метро {target_metro}")
+                strict_metro_filtered = []
+                for r in fallback_source:
+                    result_metro_raw = r.get('metro', '')
+                    if isinstance(result_metro_raw, list):
+                        result_metro = ', '.join(result_metro_raw).lower()
+                    else:
+                        result_metro = str(result_metro_raw).lower() if result_metro_raw else ''
+
+                    if result_metro and (target_metro.lower() in result_metro or result_metro in target_metro.lower()):
+                        strict_metro_filtered.append(r)
+                logger.info(f"   FALLBACK: После строгой фильтрации по метро: {len(strict_metro_filtered)} объявлений")
+                if strict_metro_filtered:
                     filtered_level1 = strict_metro_filtered
             else:
                 logger.info(f"   FALLBACK: target_metro пустой, пропускаем фильтрацию")
