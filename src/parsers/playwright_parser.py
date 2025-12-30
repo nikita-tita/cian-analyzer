@@ -1623,9 +1623,11 @@ class PlaywrightParser(BaseCianParser):
         # ═══════════════════════════════════════════════════════════════════════════
         if target_property:
             target_price = target_property.get('price', 0)
-            # Ensure target_price is numeric
+            # Ensure target_price is numeric (may come as string with currency symbols)
             if isinstance(target_price, str):
-                target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 0
+                import re
+                cleaned = re.sub(r'[^\d.,]', '', target_price.replace(',', '.'))
+                target_price = float(cleaned) if cleaned else 0
             target_price = float(target_price) if target_price else 0
 
             target_area = target_property.get('total_area', 0)
@@ -2288,9 +2290,11 @@ class PlaywrightParser(BaseCianParser):
             return []
 
         target_price = target_property.get('price', 100_000_000)
-        # Ensure target_price is numeric
+        # Ensure target_price is numeric (may come as string with currency symbols)
         if isinstance(target_price, str):
-            target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 100_000_000
+            import re
+            cleaned = re.sub(r'[^\d.,]', '', target_price.replace(',', '.'))
+            target_price = float(cleaned) if cleaned else 100_000_000
         target_price = float(target_price) if target_price else 100_000_000
 
         target_area = target_property.get('total_area', 100)
@@ -2611,9 +2615,12 @@ class PlaywrightParser(BaseCianParser):
 
         # Формируем критерии поиска
         target_price = target_property.get('price', 100_000_000)
-        # Ensure target_price is numeric (may come as string from manual input)
+        # Ensure target_price is numeric (may come as string with currency symbols)
         if isinstance(target_price, str):
-            target_price = float(target_price.replace(',', '.').replace(' ', '')) if target_price else 100_000_000
+            import re
+            # Remove all non-numeric chars except dot and comma
+            cleaned = re.sub(r'[^\d.,]', '', target_price.replace(',', '.'))
+            target_price = float(cleaned) if cleaned else 100_000_000
         target_price = float(target_price) if target_price else 100_000_000
 
         target_area = target_property.get('total_area', 100)
