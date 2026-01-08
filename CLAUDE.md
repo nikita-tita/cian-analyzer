@@ -128,6 +128,20 @@ python parsers/cian_parser.py --url "https://cian.ru/..."
 
 ---
 
+## Экосистема Housler
+
+Этот проект — часть экосистемы Housler. Общие сервисы:
+
+| Сервис | Провайдер | Документация |
+|--------|-----------|--------------|
+| **SMS авторизация** | agent.housler.ru (SMS.RU) | [AUTH_API.md](../Desktop/housler_pervichka/docs/SHARED/AUTH_API.md) |
+| **Email авторизация** | agent.housler.ru (Yandex SMTP) | [AUTH_API.md](../Desktop/housler_pervichka/docs/SHARED/AUTH_API.md) |
+| **Сервер** | 95.163.227.26 (reg.ru) | [SERVER_ACCESS.md](../Desktop/housler_pervichka/docs/SHARED/SERVER_ACCESS.md) |
+
+> **Примечание:** housler.ru не использует авторизацию (публичный анализатор).
+
+---
+
 ## Связанные документы
 
 - [housler_pervichka/DEPLOY.md](../Desktop/housler_pervichka/DEPLOY.md) — Главный гайд по серверу
