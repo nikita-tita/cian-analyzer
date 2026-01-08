@@ -64,7 +64,7 @@ Examples:
 
 ## Правила разработки
 
-> **Полные правила:** [SHARED/DEVELOPMENT_RULES.md](../housler_pervichka/docs/SHARED/DEVELOPMENT_RULES.md)
+> **Полные правила:** [SHARED/DEVELOPMENT_RULES.md](../Desktop/housler_pervichka/docs/SHARED/DEVELOPMENT_RULES.md)
 
 ### Кратко
 
@@ -130,8 +130,8 @@ python parsers/cian_parser.py --url "https://cian.ru/..."
 
 ## Связанные документы
 
-- [housler_pervichka/DEPLOY.md](../housler_pervichka/DEPLOY.md) — Главный гайд по серверу
-- [SHARED/](../housler_pervichka/docs/SHARED/) — Общая документация
+- [housler_pervichka/DEPLOY.md](../Desktop/housler_pervichka/DEPLOY.md) — Главный гайд по серверу
+- [SHARED/](../Desktop/housler_pervichka/docs/SHARED/) — Общая документация
 
 ---
 

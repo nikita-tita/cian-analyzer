@@ -15,8 +15,8 @@
 | **URL** | https://housler.ru |
 | **Порт** | 5000 |
 
-> **Главный документ:** [housler_pervichka/DEPLOY.md](../housler_pervichka/DEPLOY.md)
-> **Доступ к серверу:** [SHARED/SERVER_ACCESS.md](../housler_pervichka/docs/SHARED/SERVER_ACCESS.md)
+> **Главный документ:** [housler_pervichka/DEPLOY.md](../Desktop/housler_pervichka/DEPLOY.md)
+> **Доступ к серверу:** [SHARED/SERVER_ACCESS.md](../Desktop/housler_pervichka/docs/SHARED/SERVER_ACCESS.md)
 
 ---
 
@@ -104,8 +104,8 @@ docker restart housler-redis
 
 ## Связанные документы
 
-- [housler_pervichka/DEPLOY.md](../housler_pervichka/DEPLOY.md) — Главный гайд
-- [SHARED/DOCKER_GUIDE.md](../housler_pervichka/docs/SHARED/DOCKER_GUIDE.md) — Docker команды
+- [housler_pervichka/DEPLOY.md](../Desktop/housler_pervichka/DEPLOY.md) — Главный гайд
+- [SHARED/DOCKER_GUIDE.md](../Desktop/housler_pervichka/docs/SHARED/DOCKER_GUIDE.md) — Docker команды
 
 ---
 
